@@ -250,7 +250,7 @@ class LISAChatMonitor {
     if (this.dontAskThisSession) return;
     
     // Show prompt after page loads
-    setTimeout(() => this.promptSave(), 800);
+    setTimeout(() => this.promptSave(), 2000);
   }
 
   isChatUrl(url) {
@@ -258,7 +258,7 @@ class LISAChatMonitor {
       /claude\.ai\/chat\//,
       /chatgpt\.com\/c\//,
       /gemini\.google\.com\/app\//,
-      /grok\.com\/chat\//,
+      /grok\.com\/c\//,
       /chat\.mistral\.ai\/chat\//,
       /chat\.deepseek\.com\/chat\//,
       /copilot\.microsoft\.com\/chats\//,

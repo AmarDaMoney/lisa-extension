@@ -730,4 +730,4 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   }
 });
 
-console.log('[LISA] Core compression engine initialized v0.26');
+console.log('[LISA] Core compression engine initialized v0.27');

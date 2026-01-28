@@ -1,0 +1,95 @@
+{
+  "manifest_version": 3,
+  "name": "LISA Core - AI Memory Library",
+  "version": "0.26",
+  "description": "Semantic compression for AI conversations and web content. Extract from 8+ platforms + any webpage. Premium hashing for integrity verification.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "downloads",
+    "contextMenus",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://gemini.google.com/*",
+    "https://grok.com/*",
+    "https://chat.mistral.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://perplexity.ai/*",
+    "https://api.stripe.com/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "public/icon16.png",
+      "48": "public/icon48.png",
+      "128": "public/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["src/content/claude-parser.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["src/content/chatgpt-parser.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["src/content/gemini-parser.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://grok.com/*"],
+      "js": ["src/content/grok-parser.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.mistral.ai/*"],
+      "js": ["src/content/mistral-parser.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["src/content/deepseek-parser.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://copilot.microsoft.com/*"],
+      "js": ["src/content/copilot-parser.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://perplexity.ai/*"],
+      "js": ["src/content/perplexity-parser.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/universal-parser.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "public/icon16.png",
+    "48": "public/icon48.png",
+    "128": "public/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/popup/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

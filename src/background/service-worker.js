@@ -1,0 +1,539 @@
+// LISA Core - Semantic Compression Engine
+// Background Service Worker (Manifest V3)
+// v0.24 - Fixed context menu handling and error recovery
+
+class LISACompressor {
+  constructor() {
+    this.compressionRatio = null;
+  }
+
+  // Semantic tokenization - identifies key concepts and structures
+  tokenize(text) {
+    const tokens = {
+      entities: this.extractEntities(text),
+      concepts: this.extractConcepts(text),
+      relationships: this.extractRelationships(text),
+      intent: this.extractIntent(text),
+      context: this.extractContext(text)
+    };
+    return tokens;
+  }
+
+  extractEntities(text) {
+    const entities = [];
+    
+    const patterns = {
+      urls: /https?:\/\/[^\s]+/g,
+      emails: /[\w.-]+@[\w.-]+\.\w+/g,
+      mentions: /@\w+/g,
+      hashtags: /#\w+/g,
+      technicalTerms: /\b[A-Z][A-Za-z0-9]+(?:[A-Z][a-z]+)+\b/g,
+      acronyms: /\b[A-Z]{2,}\b/g
+    };
+
+    for (const [type, pattern] of Object.entries(patterns)) {
+      const matches = text.match(pattern) || [];
+      if (matches.length > 0) {
+        entities.push({ type, values: [...new Set(matches)] });
+      }
+    }
+
+    return entities;
+  }
+
+  extractConcepts(text) {
+    const words = text.toLowerCase().split(/\s+/);
+    const stopWords = new Set(['the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but', 'in', 'with', 'to', 'for', 'of', 'as', 'by', 'from']);
+    
+    const wordFreq = {};
+    words.forEach(word => {
+      word = word.replace(/[^\w]/g, '');
+      if (word.length > 3 && !stopWords.has(word)) {
+        wordFreq[word] = (wordFreq[word] || 0) + 1;
+      }
+    });
+
+    const sorted = Object.entries(wordFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+    return sorted.map(([word, freq]) => ({ term: word, weight: freq }));
+  }
+
+  extractRelationships(text) {
+    const relationships = [];
+    
+    const relationPatterns = [
+      { pattern: /(\w+)\s+is\s+(\w+)/gi, type: 'is-a' },
+      { pattern: /(\w+)\s+(?:relates? to|connected to)\s+(\w+)/gi, type: 'relates-to' },
+      { pattern: /(\w+)\s+(?:causes?|leads? to)\s+(\w+)/gi, type: 'causes' }
+    ];
+
+    relationPatterns.forEach(({ pattern, type }) => {
+      const matches = [...text.matchAll(pattern)];
+      matches.forEach(match => {
+        relationships.push({
+          type,
+          subject: match[1],
+          object: match[2]
+        });
+      });
+    });
+
+    return relationships;
+  }
+
+  extractIntent(text) {
+    const intents = {
+      question: /\?|^(?:what|how|why|when|where|who|can|could|would|should)/i.test(text),
+      instruction: /^(?:please|could you|can you|would you|let's|make|create|build)/i.test(text),
+      statement: true,
+      agreement: /^(?:yes|sure|okay|agreed|right|correct)/i.test(text),
+      disagreement: /^(?:no|not|incorrect|wrong|disagree)/i.test(text)
+    };
+
+    return Object.entries(intents)
+      .filter(([, value]) => value)
+      .map(([key]) => key)[0] || 'statement';
+  }
+
+  extractContext(text) {
+    return {
+      hasCode: /```|`\w+`/.test(text),
+      hasUrls: /https?:\/\//.test(text),
+      hasNumbers: /\d+/.test(text),
+      length: text.length,
+      sentences: text.split(/[.!?]+/).length
+    };
+  }
+
+  compress(conversation) {
+    const compressed = {
+      metadata: {
+        lisaVersion: '0.24',
+        platform: conversation.platform,
+        conversationId: conversation.conversationId,
+        originalUrl: conversation.url,
+        compressedAt: new Date().toISOString(),
+        messageCount: conversation.messageCount
+      },
+      semanticTokens: []
+    };
+
+    conversation.messages.forEach(message => {
+      const tokens = this.tokenize(message.content);
+      
+      compressed.semanticTokens.push({
+        role: message.role,
+        index: message.index,
+        tokens: tokens,
+        summary: this.summarize(message.content),
+        originalLength: message.content.length
+      });
+    });
+
+    const originalSize = JSON.stringify(conversation).length;
+    const compressedSize = JSON.stringify(compressed).length;
+    compressed.metadata.compressionRatio = (originalSize / compressedSize).toFixed(2);
+
+    return compressed;
+  }
+
+  summarize(text) {
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    
+    if (sentences.length <= 2) {
+      return text;
+    }
+
+    return `${sentences[0]}... ${sentences[sentences.length - 1]}`;
+  }
+
+  reconstruct(compressed) {
+    const messages = compressed.semanticTokens.map(token => {
+      let content = token.summary;
+      
+      if (token.tokens.entities) {
+        token.tokens.entities.forEach(entity => {
+          content += `\n[${entity.type}: ${entity.values.join(', ')}]`;
+        });
+      }
+
+      return {
+        role: token.role,
+        content: content,
+        reconstructed: true
+      };
+    });
+
+    return {
+      platform: compressed.metadata.platform,
+      conversationId: compressed.metadata.conversationId,
+      messages: messages,
+      metadata: {
+        originalUrl: compressed.metadata.originalUrl,
+        reconstructedAt: new Date().toISOString(),
+        compressionRatio: compressed.metadata.compressionRatio
+      }
+    };
+  }
+}
+
+class LISAHasher {
+  constructor() {
+    this.algorithm = 'SHA-256';
+  }
+
+  async generateHash(compressedData) {
+    const dataString = JSON.stringify(compressedData);
+    const encoder = new TextEncoder();
+    const data = encoder.encode(dataString);
+
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    return {
+      hash: hashHex,
+      algorithm: this.algorithm,
+      generatedAt: new Date().toISOString(),
+      dataSize: dataString.length
+    };
+  }
+
+  async verify(compressedData, expectedHash) {
+    const generated = await this.generateHash(compressedData);
+    return generated.hash === expectedHash;
+  }
+}
+
+// Initialize engines
+const compressor = new LISACompressor();
+const hasher = new LISAHasher();
+
+// Track ready content scripts
+const readyTabs = new Map();
+
+// ============================================
+// MESSAGE HANDLERS
+// ============================================
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Handle parser ready signals
+  if (request.action === 'parserReady') {
+    if (sender.tab) {
+      readyTabs.set(sender.tab.id, {
+        platform: request.platform,
+        timestamp: Date.now()
+      });
+      console.log(`[LISA] Parser ready on tab ${sender.tab.id}: ${request.platform}`);
+    }
+    sendResponse({ success: true });
+    return false;
+  }
+
+  // Handle compression
+  if (request.action === 'compress') {
+    try {
+      const compressed = compressor.compress(request.data);
+      sendResponse({ success: true, compressed });
+    } catch (error) {
+      console.error('[LISA] Compression error:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+    return false;
+  }
+  
+  // Handle reconstruction
+  if (request.action === 'reconstruct') {
+    try {
+      const reconstructed = compressor.reconstruct(request.data);
+      sendResponse({ success: true, reconstructed });
+    } catch (error) {
+      console.error('[LISA] Reconstruction error:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+    return false;
+  }
+  
+  // Handle hash generation (async)
+  if (request.action === 'generateHash') {
+    hasher.generateHash(request.data).then(hashData => {
+      sendResponse({ success: true, hashData });
+    }).catch(error => {
+      console.error('[LISA] Hash generation error:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    return true; // Keep channel open for async
+  }
+  
+  // Handle hash verification (async)
+  if (request.action === 'verifyHash') {
+    hasher.verify(request.data, request.hash).then(isValid => {
+      sendResponse({ success: true, isValid });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+  
+  // Handle selected text compression
+  if (request.action === 'compressSelectedText') {
+    try {
+      const snippet = {
+        platform: 'text-selection',
+        conversationId: 'snippet-' + Date.now(),
+        url: request.url,
+        title: request.title,
+        extractedAt: new Date().toISOString(),
+        messageCount: 1,
+        messages: [{
+          role: 'text-snippet',
+          content: request.text,
+          index: 0,
+          timestamp: new Date().toISOString()
+        }]
+      };
+      
+      const compressed = compressor.compress(snippet);
+      sendResponse({ success: true, compressed });
+    } catch (error) {
+      sendResponse({ success: false, error: error.message });
+    }
+    return false;
+  }
+
+  // Handle analytics tracking
+  if (request.action === 'trackEvent') {
+    console.log('[LISA] Event:', request.event, request.data);
+    // Future: send to analytics backend
+    sendResponse({ success: true });
+    return false;
+  }
+  
+  return false;
+});
+
+// ============================================
+// CONTEXT MENU SETUP
+// ============================================
+
+function createContextMenus() {
+  // Remove existing menus first to avoid duplicates
+  chrome.contextMenus.removeAll(() => {
+    // Export selected text to LISA Core
+    chrome.contextMenus.create({
+      id: 'export-selection',
+      title: '📤 Export Selection to LISA Core',
+      contexts: ['selection']
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[LISA] Failed to create export-selection menu:', chrome.runtime.lastError);
+      }
+    });
+    
+    console.log('[LISA] Context menus created');
+  });
+}
+
+// Create menus on install/update
+chrome.runtime.onInstalled.addListener((details) => {
+  console.log('[LISA] Extension installed/updated:', details.reason);
+  createContextMenus();
+});
+
+// Also create menus on service worker startup (in case of restart)
+chrome.runtime.onStartup.addListener(() => {
+  console.log('[LISA] Service worker started');
+  createContextMenus();
+});
+
+// ============================================
+// CONTEXT MENU CLICK HANDLERS
+// ============================================
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (!tab || !tab.id) {
+    console.error('[LISA] No valid tab for context menu action');
+    showNotification('Error', '❌ No active tab found');
+    return;
+  }
+
+  if (info.menuItemId === 'export-selection') {
+    await handleExportSelection(info, tab);
+  }
+});
+
+async function handleExportSelection(info, tab) {
+  try {
+    const selectedText = info.selectionText;
+    
+    if (!selectedText || selectedText.trim().length === 0) {
+      showNotification('LISA Core', '❌ No text selected');
+      return;
+    }
+    
+    // Create snippet data
+    const snippet = {
+      platform: 'text-selection',
+      conversationId: 'snippet-' + Date.now(),
+      url: info.pageUrl,
+      title: tab.title || 'Selected Text',
+      extractedAt: new Date().toISOString(),
+      messageCount: 1,
+      messages: [{
+        role: 'text-snippet',
+        content: selectedText,
+        index: 0,
+        timestamp: new Date().toISOString()
+      }]
+    };
+    
+    const compressed = compressor.compress(snippet);
+    
+    // Download with Save As dialog
+    await downloadCompressedData(compressed, 'snippet');
+    
+    // Show notification
+    showNotification('LISA Core', `✅ Selection saved! ${selectedText.length} chars → ${compressed.metadata.compressionRatio}:1 ratio`);
+    
+  } catch (error) {
+    console.error('[LISA] Export selection error:', error);
+    showNotification('LISA Core', `❌ Failed: ${error.message}`);
+  }
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+async function ensureContentScriptLoaded(tab) {
+  // Check if parser is already ready for this tab
+  const tabInfo = readyTabs.get(tab.id);
+  if (tabInfo && (Date.now() - tabInfo.timestamp) < 300000) { // 5 min cache
+    return true;
+  }
+  
+  // Try to inject the appropriate content script
+  try {
+    // First try sending a ping
+    const pingResponse = await sendMessageWithTimeout(tab.id, { action: 'ping' }, 1000).catch(() => null);
+    if (pingResponse) {
+      return true;
+    }
+    
+    // Determine which script to inject based on URL
+    const url = tab.url || '';
+    let scriptFile = 'src/content/universal-parser.js';
+    
+    if (url.includes('claude.ai')) scriptFile = 'src/content/claude-parser.js';
+    else if (url.includes('chatgpt.com')) scriptFile = 'src/content/chatgpt-parser.js';
+    else if (url.includes('gemini.google.com')) scriptFile = 'src/content/gemini-parser.js';
+    else if (url.includes('grok.com')) scriptFile = 'src/content/grok-parser.js';
+    else if (url.includes('chat.mistral.ai')) scriptFile = 'src/content/mistral-parser.js';
+    else if (url.includes('chat.deepseek.com')) scriptFile = 'src/content/deepseek-parser.js';
+    else if (url.includes('copilot.microsoft.com')) scriptFile = 'src/content/copilot-parser.js';
+    else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
+    
+    // Inject the script
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: [scriptFile]
+    });
+    
+    // Wait a moment for script to initialize
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return true;
+  } catch (error) {
+    console.error('[LISA] Failed to inject content script:', error);
+    throw new Error('Cannot access this page. Try refreshing.');
+  }
+}
+
+function sendMessageWithTimeout(tabId, message, timeout = 5000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Request timed out'));
+    }, timeout);
+    
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      clearTimeout(timer);
+      
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else {
+        resolve(response);
+      }
+    });
+  });
+}
+
+async function downloadCompressedData(compressed, prefix = null) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const platform = (compressed.metadata.platform || 'unknown').replace(/[.\s()]/g, '-');
+  const filePrefix = prefix || platform;
+  const filename = `lisa-${filePrefix}-${timestamp}.json`;
+  
+  const dataStr = JSON.stringify(compressed, null, 2);
+  
+  // Try blob URL first, fall back to data URL if needed
+  let downloadUrl;
+  let needsRevoke = false;
+  
+  try {
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    downloadUrl = URL.createObjectURL(dataBlob);
+    needsRevoke = true;
+  } catch (blobError) {
+    console.warn('[LISA] Blob URL failed, using data URL:', blobError);
+    // Fallback to data URL
+    downloadUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+  }
+  
+  return new Promise((resolve, reject) => {
+    chrome.downloads.download({
+      url: downloadUrl,
+      filename: filename,
+      saveAs: true
+    }, (downloadId) => {
+      if (needsRevoke) {
+        try { URL.revokeObjectURL(downloadUrl); } catch (e) { /* ignore */ }
+      }
+      
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else if (downloadId) {
+        resolve(downloadId);
+      } else {
+        reject(new Error('Download failed'));
+      }
+    });
+  });
+}
+
+function showNotification(title, message) {
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: '/public/icon48.png',
+    title: title,
+    message: message
+  });
+}
+
+// Clean up old tab entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [tabId, info] of readyTabs.entries()) {
+    if (now - info.timestamp > 600000) { // 10 minutes
+      readyTabs.delete(tabId);
+    }
+  }
+}, 60000);
+
+// Clean up when tabs are closed
+chrome.tabs.onRemoved.addListener((tabId) => {
+  readyTabs.delete(tabId);
+});
+
+console.log('[LISA] Core compression engine initialized v0.24');

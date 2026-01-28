@@ -424,18 +424,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     })();
     return true; // Keep channel open for async
   }
-
-        // Save snapshot
-        const snapshot = await snapshotManager.saveSnapshot(extractResponse.data, 'floating-button');
-        sendResponse({ success: true, snapshot });
-        
-      } catch (error) {
-        console.error('[LISA] Extract and save error:', error);
-        sendResponse({ success: false, error: error.message });
-      }
-    })();
-    return true; // Keep channel open for async
-  }
   
   // Handle snapshot operations
   if (request.action === 'getSnapshots') {

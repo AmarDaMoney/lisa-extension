@@ -1293,6 +1293,7 @@ input:checked + .toggle-slider:before {
 .snapshot-btn.delete:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
+  
 }
 /* Settings Group */
 .settings-group {

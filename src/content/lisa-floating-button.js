@@ -15,7 +15,6 @@ class LISAFloatingButton {
       
       if (this.isPremium) {
         this.createButton();
-        this.setupBeforeUnload();
       }
     } catch (error) {
       console.log('[LISA] Could not check premium status');
@@ -83,7 +82,7 @@ class LISAFloatingButton {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      .lisa-save-modal {
+      .lisa-switch-modal {
         position: fixed;
         inset: 0;
         background: rgba(0,0,0,0.5);
@@ -114,7 +113,22 @@ class LISAFloatingButton {
       .lisa-modal-text {
         font-size: 14px;
         color: #6b7280;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
+      }
+      .lisa-checkbox {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #6b7280;
+        margin-bottom: 16px;
+        cursor: pointer;
+      }
+      .lisa-checkbox input {
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
       }
       .lisa-modal-buttons {
         display: flex;
@@ -181,51 +195,8 @@ class LISAFloatingButton {
       setTimeout(() => toast.remove(), 3000);
     }
   }
-
-  setupBeforeUnload() {
-    let hasUnsaved = true;
-    
-    window.addEventListener('beforeunload', (e) => {
-      if (hasUnsaved && this.isPremium) {
-        // Show custom modal instead of browser default
-        this.showSaveModal();
-        // Note: Modern browsers limit beforeunload, so we also track via background
-        chrome.runtime.sendMessage({ 
-          action: 'tabClosing',
-          url: window.location.href
-        });
-      }
-    });
-  }
-
-  showSaveModal() {
-    if (document.querySelector('.lisa-save-modal')) return;
-
-    const modal = document.createElement('div');
-    modal.className = 'lisa-save-modal';
-    modal.innerHTML = `
-      <div class="lisa-modal-content">
-        <div class="lisa-modal-title">💾 Save before leaving?</div>
-        <div class="lisa-modal-text">This conversation hasn't been saved to your LISA library.</div>
-        <div class="lisa-modal-buttons">
-          <button class="lisa-modal-btn secondary" id="lisa-skip">Just Leave</button>
-          <button class="lisa-modal-btn primary" id="lisa-save">Save & Leave</button>
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    modal.querySelector('#lisa-skip').addEventListener('click', () => {
-      modal.remove();
-    });
-
-    modal.querySelector('#lisa-save').addEventListener('click', async () => {
-      await this.saveConversation();
-      modal.remove();
-    });
-  }
 }
+
 // ============================================
 // CHAT CHANGE DETECTION
 // ============================================
@@ -234,55 +205,55 @@ class LISAChatMonitor {
   constructor(floatingButton) {
     this.fab = floatingButton;
     this.lastUrl = window.location.href;
+    this.lastPath = new URL(window.location.href).pathname;
     this.dontAskThisSession = false;
-    this.minMessages = 3;
     this.init();
   }
 
   async init() {
-    // Check if feature is enabled
-    const result = await chrome.storage.sync.get(['askOnChatSwitch']);
-    this.enabled = result.askOnChatSwitch !== false; // Default ON
+    const result = await chrome.storage.sync.get(['askOnChatSwitch', 'userTier']);
+    this.enabled = result.askOnChatSwitch !== false;
+    const isPremium = result.userTier === 'premium';
     
-    if (this.enabled && this.fab.isPremium) {
+    if (this.enabled && isPremium) {
       this.startMonitoring();
     }
   }
 
   startMonitoring() {
-    // Check URL every 500ms
     setInterval(() => this.checkUrlChange(), 500);
     console.log('[LISA] Chat monitor started');
   }
 
- async checkUrlChange() {
+  checkUrlChange() {
     const currentUrl = window.location.href;
+    const currentPath = new URL(currentUrl).pathname;
     
-    // Skip if same URL or just a hash change
+    // Skip if same URL
     if (currentUrl === this.lastUrl) return;
     
-    // Skip if only hash/query changed (not a real chat switch)
-    const oldPath = new URL(this.lastUrl).pathname;
-    const newPath = new URL(currentUrl).pathname;
-    if (oldPath === newPath) {
+    // Skip if same path (refresh, hash change, query change)
+    if (currentPath === this.lastPath) {
       this.lastUrl = currentUrl;
       return;
     }
     
-    const oldUrl = this.lastUrl;
+    // Update tracking
+    const wasChat = this.isChatUrl(this.lastUrl);
     this.lastUrl = currentUrl;
+    this.lastPath = currentPath;
     
-    // Don't ask if user disabled for this session
+    // Skip if wasn't in a chat before
+    if (!wasChat) return;
+    
+    // Skip if disabled
     if (this.dontAskThisSession) return;
     
-    // Check if old URL was a chat (not homepage/settings)
-    if (this.isChatUrl(oldUrl)) {
-      await this.promptSave(oldUrl);
-    }
+    // Show prompt after page loads
+    setTimeout(() => this.promptSave(), 800);
   }
 
   isChatUrl(url) {
-    // Check if URL looks like a conversation
     const chatPatterns = [
       /claude\.ai\/chat\//,
       /chatgpt\.com\/c\//,
@@ -296,16 +267,15 @@ class LISAChatMonitor {
     return chatPatterns.some(pattern => pattern.test(url));
   }
 
-  async promptSave(oldUrl) {
-    // Check if modal already showing
+  promptSave() {
     if (document.querySelector('.lisa-switch-modal')) return;
 
     const modal = document.createElement('div');
     modal.className = 'lisa-switch-modal';
     modal.innerHTML = `
       <div class="lisa-modal-content">
-        <div class="lisa-modal-title">💾 Save previous chat?</div>
-        <div class="lisa-modal-text">You switched conversations. Save the previous one to your LISA library?</div>
+        <div class="lisa-modal-title">💾 Save this conversation?</div>
+        <div class="lisa-modal-text">Save the current conversation to your LISA library?</div>
         <label class="lisa-checkbox">
           <input type="checkbox" id="lisa-dont-ask">
           <span>Don't ask again this session</span>
@@ -316,39 +286,6 @@ class LISAChatMonitor {
         </div>
       </div>
     `;
-
-    // Add checkbox style if not exists
-    if (!document.querySelector('#lisa-checkbox-style')) {
-      const style = document.createElement('style');
-      style.id = 'lisa-checkbox-style';
-      style.textContent = `
-        .lisa-switch-modal {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 100001;
-          animation: lisa-fade-in 0.2s ease;
-        }
-        .lisa-checkbox {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 13px;
-          color: #6b7280;
-          margin-bottom: 16px;
-          cursor: pointer;
-        }
-        .lisa-checkbox input {
-          width: 16px;
-          height: 16px;
-          cursor: pointer;
-        }
-      `;
-      document.head.appendChild(style);
-    }
 
     document.body.appendChild(modal);
 
@@ -363,11 +300,14 @@ class LISAChatMonitor {
       if (modal.querySelector('#lisa-dont-ask').checked) {
         this.dontAskThisSession = true;
       }
-      await this.fab.saveConversation();
       modal.remove();
+      if (this.fab) {
+        await this.fab.saveConversation();
+      }
     });
   }
 }
+
 // Initialize when DOM is ready
 let floatingButton;
 if (document.readyState === 'loading') {

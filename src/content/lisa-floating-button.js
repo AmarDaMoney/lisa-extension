@@ -255,20 +255,29 @@ class LISAChatMonitor {
     console.log('[LISA] Chat monitor started');
   }
 
-  async checkUrlChange() {
+ async checkUrlChange() {
     const currentUrl = window.location.href;
     
-    if (currentUrl !== this.lastUrl) {
-      const oldUrl = this.lastUrl;
+    // Skip if same URL or just a hash change
+    if (currentUrl === this.lastUrl) return;
+    
+    // Skip if only hash/query changed (not a real chat switch)
+    const oldPath = new URL(this.lastUrl).pathname;
+    const newPath = new URL(currentUrl).pathname;
+    if (oldPath === newPath) {
       this.lastUrl = currentUrl;
-      
-      // Don't ask if user disabled for this session
-      if (this.dontAskThisSession) return;
-      
-      // Check if old URL was a chat (not homepage/settings)
-      if (this.isChatUrl(oldUrl)) {
-        await this.promptSave(oldUrl);
-      }
+      return;
+    }
+    
+    const oldUrl = this.lastUrl;
+    this.lastUrl = currentUrl;
+    
+    // Don't ask if user disabled for this session
+    if (this.dontAskThisSession) return;
+    
+    // Check if old URL was a chat (not homepage/settings)
+    if (this.isChatUrl(oldUrl)) {
+      await this.promptSave(oldUrl);
     }
   }
 

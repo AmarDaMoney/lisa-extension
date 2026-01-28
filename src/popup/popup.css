@@ -1276,6 +1276,14 @@ input:checked + .toggle-slider:before {
 .snapshot-btn.send:hover {
   background: var(--primary-dark);
 }
+.snapshot-btn.download {
+  background: var(--primary);
+  color: white;
+}
+
+.snapshot-btn.download:hover {
+  background: var(--primary-dark);
+}
 
 .snapshot-btn.delete {
   background: transparent;

@@ -808,6 +808,7 @@ class LISAPopup {
           <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)}</div>
         </div>
         <div class="snapshot-actions">
+          <button class="snapshot-btn download" data-id="${snap.id}" title="Download JSON">💾</button>
           <button class="snapshot-btn send" data-id="${snap.id}" title="Send to App">📤</button>
           <button class="snapshot-btn delete" data-id="${snap.id}" title="Delete">🗑️</button>
         </div>
@@ -815,6 +816,10 @@ class LISAPopup {
     `).join('');
 
     // Add event listeners
+    container.querySelectorAll('.snapshot-btn.download').forEach(btn => {
+      btn.addEventListener('click', (e) => this.downloadSnapshot(e.target.dataset.id));
+    });
+
     container.querySelectorAll('.snapshot-btn.send').forEach(btn => {
       btn.addEventListener('click', (e) => this.sendSnapshotToApp(e.target.dataset.id));
     });
@@ -870,6 +875,35 @@ class LISAPopup {
     });
   }
 
+  async downloadSnapshot(id) {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
+      const snapshot = response.snapshots.find(s => s.id === id);
+      
+      if (!snapshot) {
+        alert('Snapshot not found');
+        return;
+      }
+
+      // Create downloadable JSON
+      const data = snapshot.raw || snapshot;
+      const jsonStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lisa-${snapshot.platform}-${snapshot.id}.json`;
+      a.click();
+      
+      URL.revokeObjectURL(url);
+      this.trackEvent('snapshot_downloaded', { platform: snapshot.platform });
+    } catch (error) {
+      console.error('[LISA] Failed to download snapshot:', error);
+      alert('Failed to download');
+    }
+  }
+  
   async sendSnapshotToApp(id) {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });

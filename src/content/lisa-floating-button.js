@@ -226,10 +226,147 @@ class LISAFloatingButton {
     });
   }
 }
+// ============================================
+// CHAT CHANGE DETECTION
+// ============================================
 
+class LISAChatMonitor {
+  constructor(floatingButton) {
+    this.fab = floatingButton;
+    this.lastUrl = window.location.href;
+    this.dontAskThisSession = false;
+    this.minMessages = 3;
+    this.init();
+  }
+
+  async init() {
+    // Check if feature is enabled
+    const result = await chrome.storage.sync.get(['askOnChatSwitch']);
+    this.enabled = result.askOnChatSwitch !== false; // Default ON
+    
+    if (this.enabled && this.fab.isPremium) {
+      this.startMonitoring();
+    }
+  }
+
+  startMonitoring() {
+    // Check URL every 500ms
+    setInterval(() => this.checkUrlChange(), 500);
+    console.log('[LISA] Chat monitor started');
+  }
+
+  async checkUrlChange() {
+    const currentUrl = window.location.href;
+    
+    if (currentUrl !== this.lastUrl) {
+      const oldUrl = this.lastUrl;
+      this.lastUrl = currentUrl;
+      
+      // Don't ask if user disabled for this session
+      if (this.dontAskThisSession) return;
+      
+      // Check if old URL was a chat (not homepage/settings)
+      if (this.isChatUrl(oldUrl)) {
+        await this.promptSave(oldUrl);
+      }
+    }
+  }
+
+  isChatUrl(url) {
+    // Check if URL looks like a conversation
+    const chatPatterns = [
+      /claude\.ai\/chat\//,
+      /chatgpt\.com\/c\//,
+      /gemini\.google\.com\/app\//,
+      /grok\.com\/chat\//,
+      /chat\.mistral\.ai\/chat\//,
+      /chat\.deepseek\.com\/chat\//,
+      /copilot\.microsoft\.com\/chats\//,
+      /perplexity\.ai\/search\//
+    ];
+    return chatPatterns.some(pattern => pattern.test(url));
+  }
+
+  async promptSave(oldUrl) {
+    // Check if modal already showing
+    if (document.querySelector('.lisa-switch-modal')) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'lisa-switch-modal';
+    modal.innerHTML = `
+      <div class="lisa-modal-content">
+        <div class="lisa-modal-title">💾 Save previous chat?</div>
+        <div class="lisa-modal-text">You switched conversations. Save the previous one to your LISA library?</div>
+        <label class="lisa-checkbox">
+          <input type="checkbox" id="lisa-dont-ask">
+          <span>Don't ask again this session</span>
+        </label>
+        <div class="lisa-modal-buttons">
+          <button class="lisa-modal-btn secondary" id="lisa-skip-switch">Skip</button>
+          <button class="lisa-modal-btn primary" id="lisa-save-switch">Save</button>
+        </div>
+      </div>
+    `;
+
+    // Add checkbox style if not exists
+    if (!document.querySelector('#lisa-checkbox-style')) {
+      const style = document.createElement('style');
+      style.id = 'lisa-checkbox-style';
+      style.textContent = `
+        .lisa-switch-modal {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100001;
+          animation: lisa-fade-in 0.2s ease;
+        }
+        .lisa-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          color: #6b7280;
+          margin-bottom: 16px;
+          cursor: pointer;
+        }
+        .lisa-checkbox input {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('#lisa-skip-switch').addEventListener('click', () => {
+      if (modal.querySelector('#lisa-dont-ask').checked) {
+        this.dontAskThisSession = true;
+      }
+      modal.remove();
+    });
+
+    modal.querySelector('#lisa-save-switch').addEventListener('click', async () => {
+      if (modal.querySelector('#lisa-dont-ask').checked) {
+        this.dontAskThisSession = true;
+      }
+      await this.fab.saveConversation();
+      modal.remove();
+    });
+  }
+}
 // Initialize when DOM is ready
+let floatingButton;
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new LISAFloatingButton());
+  document.addEventListener('DOMContentLoaded', () => {
+    floatingButton = new LISAFloatingButton();
+    new LISAChatMonitor(floatingButton);
+  });
 } else {
-  new LISAFloatingButton();
+  floatingButton = new LISAFloatingButton();
+  new LISAChatMonitor(floatingButton);
 }

@@ -211,6 +211,84 @@ class LISAHasher {
 const compressor = new LISACompressor();
 const hasher = new LISAHasher();
 
+// ============================================
+// AUTO-SNAPSHOT MANAGER
+// ============================================
+
+class SnapshotManager {
+  constructor() {
+    this.MAX_SNAPSHOTS = 20;
+    this.STORAGE_KEY = 'lisaSnapshots';
+    this.SETTINGS_KEY = 'lisaAutoSaveSettings';
+  }
+
+  async isAutoSaveEnabled() {
+    const data = await chrome.storage.sync.get(this.SETTINGS_KEY);
+    const settings = data[this.SETTINGS_KEY] || { enabled: true };
+    return settings.enabled;
+  }
+
+  async setAutoSaveEnabled(enabled) {
+    await chrome.storage.sync.set({ [this.SETTINGS_KEY]: { enabled } });
+  }
+
+  async saveSnapshot(conversation, source = 'auto') {
+    try {
+      // Store RAW conversation (not compressed) so App can compress with user's settings
+      const snapshot = {
+        id: 'snap-' + Date.now(),
+        platform: conversation.platform,
+        url: conversation.url,
+        title: conversation.title || 'Untitled',
+        messageCount: conversation.messageCount,
+        savedAt: new Date().toISOString(),
+        source: source,
+        raw: conversation // Store full raw conversation
+      };
+
+      const data = await chrome.storage.local.get(this.STORAGE_KEY);
+      const snapshots = data[this.STORAGE_KEY] || [];
+
+      snapshots.unshift(snapshot);
+
+      if (snapshots.length > this.MAX_SNAPSHOTS) {
+        snapshots.length = this.MAX_SNAPSHOTS;
+      }
+
+      await chrome.storage.local.set({ [this.STORAGE_KEY]: snapshots });
+
+      console.log(`[LISA] Snapshot saved: ${snapshot.platform} - ${snapshot.title}`);
+      return snapshot;
+    } catch (error) {
+      console.error('[LISA] Failed to save snapshot:', error);
+      throw error;
+    }
+  }
+
+  async getSnapshots() {
+    const data = await chrome.storage.local.get(this.STORAGE_KEY);
+    return data[this.STORAGE_KEY] || [];
+  }
+
+  async getSnapshot(id) {
+    const snapshots = await this.getSnapshots();
+    return snapshots.find(s => s.id === id);
+  }
+
+  async deleteSnapshot(id) {
+    const data = await chrome.storage.local.get(this.STORAGE_KEY);
+    const snapshots = data[this.STORAGE_KEY] || [];
+    const filtered = snapshots.filter(s => s.id !== id);
+    await chrome.storage.local.set({ [this.STORAGE_KEY]: filtered });
+  }
+
+  async clearAllSnapshots() {
+    await chrome.storage.local.remove(this.STORAGE_KEY);
+  }
+}
+
+const snapshotManager = new SnapshotManager();
+
 // Track ready content scripts
 const readyTabs = new Map();
 
@@ -303,6 +381,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  // Handle snapshot operations
+  if (request.action === 'getSnapshots') {
+    snapshotManager.getSnapshots().then(snapshots => {
+      sendResponse({ success: true, snapshots });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+
+  if (request.action === 'deleteSnapshot') {
+    snapshotManager.deleteSnapshot(request.id).then(() => {
+      sendResponse({ success: true });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+
+  if (request.action === 'clearSnapshots') {
+    snapshotManager.clearAllSnapshots().then(() => {
+      sendResponse({ success: true });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+
+  if (request.action === 'getAutoSaveEnabled') {
+    snapshotManager.isAutoSaveEnabled().then(enabled => {
+      sendResponse({ success: true, enabled });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+
+  if (request.action === 'setAutoSaveEnabled') {
+    snapshotManager.setAutoSaveEnabled(request.enabled).then(() => {
+      sendResponse({ success: true });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+  
   // Handle analytics tracking
   if (request.action === 'trackEvent') {
     console.log('[LISA] Event:', request.event, request.data);
@@ -531,9 +655,79 @@ setInterval(() => {
   }
 }, 60000);
 
-// Clean up when tabs are closed
-chrome.tabs.onRemoved.addListener((tabId) => {
-  readyTabs.delete(tabId);
+// ============================================
+// AUTO-SNAPSHOT ON TAB CLOSE
+// ============================================
+
+// Track tabs with AI platforms for auto-save
+const aiPlatformTabs = new Map();
+
+// Detect when user navigates to AI platform
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    const aiPlatforms = [
+      'claude.ai',
+      'chatgpt.com',
+      'gemini.google.com',
+      'grok.com',
+      'chat.mistral.ai',
+      'chat.deepseek.com',
+      'copilot.microsoft.com',
+      'perplexity.ai'
+    ];
+    
+    const isAIPlatform = aiPlatforms.some(p => tab.url.includes(p));
+    
+    if (isAIPlatform) {
+      aiPlatformTabs.set(tabId, {
+        url: tab.url,
+        title: tab.title,
+        platform: aiPlatforms.find(p => tab.url.includes(p)),
+        lastSeen: Date.now()
+      });
+    }
+  }
 });
 
-console.log('[LISA] Core compression engine initialized v0.24');
+// Auto-save when AI platform tab is closed
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  readyTabs.delete(tabId);
+  
+  const tabInfo = aiPlatformTabs.get(tabId);
+  if (!tabInfo) return;
+  
+  aiPlatformTabs.delete(tabId);
+  
+  // Check if auto-save is enabled
+  const autoSaveEnabled = await snapshotManager.isAutoSaveEnabled();
+  if (!autoSaveEnabled) {
+    console.log('[LISA] Auto-save disabled, skipping snapshot');
+    return;
+  }
+  
+  try {
+    // Try to get conversation from the tab before it fully closes
+    // Note: This may not always work if tab is already gone
+    console.log(`[LISA] Tab closed: ${tabInfo.platform} - attempting auto-save`);
+    
+    // Since tab is closing, we save what we tracked
+    // Full extraction would need to happen BEFORE close (future enhancement)
+    const snapshot = {
+      platform: tabInfo.platform,
+      url: tabInfo.url,
+      title: tabInfo.title,
+      messageCount: 0,
+      messages: [],
+      extractedAt: new Date().toISOString(),
+      note: 'Tab closed - metadata only. Use manual export for full conversation.'
+    };
+    
+    await snapshotManager.saveSnapshot(snapshot, 'auto-close');
+    showNotification('LISA Auto-Save', `📸 Saved: ${tabInfo.title || tabInfo.platform}`);
+    
+  } catch (error) {
+    console.error('[LISA] Auto-save failed:', error);
+  }
+});
+
+console.log('[LISA] Core compression engine initialized v0.26');

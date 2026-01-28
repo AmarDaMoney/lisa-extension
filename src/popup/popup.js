@@ -20,6 +20,8 @@ class LISAPopup {
     this.setupUI();
     this.detectPlatform();
     this.setupEventListeners();
+    this.loadSnapshots();
+    this.setupAutoSaveToggle();
   }
 
   async loadUsageStats() {
@@ -775,6 +777,133 @@ class LISAPopup {
     }
   }
 
+  // ============================================
+  // SNAPSHOTS METHODS
+  // ============================================
+
+  async loadSnapshots() {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
+      if (response.success) {
+        this.renderSnapshots(response.snapshots);
+      }
+    } catch (error) {
+      console.error('[LISA] Failed to load snapshots:', error);
+    }
+  }
+
+  renderSnapshots(snapshots) {
+    const container = document.getElementById('snapshotsList');
+    
+    if (!snapshots || snapshots.length === 0) {
+      container.innerHTML = '<p class="empty-state">No snapshots yet. Close an AI chat tab to auto-save.</p>';
+      return;
+    }
+
+    container.innerHTML = snapshots.map(snap => `
+      <div class="snapshot-item" data-id="${snap.id}">
+        <div class="snapshot-info">
+          <div class="snapshot-title">${this.escapeHtml(snap.title || snap.platform)}</div>
+          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)}</div>
+        </div>
+        <div class="snapshot-actions">
+          <button class="snapshot-btn send" data-id="${snap.id}" title="Send to App">📤</button>
+          <button class="snapshot-btn delete" data-id="${snap.id}" title="Delete">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+
+    // Add event listeners
+    container.querySelectorAll('.snapshot-btn.send').forEach(btn => {
+      btn.addEventListener('click', (e) => this.sendSnapshotToApp(e.target.dataset.id));
+    });
+
+    container.querySelectorAll('.snapshot-btn.delete').forEach(btn => {
+      btn.addEventListener('click', (e) => this.deleteSnapshot(e.target.dataset.id));
+    });
+  }
+
+  async setupAutoSaveToggle() {
+    const toggle = document.getElementById('autoSaveToggle');
+    
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getAutoSaveEnabled' });
+      if (response.success) {
+        toggle.checked = response.enabled;
+      }
+    } catch (error) {
+      console.error('[LISA] Failed to get auto-save status:', error);
+    }
+
+    toggle.addEventListener('change', async () => {
+      try {
+        await chrome.runtime.sendMessage({ 
+          action: 'setAutoSaveEnabled', 
+          enabled: toggle.checked 
+        });
+        this.trackEvent('auto_save_toggled', { enabled: toggle.checked });
+      } catch (error) {
+        console.error('[LISA] Failed to set auto-save:', error);
+      }
+    });
+  }
+
+  async sendSnapshotToApp(id) {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
+      const snapshot = response.snapshots.find(s => s.id === id);
+      
+      if (!snapshot) {
+        alert('Snapshot not found');
+        return;
+      }
+
+      // Open App with snapshot data in URL (base64 encoded for short ones)
+      // For longer ones, use localStorage handoff
+      const appUrl = 'https://lisa-web-backend-production.up.railway.app';
+      
+      // Store in extension storage for App to retrieve
+      await chrome.storage.local.set({ pendingSnapshot: snapshot });
+      
+      // Open App
+      chrome.tabs.create({ url: `${appUrl}?import=extension` });
+      
+      this.trackEvent('snapshot_sent_to_app', { platform: snapshot.platform });
+    } catch (error) {
+      console.error('[LISA] Failed to send snapshot:', error);
+      alert('Failed to send to App');
+    }
+  }
+
+  async deleteSnapshot(id) {
+    if (!confirm('Delete this snapshot?')) return;
+    
+    try {
+      await chrome.runtime.sendMessage({ action: 'deleteSnapshot', id });
+      this.loadSnapshots(); // Refresh list
+      this.trackEvent('snapshot_deleted');
+    } catch (error) {
+      console.error('[LISA] Failed to delete snapshot:', error);
+    }
+  }
+
+  formatTimeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
   openFeedback() {
     chrome.tabs.create({ url: 'https://sat-chain.com/lisa-feedback' });
   }

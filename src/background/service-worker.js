@@ -381,6 +381,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  // Handle floating button save
+  if (request.action === 'extractAndSave') {
+    (async () => {
+      try {
+        // Get the active tab
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab) {
+          sendResponse({ success: false, error: 'No active tab' });
+          return;
+        }
+
+        // Extract conversation from the tab
+        const extractResponse = await chrome.tabs.sendMessage(tab.id, { action: 'extractConversation' });
+        
+        if (!extractResponse || !extractResponse.success) {
+          sendResponse({ success: false, error: extractResponse?.error || 'Extraction failed' });
+          return;
+        }
+
+        // Save snapshot
+        const snapshot = await snapshotManager.saveSnapshot(extractResponse.data, 'floating-button');
+        sendResponse({ success: true, snapshot });
+        
+      } catch (error) {
+        console.error('[LISA] Extract and save error:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true; // Keep channel open for async
+  }
+  
   // Handle snapshot operations
   if (request.action === 'getSnapshots') {
     snapshotManager.getSnapshots().then(snapshots => {

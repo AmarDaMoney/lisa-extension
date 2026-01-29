@@ -914,20 +914,39 @@ class LISAPopup {
         return;
       }
 
-      // Open App with snapshot data in URL (base64 encoded for short ones)
-      // For longer ones, use localStorage handoff
+      // Get license key
+      const storage = await chrome.storage.sync.get(['licenseKey']);
+      if (!storage.licenseKey) {
+        alert('Please add your license key in Settings first');
+        return;
+      }
+
+      // Send to App API
       const appUrl = 'https://lisa-web-backend-production.up.railway.app';
-      
-      // Store in extension storage for App to retrieve
-      await chrome.storage.local.set({ pendingSnapshot: snapshot });
-      
-      // Open App
-      chrome.tabs.create({ url: `${appUrl}?import=extension` });
-      
-      this.trackEvent('snapshot_sent_to_app', { platform: snapshot.platform });
+      const apiResponse = await fetch(`${appUrl}/api/snapshots`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          license_key: storage.licenseKey,
+          snapshot: snapshot.raw || snapshot
+        })
+      });
+
+      const result = await apiResponse.json();
+
+      if (result.success) {
+        alert('✅ Sent to App! You now have ' + result.totalSnapshots + ' snapshots in your library.');
+        this.trackEvent('snapshot_sent_to_app', { platform: snapshot.platform });
+      } else {
+        alert('❌ Failed: ' + (result.error || 'Unknown error'));
+      }
     } catch (error) {
       console.error('[LISA] Failed to send snapshot:', error);
-      alert('Failed to send to App');
+      alert('Failed to send to App: ' + error.message);
+    }
+  }
     }
   }
 

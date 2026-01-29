@@ -947,8 +947,6 @@ class LISAPopup {
       alert('Failed to send to App: ' + error.message);
     }
   }
-    }
-  }
 
   async deleteSnapshot(id) {
     if (!confirm('Delete this snapshot?')) return;

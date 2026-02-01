@@ -82,6 +82,16 @@ class LISAFloatingButton {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
+      .lisa-menu-item {
+        padding: 10px 16px;
+        color: #fafafa;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .lisa-menu-item:hover {
+        background: #3b82f6;
+      }
       .lisa-switch-modal {
         position: fixed;
         inset: 0;
@@ -160,11 +170,116 @@ class LISAFloatingButton {
     document.head.appendChild(styles);
     document.body.appendChild(button);
 
-    button.querySelector('.lisa-fab').addEventListener('click', () => this.saveConversation());
+    button.querySelector(".lisa-fab").addEventListener("click", () => this.showActionMenu());
     this.button = button;
     console.log('[LISA] Floating button ready');
   }
 
+
+  showActionMenu() {
+    // Remove existing menu if any
+    const existing = document.querySelector(".lisa-action-menu");
+    if (existing) { existing.remove(); return; }
+    
+    const menu = document.createElement("div");
+    menu.className = "lisa-action-menu";
+    menu.innerHTML = `
+      <div class="lisa-menu-item" data-action="save">💾 Save to Library</div>
+      <div class="lisa-menu-item" data-action="compress">⚡ Send to Compress</div>
+      <div class="lisa-menu-item" data-action="download">📥 Download JSON</div>
+    `;
+    
+    // Position near the button
+    const btn = this.button.getBoundingClientRect();
+    menu.style.cssText = `
+      position: fixed;
+      bottom: ${window.innerHeight - btn.top + 10}px;
+      right: ${window.innerWidth - btn.right}px;
+      background: #1f1f23;
+      border: 1px solid #3b82f6;
+      border-radius: 8px;
+      padding: 8px 0;
+      z-index: 2147483647;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    `;
+    
+    document.body.appendChild(menu);
+    
+    // Handle clicks
+    menu.addEventListener("click", async (e) => {
+      const action = e.target.dataset?.action;
+      menu.remove();
+      if (action === "save") this.saveConversation();
+      else if (action === "compress") this.sendToCompress();
+      else if (action === "download") this.downloadJSON();
+    });
+    
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener("click", function closeMenu(e) {
+        if (!menu.contains(e.target)) {
+          menu.remove();
+          document.removeEventListener("click", closeMenu);
+        }
+      });
+    }, 100);
+  }
+
+  async sendToCompress() {
+    try {
+      this.showToast("Extracting conversation...");
+      
+      // Use LISA-V parser for verbatim extraction
+      const parser = new LisaVParser();
+      await parser.extractConversation();
+      const lisaV = parser.toJSONL();
+      const stats = parser.getStats();
+      
+      this.showToast(`Sending ${stats.totalBlocks} blocks to App...`);
+      
+      // Send to App for compression
+      const response = await fetch("https://lisa-web-backend-production.up.railway.app/api/compress-lisav", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: lisaV, format: "lisav" })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        this.showToast(`✅ Compressed! ${result.compression_ratio} ratio`);
+        // Open App with result
+        window.open(`https://lisa-web-backend-production.up.railway.app/app?result=${encodeURIComponent(JSON.stringify(result))}`, "_blank");
+      } else {
+        this.showToast("❌ " + (result.error || "Compression failed"), true);
+      }
+    } catch (error) {
+      console.error("[LISA] Compress error:", error);
+      this.showToast("❌ Could not compress", true);
+    }
+  }
+
+  async downloadJSON() {
+    try {
+      this.showToast("Preparing download...");
+      const response = await chrome.runtime.sendMessage({ action: "extractAndSave" });
+      if (response?.success && response?.snapshot) {
+        const blob = new Blob([JSON.stringify(response.snapshot, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `lisa-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.showToast("✅ Downloaded!");
+      } else {
+        this.showToast("❌ " + (response?.error || "Download failed"), true);
+      }
+    } catch (error) {
+      this.showToast("❌ Could not download", true);
+    }
+  }
   async saveConversation() {
     try {
       this.showToast('Saving...');

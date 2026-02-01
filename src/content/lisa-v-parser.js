@@ -244,6 +244,116 @@ class LisaVParser {
     return messages;
   }
 
+  // Extract relationships between concepts (code dependencies, topic flows)
+  extractRelationships() {
+    const relationships = [];
+    const codeBlocks = this.blocks.filter(b => b.t === "code");
+    const textBlocks = this.blocks.filter(b => b.t === "a_text" || b.t === "u");
+    
+    // Code file dependencies
+    const files = codeBlocks.map(b => b.file).filter(f => f);
+    for (let i = 1; i < codeBlocks.length; i++) {
+      if (codeBlocks[i].file && codeBlocks[i-1].file) {
+        relationships.push({
+          t: "relationship",
+          subject: codeBlocks[i-1].file,
+          predicate: "followed_by",
+          object: codeBlocks[i].file
+        });
+      }
+    }
+    
+    // Detect imports/dependencies in code
+    for (const block of codeBlocks) {
+      const importMatches = block.v.match(/import\s+[\w{}\s,]+\s+from\s+["']([^"']+)["']/g) || [];
+      const requireMatches = block.v.match(/require\(["']([^"']+)["']\)/g) || [];
+      
+      for (const imp of [...importMatches, ...requireMatches]) {
+        const module = imp.match(/["']([^"']+)["']/)?.[1];
+        if (module && block.file) {
+          relationships.push({
+            t: "relationship",
+            subject: block.file,
+            predicate: "imports",
+            object: module
+          });
+        }
+      }
+    }
+    
+    return relationships;
+  }
+
+  // Generate handoff "next" blocks based on conversation analysis
+  generateNextBlocks() {
+    const nextBlocks = [];
+    const lastMessages = this.blocks.slice(-10);
+    const allText = this.blocks.filter(b => b.t === "a_text").map(b => b.v).join(" ");
+    
+    // Detect unfinished tasks (TODO, FIXME, will implement, next step)
+    const todoPatterns = [
+      /TODO:?\s*(.{10,80})/gi,
+      /FIXME:?\s*(.{10,80})/gi,
+      /will implement\s+(.{10,50})/gi,
+      /next,?\s+(?:we |I )?(?:should|will|need to)\s+(.{10,80})/gi,
+      /remaining:?\s*(.{10,80})/gi
+    ];
+    
+    for (const pattern of todoPatterns) {
+      const matches = allText.matchAll(pattern);
+      for (const match of matches) {
+        nextBlocks.push({
+          t: "next",
+          action: match[1].trim().replace(/[.,;]$/, ""),
+          priority: "medium",
+          owner: "next_instance",
+          auto_detected: true
+        });
+      }
+    }
+    
+    // Detect questions left unanswered
+    const lastUserMsg = [...this.blocks].reverse().find(b => b.t === "u");
+    if (lastUserMsg?.v?.includes("?")) {
+      nextBlocks.push({
+        t: "next",
+        action: "Address user question: " + lastUserMsg.v.slice(0, 100),
+        priority: "high",
+        owner: "next_instance",
+        auto_detected: true
+      });
+    }
+    
+    // Deduplicate
+    const seen = new Set();
+    return nextBlocks.filter(b => {
+      const key = b.action.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 5); // Max 5 next blocks
+  }
+
+  // Build complete LISA-V with relationships and next blocks
+  finalize() {
+    const relationships = this.extractRelationships();
+    const nextBlocks = this.generateNextBlocks();
+    
+    // Add relationships before the end
+    this.blocks.push(...relationships);
+    
+    // Add next blocks at the end
+    this.blocks.push(...nextBlocks);
+    
+    // Add closing sys block
+    this.blocks.push({
+      t: "sys",
+      v: "Session captured. " + this.getStats().totalBlocks + " blocks. Ready for handoff."
+    });
+    
+    return this;
+  }
+
   // Export as JSONL string
   toJSONL() {
     return this.blocks.map(block => JSON.stringify(block)).join('\n');

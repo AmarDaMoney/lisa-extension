@@ -233,10 +233,11 @@ class LISAFloatingButton {
       // Use LISA-V parser for verbatim extraction
       const parser = new LisaVParser();
       await parser.extractConversation();
+      parser.finalize(); // Add relationships and next blocks
       const lisaV = parser.toJSONL();
       const stats = parser.getStats();
       
-      this.showToast(`Sending ${stats.totalBlocks} blocks to App...`);
+      this.showToast("Sending " + stats.totalBlocks + " blocks to App...");
       
       // Send to App for compression
       const response = await fetch("https://lisa-web-backend-production.up.railway.app/api/compress-lisav", {

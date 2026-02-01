@@ -4,24 +4,24 @@
  */
 
 const STRIPE_CONFIG = {
-  // Use test key for development, production key for live
-  publishableKey: 'pk_test_YOUR_STRIPE_PUBLISHABLE_KEY_HERE', // Replace with actual key
+  // Use live publishable key provided for the extension (do NOT include secret keys here)
+  publishableKey: 'pk_live_51SqXDpRCWqG97BQip7QBLUxs8UgWMjRqVgi3Xj0KS5jH48RvaxxVtnKcTr82KBb3AOZ9SvX3J5Kc6I5JSbaPvwVG00IeDxOIXq',
   
-  // Stripe products configuration
+  // Stripe products configuration (use your Price IDs)
   products: {
     premium_monthly: {
-      priceId: 'price_YOUR_MONTHLY_PRICE_ID',
-      name: 'LISA Core Premium - Monthly',
-      amount: 999, // $9.99 in cents
+      priceId: 'price_1Sw03YRCWqG97BQiCZBiVsu4',
+      name: 'LISA Core Extension Pro - Monthly',
+      amount: 900, // $9.00 in cents
       interval: 'month',
-      description: 'Unlimited exports, LISA Hash, cloud sync, priority support'
+      description: 'LISA Pro: 50 compressions/day, cloud sync, 1M character limit, priority support'
     },
     premium_annual: {
-      priceId: 'price_YOUR_ANNUAL_PRICE_ID',
-      name: 'LISA Core Premium - Annual',
-      amount: 99900, // $99.90 in cents (save 17%)
+      priceId: 'price_1Sw04JRCWqG97BQi9KwysKEK',
+      name: 'LISA Core Extension Pro - Annual',
+      amount: 7900, // $79.00 in cents (save ~27%)
       interval: 'year',
-      description: 'Annual subscription with 17% discount'
+      description: 'Annual LISA Pro: 50 compressions/day, cloud sync, 1M character limit, priority support'
     }
   },
 

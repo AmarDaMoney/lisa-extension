@@ -212,10 +212,6 @@ class LISAFloatingButton {
       menu.remove();
       if (action === "save-json") this.saveConversation();
       else if (action === "save-lisav") this.saveLisaV();
-      if (action === "save-json") this.saveConversation();
-      else if (action === "save-lisav") this.saveLisaV();
-      if (action === "save-json") this.saveConversation();
-      else if (action === "save-lisav") this.saveLisaV();
     });
     
     // Close on outside click

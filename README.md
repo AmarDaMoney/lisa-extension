@@ -6,7 +6,7 @@
 
 **AI Memory Library** - Capture AI conversations from Claude, ChatGPT, Gemini & more!
 
-![Version](https://img.shields.io/badge/version-0.40-blue)
+![Version](https://img.shields.io/badge/version-0.39-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 🎯 What is LISA Core?
@@ -23,11 +23,7 @@ LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into
 - 📤 **One-Click Export** - Extract full conversations with a single click
 - ✂️ **Selection Export** - Right-click to export selected text snippets
 - 🗜️ **Semantic Compression** - 4:1 to 5:1 compression ratio
-- � **Dual Export Formats** - LISA-V (.jsonl) for ML datasets, Raw JSON for analysis
-- 📋 **Snapshot History** - Browse your last 50 captures in the History tab
-- 🔘 **Floating Button** - Quick-access button on supported AI platforms
-- 🔔 **Notifications** - Visual confirmation when snapshots are captured
-- �🔐 **LISA Hash** - Cryptographic integrity verification (Premium)
+- 🔐 **LISA Hash** - Cryptographic integrity verification (Premium)
 - ☁️ **Web App Sync** - Connect with LISA Core Web App
 
 ## 🚀 Installation
@@ -82,23 +78,17 @@ One-click install from Chrome Web Store - stay tuned!
 lisa-extension/
 ├── manifest.json           # Extension configuration
 ├── src/
-│   ├── background/        # Service worker & history
-│   │   ├── service-worker.js
-│   │   └── historyManager.js
+│   ├── background/        # Service worker
+│   │   └── service-worker.js
 │   ├── content/           # Platform parsers
 │   │   ├── claude-parser.js
 │   │   ├── chatgpt-parser.js
 │   │   ├── gemini-parser.js
-│   │   ├── lisa-v-parser.js
-│   │   ├── lisa-floating-button.js
-│   │   └── ... (11 total)
-│   ├── popup/             # Extension UI
-│   │   ├── popup.html
-│   │   ├── popup.css
-│   │   └── popup.js
-│   └── shared/            # Shared utilities
-│       ├── types.js
-│       └── captureConfig.js
+│   │   └── ... (9 total)
+│   └── popup/             # Extension UI
+│       ├── popup.html
+│       ├── popup.css
+│       └── popup.js
 └── public/                # Icons
 ```
 

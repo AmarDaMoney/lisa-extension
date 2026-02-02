@@ -6,7 +6,7 @@
 
 **AI Memory Library** - Capture AI conversations from Claude, ChatGPT, Gemini & more!
 
-![Version](https://img.shields.io/badge/version-0.39-blue)
+![Version](https://img.shields.io/badge/version-0.40-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 🎯 What is LISA Core?
@@ -25,6 +25,9 @@ LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into
 - 🗜️ **Semantic Compression** - 4:1 to 5:1 compression ratio
 - 🔐 **LISA Hash** - Cryptographic integrity verification (Premium)
 - ☁️ **Web App Sync** - Connect with LISA Core Web App
+- 📜 **Version History** - Git-style tracking of conversation evolution
+- 🔗 **Hash Chain** - SHA-256 integrity verification for each snapshot
+- ⏪ **Time Machine** - View and restore previous versions
 
 ## 🚀 Installation
 

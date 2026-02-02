@@ -234,7 +234,7 @@ class LISAFloatingButton {
       const parser = new LisaVParser();
       await parser.extractConversation();
       parser.finalize();
-      const lisaV = parser.toJSONL();
+      const lisaV = parser.toArray();
       const stats = parser.getStats();
       
       // Save via service worker

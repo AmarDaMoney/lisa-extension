@@ -153,21 +153,20 @@ class LisaVParser {
     for (const msg of messages) {
       this.blocks.push(...msg);
     }
-
     return this.blocks;
   }
 
-  // Claude-specific extraction
   async extractClaudeMessages() {
     const messages = [];
-    const messageContainers = document.querySelectorAll('[data-test-render-count], .font-claude-message, [class*="Message"]');
+    const messageContainers = document.querySelectorAll("[data-test-render-count]");
     
     for (const container of messageContainers) {
-      const isUser = container.closest('[class*="human"]') !== null ||
-                     container.querySelector('[class*="human"]') !== null ||
-                     container.textContent?.startsWith('You');
+      // Better user detection - matches working claude-parser.js
+      const isUser = container.querySelector("[data-is-streaming]")?.textContent?.includes("You") ||
+                     container.closest("[class*=\"human\"]") !== null ||
+                     container.getAttribute("data-is-human") === "true";
       
-      const role = isUser ? 'user' : 'assistant';
+      const role = isUser ? "user" : "assistant";
       const blocks = await this.parseMessageContent(container, role);
       if (blocks.length > 0) {
         messages.push(blocks);
@@ -175,6 +174,20 @@ class LisaVParser {
     }
     
     return messages;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   }
 
   // ChatGPT-specific extraction

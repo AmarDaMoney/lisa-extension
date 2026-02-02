@@ -910,12 +910,23 @@ class LISAPopup {
       }
 
       // Create downloadable file
-      const data = snapshot.raw || snapshot;
       const isLisaV = snapshot.format === 'lisa-v';
-      const jsonStr = JSON.stringify(data, null, 2);
-      const mimeType = isLisaV ? 'application/jsonl' : 'application/json';
-      const extension = isLisaV ? 'jsonl' : 'json';
-      const blob = new Blob([jsonStr], { type: mimeType });
+      let fileContent, mimeType, extension;
+      
+      if (isLisaV) {
+        // LISA-V: output the raw JSONL content directly
+        fileContent = snapshot.content;
+        mimeType = 'application/jsonl';
+        extension = 'jsonl';
+      } else {
+        // Standard format: JSON stringify the data
+        const data = snapshot.raw || snapshot;
+        fileContent = JSON.stringify(data, null, 2);
+        mimeType = 'application/json';
+        extension = 'json';
+      }
+      
+      const blob = new Blob([fileContent], { type: mimeType });
       const url = URL.createObjectURL(blob);
       
       const a = document.createElement('a');

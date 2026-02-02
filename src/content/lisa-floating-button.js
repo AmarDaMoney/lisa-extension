@@ -27,7 +27,7 @@ class LISAFloatingButton {
     const button = document.createElement('div');
     button.id = 'lisa-floating-btn';
     button.innerHTML = `
-      <button class="lisa-fab" title="Save to LISA Library">
+      <button class="lisa-fab" title="LISA - AI Memory Library">
         <span class="lisa-fab-icon">💾</span>
         <span class="lisa-fab-text">LISA</span>
       </button>
@@ -184,9 +184,9 @@ class LISAFloatingButton {
     const menu = document.createElement("div");
     menu.className = "lisa-action-menu";
     menu.innerHTML = `
-      <div class="lisa-menu-item" data-action="save">💾 Save to Library</div>
-      <div class="lisa-menu-item" data-action="compress">⚡ Send to Compress</div>
-      <div class="lisa-menu-item" data-action="download">📥 Download JSON</div>
+      <div class="lisa-menu-item" data-action="save-json">💾 Save Raw JSON</div>
+      <div class="lisa-menu-item" data-action="save-lisav">📋 Save LISA-V</div>
+      
     `;
     
     // Position near the button
@@ -210,9 +210,12 @@ class LISAFloatingButton {
     menu.addEventListener("click", async (e) => {
       const action = e.target.dataset?.action;
       menu.remove();
-      if (action === "save") this.saveConversation();
-      else if (action === "compress") this.sendToCompress();
-      else if (action === "download") this.downloadJSON();
+      if (action === "save-json") this.saveConversation();
+      else if (action === "save-lisav") this.saveLisaV();
+      if (action === "save-json") this.saveConversation();
+      else if (action === "save-lisav") this.saveLisaV();
+      if (action === "save-json") this.saveConversation();
+      else if (action === "save-lisav") this.saveLisaV();
     });
     
     // Close on outside click
@@ -226,61 +229,74 @@ class LISAFloatingButton {
     }, 100);
   }
 
-  async sendToCompress() {
+
+  async saveLisaV() {
     try {
-      this.showToast("Extracting conversation...");
+      this.showToast("Extracting LISA-V...");
       
       // Use LISA-V parser for verbatim extraction
       const parser = new LisaVParser();
       await parser.extractConversation();
-      parser.finalize(); // Add relationships and next blocks
+      parser.finalize();
       const lisaV = parser.toJSONL();
       const stats = parser.getStats();
       
-      this.showToast("Sending " + stats.totalBlocks + " blocks to App...");
-      
-      // Send to App for compression
-      const response = await fetch("https://lisa-web-backend-production.up.railway.app/api/compress-lisav", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: lisaV, format: "lisav" })
+      // Save via service worker
+      const response = await chrome.runtime.sendMessage({
+        action: "saveLisaV",
+        data: {
+          content: lisaV,
+          stats: stats,
+          platform: parser.detectPlatform(),
+          url: window.location.href,
+          title: document.title
+        }
       });
       
-      const result = await response.json();
-      
-      if (result.success) {
-        this.showToast(`✅ Compressed! ${result.compression_ratio} ratio`);
-        // Open App with result
-        window.open(`https://lisa-web-backend-production.up.railway.app/app?result=${encodeURIComponent(JSON.stringify(result))}`, "_blank");
+      if (response?.success) {
+        this.showToast("✅ LISA-V saved! " + stats.totalBlocks + " blocks");
       } else {
-        this.showToast("❌ " + (result.error || "Compression failed"), true);
+        this.showToast("❌ " + (response?.error || "Save failed"), true);
       }
     } catch (error) {
-      console.error("[LISA] Compress error:", error);
-      this.showToast("❌ Could not compress", true);
+      console.error("[LISA] LISA-V save error:", error);
+      this.showToast("❌ Could not save LISA-V", true);
     }
   }
 
-  async downloadJSON() {
-    try {
-      this.showToast("Preparing download...");
-      const response = await chrome.runtime.sendMessage({ action: "extractAndSave" });
-      if (response?.success && response?.snapshot) {
-        const blob = new Blob([JSON.stringify(response.snapshot, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `lisa-${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        this.showToast("✅ Downloaded!");
-      } else {
-        this.showToast("❌ " + (response?.error || "Download failed"), true);
-      }
-    } catch (error) {
-      this.showToast("❌ Could not download", true);
-    }
-  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   async saveConversation() {
     try {
       this.showToast('Saving...');

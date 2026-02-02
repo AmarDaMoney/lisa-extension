@@ -425,6 +425,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep channel open for async
   }
   
+
+  // Handle LISA-V save
+  if (request.action === "saveLisaV") {
+    (async () => {
+      try {
+        const data = request.data;
+        const snapshot = {
+          id: "lisav-" + Date.now(),
+          syncId: "sync-" + Date.now(),
+          format: "lisa-v",
+          content: data.content,
+          stats: data.stats,
+          platform: data.platform,
+          url: data.url,
+          title: data.title || "LISA-V Capture",
+          timestamp: new Date().toISOString(),
+          source: "floating-button"
+        };
+        await snapshotManager.saveSnapshot(snapshot, "floating-button-lisav");
+        sendResponse({ success: true, snapshot });
+      } catch (error) {
+        console.error("[LISA] LISA-V save error:", error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
   // Handle snapshot operations
   if (request.action === 'getSnapshots') {
     snapshotManager.getSnapshots().then(snapshots => {

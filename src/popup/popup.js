@@ -909,15 +909,18 @@ class LISAPopup {
         return;
       }
 
-      // Create downloadable JSON
+      // Create downloadable file
       const data = snapshot.raw || snapshot;
+      const isLisaV = snapshot.format === 'lisa-v';
       const jsonStr = JSON.stringify(data, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const mimeType = isLisaV ? 'application/jsonl' : 'application/json';
+      const extension = isLisaV ? 'jsonl' : 'json';
+      const blob = new Blob([jsonStr], { type: mimeType });
       const url = URL.createObjectURL(blob);
       
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lisa-${snapshot.platform}-${snapshot.id}.json`;
+      a.download = `lisa-${snapshot.platform}-${snapshot.id}.${extension}`;
       a.click();
       
       URL.revokeObjectURL(url);

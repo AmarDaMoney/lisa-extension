@@ -234,6 +234,12 @@ class SnapshotManager {
 
   async saveSnapshot(conversation, source = 'auto') {
     try {
+      const data = await chrome.storage.local.get(this.STORAGE_KEY);
+      const snapshots = data[this.STORAGE_KEY] || [];
+
+      // Phase 6: Check if this is an update to existing conversation (same URL)
+      const existing = snapshots.find(s => s.url === conversation.url);
+
       // Store RAW conversation (not compressed) so App can compress with user's settings
       const snapshot = {
         id: 'snap-' + Date.now(),
@@ -246,8 +252,19 @@ class SnapshotManager {
         raw: conversation // Store full raw conversation
       };
 
-      const data = await chrome.storage.local.get(this.STORAGE_KEY);
-      const snapshots = data[this.STORAGE_KEY] || [];
+      // Phase 6: Add versioning fields
+      if (existing) {
+        snapshot.version = (existing.version || 1) + 1;
+        snapshot.parentId = existing.id;
+        snapshot.rootId = existing.rootId || existing.id;
+      } else {
+        snapshot.version = 1;
+        snapshot.parentId = null;
+        snapshot.rootId = snapshot.id;
+      }
+
+      // Phase 6: Generate content hash
+      snapshot.hash = await this.hashContent(JSON.stringify(conversation));
 
       snapshots.unshift(snapshot);
 
@@ -257,7 +274,7 @@ class SnapshotManager {
 
       await chrome.storage.local.set({ [this.STORAGE_KEY]: snapshots });
 
-      console.log(`[LISA] Snapshot saved: ${snapshot.platform} - ${snapshot.title}`);
+      console.log(`[LISA] Snapshot saved: ${snapshot.platform} - ${snapshot.title} (v${snapshot.version})`);
       return snapshot;
     } catch (error) {
       console.error('[LISA] Failed to save snapshot:', error);
@@ -284,6 +301,23 @@ class SnapshotManager {
 
   async clearAllSnapshots() {
     await chrome.storage.local.remove(this.STORAGE_KEY);
+  }
+
+  // Phase 6: Generate content hash for version integrity
+  async hashContent(content) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+  }
+
+  // Phase 6: Get version history for a conversation
+  async getVersionHistory(rootId) {
+    const snapshots = await this.getSnapshots();
+    return snapshots
+      .filter(s => s.rootId === rootId || s.id === rootId)
+      .sort((a, b) => (a.version || 1) - (b.version || 1));
   }
 }
 
@@ -456,6 +490,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getSnapshots') {
     snapshotManager.getSnapshots().then(snapshots => {
       sendResponse({ success: true, snapshots });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+
+  // Phase 6: Get version history for a conversation
+  if (request.action === 'getVersionHistory') {
+    snapshotManager.getVersionHistory(request.rootId).then(history => {
+      sendResponse({ success: true, history });
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
     });

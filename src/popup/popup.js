@@ -829,9 +829,10 @@ class LISAPopup {
       <div class="snapshot-item" data-id="${snap.id}">
         <div class="snapshot-info">
           <div class="snapshot-title">${this.escapeHtml(snap.title || snap.platform)}</div>
-          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)}</div>
+          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}</div>
         </div>
         <div class="snapshot-actions">
+          <button class="snapshot-btn history" data-root-id="${snap.rootId || snap.id}" title="Version History">📜</button>
           <button class="snapshot-btn download" data-id="${snap.id}" title="Download JSON">💾</button>
           <button class="snapshot-btn send" data-id="${snap.id}" title="Send to App">📤</button>
           <button class="snapshot-btn delete" data-id="${snap.id}" title="Delete">🗑️</button>
@@ -840,6 +841,10 @@ class LISAPopup {
     `).join('');
 
     // Add event listeners
+    container.querySelectorAll('.snapshot-btn.history').forEach(btn => {
+      btn.addEventListener('click', (e) => this.showVersionHistory(e.target.dataset.rootId));
+    });
+
     container.querySelectorAll('.snapshot-btn.download').forEach(btn => {
       btn.addEventListener('click', (e) => this.downloadSnapshot(e.target.dataset.id));
     });
@@ -995,6 +1000,33 @@ class LISAPopup {
       this.trackEvent('snapshot_deleted');
     } catch (error) {
       console.error('[LISA] Failed to delete snapshot:', error);
+    }
+  }
+
+  // Phase 6: Show version history for a conversation
+  async showVersionHistory(rootId) {
+    try {
+      const response = await chrome.runtime.sendMessage({ 
+        action: 'getVersionHistory', 
+        rootId: rootId 
+      });
+      
+      if (response.success && response.history.length > 0) {
+        const historyHtml = response.history.map(v => `
+          <div class="history-item">
+            <span>v${v.version || 1} - ${this.formatTimeAgo(v.savedAt)}</span>
+            <span class="hash">${v.hash ? v.hash.slice(0, 8) : 'N/A'}</span>
+          </div>
+        `).join('');
+        
+        alert(`Version History (${response.history.length} versions):\n\n` + 
+          response.history.map(v => `v${v.version || 1} - ${new Date(v.savedAt).toLocaleString()}`).join('\n'));
+      } else {
+        alert('No version history found (this is v1)');
+      }
+    } catch (error) {
+      console.error('[LISA] Failed to get version history:', error);
+      alert('Failed to load history');
     }
   }
 

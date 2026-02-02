@@ -1,6 +1,9 @@
 // LISA Core - Semantic Compression Engine
 // Background Service Worker (Manifest V3)
-// v0.39 - Fixed LISA-V download format
+// v0.40 - Added history tracking and capture configuration
+
+// Import v0.40 modules
+// historyManager.js functions are available globally after import
 
 class LISACompressor {
   constructor() {
@@ -110,7 +113,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.39',
+        lisaVersion: '0.40',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
@@ -801,4 +804,52 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   }
 });
 
-console.log('[LISA] Core compression engine initialized v0.39');
+// ============================================
+// HISTORY MANAGER INTEGRATION (v0.40)
+// ============================================
+
+// Listen for history requests from popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'getHistory') {
+    (async () => {
+      try {
+        const history = await getHistory();
+        const stats = await getHistoryStats();
+        sendResponse({ success: true, history, stats });
+      } catch (error) {
+        console.error('[LISA] Error getting history:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true; // Keep channel open for async response
+  }
+  
+  if (request.action === 'clearHistory') {
+    (async () => {
+      try {
+        await clearHistory();
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('[LISA] Error clearing history:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+
+  if (request.action === 'saveToHistory') {
+    (async () => {
+      try {
+        const { url, title, format, elementCount } = request;
+        await saveToHistory(url, title, format, elementCount);
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('[LISA] Error saving to history:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+});
+
+console.log('[LISA] Core compression engine initialized v0.40');

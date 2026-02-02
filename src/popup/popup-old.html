@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LISA Core</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <img src="../public/logo.png" alt="LISA Core" class="header-logo">
+        <h1>LISA Core</h1>
+        <span class="subtitle">AI Memory Library</span>
+        <span class="version">v0.39</span>
+      </div>
+      <div class="user-status">
+        <span id="userTier" class="tier-badge">Free</span>
+        <button id="upgradeBtn" class="tier-badge upgrade-badge" style="display: none;">⭐ Upgrade</button>
+      </div>
+    </header>
+
+    <!-- Platform Detection -->
+    <div class="platform-info">
+      <span id="platformStatus" class="status">Detecting platform...</span>
+      <div class="disclaimer">
+        <small>⚠️ <strong>Text only:</strong> Media files are not captured in compression</small>
+      </div>
+    </div>
+
+    <!-- Main Actions -->
+    <div class="actions">
+      <button id="extractBtn" class="btn btn-primary" disabled>
+        <span class="icon">📤</span>
+        Export Conversation
+      </button>
+
+      <div id="extractedInfo" class="info-box" style="display: none;">
+        <p><strong>Messages:</strong> <span id="messageCount">0</span></p>
+        <p><strong>Platform:</strong> <span id="detectedPlatform">-</span></p>
+      </div>
+
+      <button id="compressBtn" class="btn btn-secondary" style="display: none;">
+        <span class="icon">🗜️</span>
+        Compress to LISA JSON
+      </button>
+
+      <div id="compressionInfo" class="info-box success" style="display: none;">
+        <p><strong>Compression Ratio:</strong> <span id="compressionRatio">-</span>:1</p>
+        <p><strong>Original Size:</strong> <span id="originalSize">-</span></p>
+        <p><strong>Compressed Size:</strong> <span id="compressedSize">-</span></p>
+      </div>
+
+      <!-- Premium Feature: Hashing -->
+      <div id="hashingSection" class="premium-section" style="display: none;">
+        <div class="premium-badge">
+          <span class="icon">⭐</span>
+          <span>Premium Feature</span>
+        </div>
+        <button id="generateHashBtn" class="btn btn-premium">
+          <span class="icon">🔐</span>
+          Generate LISA Hash
+        </button>
+        <div id="hashInfo" class="info-box" style="display: none;">
+          <p><strong>Hash:</strong> <span id="hashValue" class="hash-display">-</span></p>
+          <p><strong>Algorithm:</strong> SHA-256</p>
+          <button id="copyHashBtn" class="btn btn-small">Copy Hash</button>
+        </div>
+      </div>
+
+      <!-- Download Actions -->
+      <div id="downloadSection" style="display: none;">
+        <button id="downloadBtn" class="btn btn-success">
+          <span class="icon">💾</span>
+          Download LISA JSON
+        </button>
+      </div>
+
+      <!-- How to Use Section -->
+      <div class="how-to-use-section">
+        <div class="section-divider">
+          <span>How to Use LISA JSON</span>
+        </div>
+        
+        <div class="instructions-box">
+          <h4>💡 To Use Your Compressed Conversation:</h4>
+          <ol class="usage-steps">
+            <li>
+              <strong>Open your AI chat</strong> (Claude, ChatGPT, Gemini, etc.)
+            </li>
+            <li>
+              <strong>Click the file upload button</strong> (📎 icon)
+            </li>
+            <li>
+              <strong>Upload your LISA JSON file</strong>
+            </li>
+            <li>
+              <strong>Use this prompt:</strong>
+              <div class="prompt-box">
+                <code id="suggestedPrompt">"Read this LISA JSON and continue our conversation"</code>
+                <button id="copyPromptBtn" class="btn-copy" title="Copy prompt">📋</button>
+              </div>
+            </li>
+          </ol>
+          
+          <div class="value-highlight">
+            <p>✨ <strong>Result:</strong> The AI will understand the full context using only the compressed semantic tokens - saving you ~80% on tokens!</p>
+          </div>
+          
+          <div class="shortcut-info">
+            <p><strong>💡 Quick Tip:</strong> Right-click anywhere on a conversation page and select "Save to LISA Core" for instant export!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Snapshots Section -->
+    <div class="section snapshots-section">
+      <div class="section-header">
+        <h3>📸 Auto-Snapshots</h3>
+        <label class="toggle-switch">
+          <input type="checkbox" id="autoSaveToggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div id="snapshotsList" class="snapshots-list">
+        <p class="empty-state">No snapshots yet. Close an AI chat tab to auto-save.</p>
+      </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer>
+      <div class="links">
+        <a href="#" id="helpLink">Help</a>
+        <a href="#" id="settingsLink">Settings</a>
+        <a href="#" id="feedbackLink">Feedback</a>
+      </div>
+      <p class="copyright">© 2026 SAT-CHAIN LLC</p>
+    </footer>
+  </div>
+
+  <!-- Help Modal Overlay -->
+  <div id="helpModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>LISA Core - AI Memory Library</h2>
+        <button id="closeHelpBtn" class="btn-close">✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <section class="help-section">
+          <h3>🎯 What is LISA Core?</h3>
+          <p>LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into semantic tokens, saving up to 80% of tokens while preserving full meaning.</p>
+          <div class="example-box">
+            <p><strong>Example:</strong></p>
+            <p>📊 Original conversation: 10,000 tokens</p>
+            <p>🗜️ LISA compressed: 2,000 tokens</p>
+            <p>✨ Savings: 8,000 tokens (80%!)</p>
+          </div>
+        </section>
+        
+        <section class="help-section">
+          <h3>📤 How to Export</h3>
+          <p><strong>Method 1 - Full Conversation:</strong></p>
+          <ol>
+            <li>Open any AI conversation</li>
+            <li>Click LISA icon → "Export Conversation"</li>
+            <li>Compress and download</li>
+          </ol>
+          <p><strong>Method 2 - Quick Save:</strong></p>
+          <p>Right-click anywhere → "Save to LISA Core"</p>
+          <p><strong>Method 3 - Selected Text:</strong></p>
+          <p>Highlight text → Right-click → "Export to LISA Core"</p>
+        </section>
+        
+        <section class="help-section">
+          <h3>📥 How to Import & Use</h3>
+          <p><strong>The Smart Way (Token Savings!):</strong></p>
+          <ol>
+            <li>Open your AI chat (Claude, ChatGPT, Gemini)</li>
+            <li>Click the file upload button (📎)</li>
+            <li>Upload the LISA JSON file</li>
+            <li>Tell the AI: <code>"Read this LISA JSON and continue our conversation"</code></li>
+          </ol>
+          <p class="highlight-box">💡 <strong>Key Benefit:</strong> The AI understands the full context using only the compressed semantic tokens - saving you 80% on tokens!</p>
+        </section>
+        
+        <section class="help-section">
+          <h3>💰 Why This Matters</h3>
+          <table class="comparison-table">
+            <tr>
+              <th>Without LISA</th>
+              <th>With LISA</th>
+            </tr>
+            <tr>
+              <td>10,000 tokens used</td>
+              <td>2,000 tokens used</td>
+            </tr>
+            <tr>
+              <td>Higher costs</td>
+              <td>80% cost savings</td>
+            </tr>
+            <tr>
+              <td>Limited context window</td>
+              <td>5x more context!</td>
+            </tr>
+          </table>
+        </section>
+        
+        <section class="help-section">
+          <h3>🌐 Supported Platforms</h3>
+          <div class="platforms-grid">
+            <span class="platform-badge">✅ Claude</span>
+            <span class="platform-badge">✅ ChatGPT</span>
+            <span class="platform-badge">✅ Gemini</span>
+            <span class="platform-badge">✅ Grok</span>
+            <span class="platform-badge">✅ Mistral AI</span>
+            <span class="platform-badge">✅ DeepSeek</span>
+            <span class="platform-badge">✅ Copilot</span>
+            <span class="platform-badge">✅ Perplexity</span>
+            <span class="platform-badge">✅ Any Website</span>
+          </div>
+        </section>
+        
+        <section class="help-section">
+          <h3>⭐ Premium Features ($9.99/mo)</h3>
+          <ul class="feature-list">
+            <li>🔐 <strong>LISA Hash:</strong> Cryptographic verification for compliance</li>
+            <li>☁️ <strong>Cloud Sync:</strong> Access conversations across all devices</li>
+            <li>🔍 <strong>Semantic Search:</strong> Find conversations by meaning, not just keywords</li>
+            <li>∞ <strong>Unlimited:</strong> No export/import limits</li>
+            <li>📌 <strong>API Access:</strong> Integrate with your workflows</li>
+          </ul>
+        </section>
+      </div>
+      
+      <div class="modal-footer">
+        <button id="gotItBtn" class="btn btn-primary">Got It!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upgrade Modal Overlay -->
+  <div id="upgradeModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content upgrade-modal">
+      <div class="modal-header upgrade-header">
+        <h2>⭐ Upgrade to Premium</h2>
+        <button id="closeUpgradeBtn" class="btn-close">✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <section class="upgrade-section">
+          <div class="pricing-highlight">
+            <span class="price">$9</span>
+            <span class="period">/month</span>
+          </div>
+          
+          <h3>🚀 Premium Features</h3>
+          <ul class="premium-features-list">
+            <li>
+              <span class="feature-icon">🔐</span>
+              <div class="feature-content">
+                <strong>LISA Hash</strong>
+                <p>Cryptographic verification for compliance & integrity proof</p>
+              </div>
+            </li>
+            <li>
+              <span class="feature-icon">∞</span>
+              <div class="feature-content">
+                <strong>Unlimited Exports</strong>
+                <p>No weekly limits on exports or imports</p>
+              </div>
+            </li>
+            <li>
+              <span class="feature-icon">⚡</span>
+              <div class="feature-content">
+                <strong>Priority Support</strong>
+                <p>Direct access to the development team</p>
+              </div>
+            </li>
+          </ul>
+          
+          <button id="subscribeBtn" class="btn btn-subscribe">
+            Subscribe Now
+          </button>
+          
+          <p class="billing-note">Unlocks Extension + Web App • Cancel anytime</p>
+        </section>
+        
+        <div class="app-teaser">
+          <div class="teaser-divider">
+            <span>Want even more?</span>
+          </div>
+          
+          <div class="app-promo">
+            <h4>🖥️ LISA Core Web App</h4>
+            <p>Your full AI memory dashboard:</p>
+            <ul class="app-features">
+              <li>📊 50+ daily compressions (Pro)</li>
+              <li>🔄 Multi-AI support (Claude, GPT-4, Gemini)</li>
+              <li>📚 Conversation library & history</li>
+              <li>🔌 API access for integrations (Team)</li>
+            </ul>
+            <button id="learnMoreAppBtn" class="btn btn-app">
+              Open Web App →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal Overlay -->
+  <div id="settingsModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content settings-modal">
+      <div class="modal-header settings-header">
+        <h2>⚙️ Settings</h2>
+        <button id="closeSettingsBtn" class="btn-close">✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <section class="settings-section">
+          <h3>🔑 License Key</h3>
+          <p class="settings-desc">Enter your license key to unlock Premium features.</p>
+          
+          <div class="license-input-group">
+            <input 
+              type="text" 
+              id="licenseKeyInput" 
+              class="license-input" 
+              placeholder="LISA-PRO-XXXXXXXX"
+              spellcheck="false"
+              autocomplete="off"
+            />
+            <button id="validateKeyBtn" class="btn btn-validate">
+              Validate
+            </button>
+          </div>
+          
+          <div id="licenseStatus" class="license-status" style="display: none;">
+            <span id="licenseStatusIcon"></span>
+            <span id="licenseStatusText"></span>
+          </div>
+          
+          <div class="license-info">
+            <p><strong>Current Tier:</strong> <span id="currentTierDisplay">Free</span></p>
+            <p id="licenseExpiry" style="display: none;"><strong>Valid Until:</strong> <span id="expiryDate"></span></p>
+          </div>
+        </section>
+        
+        <div class="settings-divider"></div>
+        
+        <section class="settings-section">
+          <h3>🛒 Don't have a license key?</h3>
+          <p class="settings-desc">Subscribe to Premium to get your key.</p>
+          
+          <div class="settings-buttons">
+            <button id="settingsSubscribeBtn" class="btn btn-subscribe-small">
+              Subscribe ($9/mo)
+            </button>
+            <button id="settingsOpenAppBtn" class="btn btn-app-small">
+              Open Web App
+            </button>
+          </div>
+        </section>
+        <!-- Chat Switch Setting -->
+        <div class="settings-group">
+          <label class="settings-label">When switching chats</label>
+          <div class="settings-option">
+            <span>Ask to save previous conversation</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="askOnChatSwitch" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="settings-divider"></div>
+        
+        <section class="settings-section">
+          <h3>🗑️ Reset</h3>
+          <p class="settings-desc">Clear all local data and start fresh.</p>
+          <button id="resetDataBtn" class="btn btn-danger">
+            Reset Extension Data
+          </button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="overlay" style="display: none;">
+    <div class="spinner"></div>
+    <p id="loadingText">Processing...</p>
+  </div>
+
+  <!-- Stripe integration scripts -->
+  <script src="src/stripe/stripe-config.js"></script>
+  <script src="src/stripe/stripe-client.js"></script>
+  <script src="src/stripe/stripe-subscription-modal.js"></script>
+  <script src="src/stripe/stripe-payment-manager.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
+

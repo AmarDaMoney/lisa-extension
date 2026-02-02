@@ -4,6 +4,7 @@
 class LisaVParser {
   constructor() {
     this.blocks = [];
+    this.hashChain = null; // Previous block hash for chain
   }
 
   // SHA-256 hash for code provenance
@@ -13,6 +14,17 @@ class LisaVParser {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 8);
+  }
+
+  // Add block with hash chain linkage
+  async addBlockWithChain(block) {
+    block._prevHash = this.hashChain;
+    const blockStr = JSON.stringify(block);
+    const fullHash = await this.sha256(blockStr);
+    block._hash = fullHash.slice(0, 16);
+    this.hashChain = fullHash;
+    this.blocks.push(block);
+    return block;
   }
 
   // Detect platform from URL
@@ -123,6 +135,7 @@ class LisaVParser {
   // Main extraction method - platform agnostic
   async extractConversation() {
     this.blocks = [];
+    this.hashChain = null; // Previous block hash for chain
     const platform = this.detectPlatform();
     
     // Add meta block
@@ -348,7 +361,7 @@ class LisaVParser {
   }
 
   // Build complete LISA-V with relationships and next blocks
-  finalize() {
+  async finalize() {
     const relationships = this.extractRelationships();
     const nextBlocks = this.generateNextBlocks();
     
@@ -358,6 +371,15 @@ class LisaVParser {
     // Add next blocks at the end
     this.blocks.push(...nextBlocks);
     
+    // Add integrity manifest
+    const merkleRoot = await this.getMerkleRoot();
+    this.blocks.push({
+      t: "manifest",
+      merkleRoot: merkleRoot,
+      blockCount: this.blocks.length,
+      timestamp: new Date().toISOString()
+    });
+
     // Add closing sys block
     this.blocks.push({
       t: "sys",
@@ -368,6 +390,35 @@ class LisaVParser {
   }
 
   // Export as JSONL string
+  // Calculate Merkle root of all blocks
+  async getMerkleRoot() {
+    if (this.blocks.length === 0) return null;
+    let hashes = [];
+    for (const block of this.blocks) {
+      hashes.push(await this.sha256(JSON.stringify(block)));
+    }
+    while (hashes.length > 1) {
+      const next = [];
+      for (let i = 0; i < hashes.length; i += 2) {
+        const left = hashes[i];
+        const right = hashes[i + 1] || left;
+        next.push(await this.sha256(left + right));
+      }
+      hashes = next;
+    }
+    return hashes[0];
+  }
+
+  // Verify chain integrity
+  verifyChain() {
+    let prev = null;
+    for (const block of this.blocks) {
+      if (block._prevHash !== prev) return false;
+      prev = block._hash || null;
+    }
+    return true;
+  }
+
   toJSONL() {
     return this.blocks.map(block => JSON.stringify(block)).join('\n');
   }

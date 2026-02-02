@@ -233,7 +233,7 @@ class LISAFloatingButton {
       // Use LISA-V parser for verbatim extraction
       const parser = new LisaVParser();
       await parser.extractConversation();
-      parser.finalize();
+      await parser.finalize();
       const lisaV = parser.toArray();
       const stats = parser.getStats();
       

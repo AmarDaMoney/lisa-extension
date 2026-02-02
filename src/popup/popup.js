@@ -1,5 +1,5 @@
 // LISA Core Extension - Popup Logic
-// v0.24 - Fixed error handling and user feedback
+// v0.39 - Fixed LISA-V download format
 
 class LISAPopup {
   constructor() {

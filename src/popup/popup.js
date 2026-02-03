@@ -168,6 +168,16 @@ class LISAPopup {
   }
 
   setupEventListeners() {
+    // Quick Tips Accordion Toggle
+    const quickTipsToggle = document.getElementById('quickTipsToggle');
+    const quickTipsContent = document.getElementById('quickTipsContent');
+    if (quickTipsToggle && quickTipsContent) {
+      quickTipsToggle.addEventListener('click', () => {
+        quickTipsToggle.classList.toggle('active');
+        quickTipsContent.classList.toggle('expanded');
+      });
+    }
+
     // Extract conversation
     document.getElementById('extractBtn').addEventListener('click', () => {
       this.extractConversation();

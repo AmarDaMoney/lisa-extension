@@ -51,8 +51,8 @@ class StripeClient {
         },
         body: JSON.stringify({
           priceId: priceId,
-          successUrl: successUrl,
-          cancelUrl: cancelUrl
+          success_url: successUrl,
+          cancel_url: cancelUrl
         })
       });
 

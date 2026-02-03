@@ -9,6 +9,9 @@ class StripePaymentManager {
     this.config = config;
     this.currentPlan = 'month'; // 'month' or 'year'
     this.isProcessing = false;
+    this.isTogglingPlan = false;
+    this.currentClientSecret = null;
+    this.currentSubscriptionId = null;
   }
 
   /**
@@ -110,12 +113,12 @@ class StripePaymentManager {
   /**
    * Open subscription modal
    */
-  openSubscriptionModal() {
+  async openSubscriptionModal() {
     const modal = document.getElementById('stripeSubscriptionModal');
     if (modal) {
       modal.style.display = 'flex';
-      // Mount payment element
-      this.mountPaymentElement();
+      // Initialize payment element (creates subscription first to get clientSecret)
+      await this.initializePaymentElement();
     }
   }
 
@@ -127,27 +130,65 @@ class StripePaymentManager {
     if (modal) {
       modal.style.display = 'none';
       this.stripe.cleanup();
+      this.currentClientSecret = null;
     }
   }
 
   /**
-   * Mount Stripe Payment Element
+   * Initialize Stripe Payment Element (creates subscription first to get clientSecret)
    */
-  async mountPaymentElement() {
+  async initializePaymentElement() {
     try {
-      // Create payment element
-      await this.stripe.createPaymentElement('payment-element');
+      this.showPaymentMessage('Loading payment form...', 'info');
+      
+      // Get the correct price ID based on selected plan
+      const priceId = this.currentPlan === 'month'
+        ? this.config.products.premium_monthly.priceId
+        : this.config.products.premium_annual.priceId;
+
+      // Create subscription on server to get clientSecret
+      const subData = await this.stripe.createSubscription(priceId, this.currentPlan);
+      console.log('[LISA] Subscription created for payment element:', subData);
+      
+      if (!subData.client_secret) {
+        throw new Error('No client secret returned from server');
+      }
+
+      this.currentClientSecret = subData.client_secret;
+      this.currentSubscriptionId = subData.subscription_id;
+
+      // Now create payment element with the clientSecret
+      await this.stripe.createPaymentElement('payment-element', subData.client_secret);
+      
+      // Hide the loading message
+      const messageEl = document.getElementById('payment-message');
+      if (messageEl) {
+        messageEl.style.display = 'none';
+      }
+      
       console.log('[LISA] Payment element mounted');
     } catch (error) {
-      console.error('[LISA] Failed to mount payment element:', error);
-      this.showPaymentMessage(error.message, 'error');
+      console.error('[LISA] Failed to initialize payment element:', error);
+      this.showPaymentMessage('Failed to load payment form: ' + error.message, 'error');
     }
+  }
+
+  /**
+   * Mount Stripe Payment Element (legacy - now use initializePaymentElement)
+   */
+  async mountPaymentElement() {
+    // Redirect to the new initialization flow
+    await this.initializePaymentElement();
   }
 
   /**
    * Handle billing cycle toggle
    */
-  handleBillingToggle(button) {
+  async handleBillingToggle(button) {
+    // Prevent multiple clicks while processing
+    if (this.isTogglingPlan) return;
+    this.isTogglingPlan = true;
+
     // Update active state
     document.querySelectorAll('.billing-toggle').forEach(btn => {
       btn.classList.remove('active');
@@ -160,14 +201,24 @@ class StripePaymentManager {
     // Update button text
     const submitBtn = document.getElementById('submit-stripe-form');
     const price = this.currentPlan === 'month' 
-      ? '$9.99/month' 
-      : '$99.90/year';
+      ? '$9.00/month' 
+      : '$79.00/year';
     const buttonText = document.getElementById('submit-button-text');
     if (buttonText) {
       buttonText.textContent = `Subscribe - ${price}`;
     }
 
     console.log('[LISA] Billing plan changed to:', this.currentPlan);
+
+    // Reinitialize payment element with new price
+    try {
+      this.stripe.cleanup();
+      await this.initializePaymentElement();
+    } catch (error) {
+      console.error('[LISA] Failed to reinitialize payment element:', error);
+    } finally {
+      this.isTogglingPlan = false;
+    }
   }
 
   /**
@@ -189,18 +240,14 @@ class StripePaymentManager {
       spinnerEl.style.display = 'inline-block';
       textEl.style.display = 'none';
 
-      this.showPaymentMessage('Creating subscription...', 'info');
+      this.showPaymentMessage('Processing payment...', 'info');
 
-      // Get the correct price ID based on selected plan
-      const priceId = this.currentPlan === 'month'
-        ? this.config.products.premium_monthly.priceId
-        : this.config.products.premium_annual.priceId;
+      // Check if we have a client secret (subscription already created when modal opened)
+      if (!this.currentClientSecret) {
+        throw new Error('Payment not properly initialized. Please close and try again.');
+      }
 
-      // Create subscription on server
-      const subData = await this.stripe.createSubscription(priceId, this.currentPlan);
-      console.log('[LISA] Subscription created:', subData);
-
-      // Confirm payment
+      // Confirm payment (subscription was already created when modal opened)
       const paymentResult = await this.stripe.confirmPayment();
       console.log('[LISA] Payment confirmed:', paymentResult);
 

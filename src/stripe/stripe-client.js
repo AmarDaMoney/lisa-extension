@@ -49,15 +49,31 @@ class StripeClient {
   }
 
   /**
-   * Create Payment Element for subscription
+   * Create Payment Element for subscription (requires clientSecret)
    */
-  async createPaymentElement(containerId) {
+  async createPaymentElement(containerId, clientSecret) {
     try {
       if (!this.stripe) {
         await this.init();
       }
 
-      this.elements = this.stripe.elements();
+      if (!clientSecret) {
+        throw new Error('Client secret is required to create payment element');
+      }
+
+      this.clientSecret = clientSecret;
+      
+      // Create elements with the clientSecret (required for Payment Element)
+      this.elements = this.stripe.elements({
+        clientSecret: clientSecret,
+        appearance: {
+          theme: 'stripe',
+          variables: {
+            colorPrimary: '#6366f1'
+          }
+        }
+      });
+      
       this.paymentElement = this.elements.create('payment');
       this.paymentElement.mount(`#${containerId}`);
 

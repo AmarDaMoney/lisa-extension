@@ -18,10 +18,10 @@ const STRIPE_SUBSCRIPTION_MODAL_HTML = `
         <span class="toggle-label">Billing Period:</span>
         <div class="toggle-group">
           <button class="billing-toggle active" data-period="month">
-            Monthly<br><small>$9.99/mo</small>
+            Monthly<br><small>$9.00/mo</small>
           </button>
           <button class="billing-toggle" data-period="year">
-            Annual<br><small>$99.90/yr</small><span class="save-badge">Save 17%</span>
+            Annual<br><small>$79.00/yr</small><span class="save-badge">Save 27%</span>
           </button>
         </div>
       </div>
@@ -48,7 +48,7 @@ const STRIPE_SUBSCRIPTION_MODAL_HTML = `
           
           <!-- Submit button -->
           <button id="submit-stripe-form" type="submit" class="btn btn-subscribe-full">
-            <span id="submit-button-text">Subscribe - $9.99/month</span>
+            <span id="submit-button-text">Subscribe - $9.00/month</span>
             <span id="submit-button-spinner" class="spinner-small" style="display: none;"></span>
           </button>
         </form>
@@ -131,7 +131,7 @@ const STRIPE_SUBSCRIPTION_MODAL_HTML = `
           </div>
           <div class="detail-row">
             <span class="label">Amount:</span>
-            <span class="value" id="subAmount">$9.99/month</span>
+            <span class="value" id="subAmount">$9.00/month</span>
           </div>
           <div class="detail-row">
             <span class="label">Renews:</span>

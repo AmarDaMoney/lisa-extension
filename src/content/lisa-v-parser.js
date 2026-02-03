@@ -4,7 +4,6 @@
 class LisaVParser {
   constructor() {
     this.blocks = [];
-    this.hashChain = null; // Previous block hash for chain
   }
 
   // SHA-256 hash for code provenance
@@ -14,17 +13,6 @@ class LisaVParser {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 8);
-  }
-
-  // Add block with hash chain linkage
-  async addBlockWithChain(block) {
-    block._prevHash = this.hashChain;
-    const blockStr = JSON.stringify(block);
-    const fullHash = await this.sha256(blockStr);
-    block._hash = fullHash.slice(0, 16);
-    this.hashChain = fullHash;
-    this.blocks.push(block);
-    return block;
   }
 
   // Detect platform from URL
@@ -135,7 +123,6 @@ class LisaVParser {
   // Main extraction method - platform agnostic
   async extractConversation() {
     this.blocks = [];
-    this.hashChain = null; // Previous block hash for chain
     const platform = this.detectPlatform();
     
     // Add meta block
@@ -407,16 +394,6 @@ class LisaVParser {
       hashes = next;
     }
     return hashes[0];
-  }
-
-  // Verify chain integrity
-  verifyChain() {
-    let prev = null;
-    for (const block of this.blocks) {
-      if (block._prevHash !== prev) return false;
-      prev = block._hash || null;
-    }
-    return true;
   }
 
   toJSONL() {

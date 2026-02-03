@@ -50,11 +50,9 @@ class StripeClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_id: userID,
-          price_id: priceId,
-          billing_cycle: billingCycle,
-          success_url: successUrl,
-          cancel_url: cancelUrl
+          priceId: priceId,
+          successUrl: successUrl,
+          cancelUrl: cancelUrl
         })
       });
 

@@ -599,31 +599,13 @@ class LISAPopup {
   initiateSubscription() {
     this.trackEvent('subscription_initiated');
 
-    // Initialize or reuse the Stripe payment manager
-    try {
-      if (window._lisaStripeManager && window._lisaStripeManagerInitialized) {
-        window._lisaStripeManager.openSubscriptionModal();
-        return;
-      }
-
-      // Create Stripe client and manager
-      const client = new StripeClient(STRIPE_CONFIG.publishableKey, STRIPE_CONFIG.apiBaseUrl);
-      const manager = new StripePaymentManager(client, STRIPE_CONFIG);
-
-      // Store globally to avoid re-initialization
-      window._lisaStripeManager = manager;
-
-      manager.init().then(() => {
-        window._lisaStripeManagerInitialized = true;
-        manager.openSubscriptionModal();
-      }).catch(err => {
-        console.error('[LISA] Failed to initialize Stripe manager:', err);
-        this.showError('Failed to open payment modal');
-      });
-    } catch (error) {
-      console.error('[LISA] initiateSubscription error:', error);
-      this.showError('Subscription currently unavailable');
-    }
+    // Redirect to the web app pricing page
+    // Users can purchase there and get a license key that works for both app and extension
+    const pricingUrl = 'https://lisa-web-backend-production.up.railway.app/pricing';
+    chrome.tabs.create({ url: pricingUrl });
+    
+    // Close the upgrade modal if open
+    this.closeUpgradeModal();
   }
 
   openAppPage() {

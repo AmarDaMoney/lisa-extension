@@ -1,6 +1,7 @@
 /**
  * LISA Core - Stripe Client
  * Handles all Stripe payment operations and subscription management
+ * Updated: Uses Stripe Checkout Sessions for Chrome Extension compatibility
  */
 
 class StripeClient {
@@ -16,84 +17,33 @@ class StripeClient {
   }
 
   /**
-   * Initialize Stripe
+   * Initialize Stripe - simplified for Checkout Sessions
    */
   async init() {
     try {
-      // Load Stripe library
-      if (!window.Stripe) {
-        await this.loadStripeLibrary();
-      }
-      
-      this.stripe = Stripe(this.publishableKey);
-      console.log('[LISA Stripe] Stripe initialized');
+      console.log('[LISA Stripe] Client initialized (Checkout Session mode)');
       return true;
     } catch (error) {
-      console.error('[LISA Stripe] Failed to initialize Stripe:', error);
+      console.error('[LISA Stripe] Failed to initialize:', error);
       throw new Error('Failed to initialize payment system');
     }
   }
 
   /**
-   * Load Stripe library from CDN
+   * Create Stripe Checkout Session and redirect to payment page
+   * This is the recommended approach for Chrome Extensions (no external scripts needed)
    */
-  loadStripeLibrary() {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://js.stripe.com/v3/';
-      script.async = true;
-      script.onload = resolve;
-      script.onerror = () => reject(new Error('Failed to load Stripe library'));
-      document.head.appendChild(script);
-    });
-  }
-
-  /**
-   * Create Payment Element for subscription (requires clientSecret)
-   */
-  async createPaymentElement(containerId, clientSecret) {
+  async createCheckoutSession(priceId, billingCycle = 'month') {
     try {
-      if (!this.stripe) {
-        await this.init();
-      }
-
-      if (!clientSecret) {
-        throw new Error('Client secret is required to create payment element');
-      }
-
-      this.clientSecret = clientSecret;
-      
-      // Create elements with the clientSecret (required for Payment Element)
-      this.elements = this.stripe.elements({
-        clientSecret: clientSecret,
-        appearance: {
-          theme: 'stripe',
-          variables: {
-            colorPrimary: '#6366f1'
-          }
-        }
-      });
-      
-      this.paymentElement = this.elements.create('payment');
-      this.paymentElement.mount(`#${containerId}`);
-
-      console.log('[LISA Stripe] Payment element created');
-      return this.paymentElement;
-    } catch (error) {
-      console.error('[LISA Stripe] Failed to create payment element:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create subscription via backend
-   */
-  async createSubscription(priceId, billingCycle = 'month') {
-    try {
-      // Get current user/device ID from storage
       const userID = await this.getUserID();
       
-      const response = await fetch(`${this.apiBaseUrl}/stripe/create-subscription`, {
+      // Get the success/cancel URLs for the extension
+      const successUrl = chrome.runtime.getURL('src/popup/success.html') + '?session_id={CHECKOUT_SESSION_ID}';
+      const cancelUrl = chrome.runtime.getURL('src/popup/popup.html') + '?payment_cancelled=true';
+      
+      console.log('[LISA Stripe] Creating checkout session...', { priceId, billingCycle });
+      
+      const response = await fetch(`${this.apiBaseUrl}/stripe/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,65 +52,119 @@ class StripeClient {
           user_id: userID,
           price_id: priceId,
           billing_cycle: billingCycle,
-          return_url: chrome.runtime.getURL('src/popup/popup.html')
+          success_url: successUrl,
+          cancel_url: cancelUrl
         })
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[LISA Stripe] Server error:', response.status, errorText);
         throw new Error(`Server error: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('[LISA Stripe] Checkout session created:', data);
       
-      if (data.client_secret) {
-        this.clientSecret = data.client_secret;
+      if (data.url) {
+        // Redirect to Stripe Checkout
+        return data;
+      } else {
+        throw new Error('No checkout URL returned from server');
       }
-      
-      if (data.subscription_id) {
-        this.subscriptionId = data.subscription_id;
-      }
-
-      console.log('[LISA Stripe] Subscription created:', data);
-      return data;
     } catch (error) {
-      console.error('[LISA Stripe] Failed to create subscription:', error);
+      console.error('[LISA Stripe] Failed to create checkout session:', error);
       throw error;
     }
   }
 
   /**
-   * Confirm payment with card details
+   * Open Stripe Checkout in a new tab (works with Chrome Extensions)
    */
-  async confirmPayment() {
+  async openCheckout(priceId, billingCycle = 'month') {
     try {
-      if (!this.stripe || !this.elements) {
-        throw new Error('Stripe not initialized');
+      const sessionData = await this.createCheckoutSession(priceId, billingCycle);
+      
+      if (sessionData.url) {
+        // Open Stripe Checkout in a new tab
+        chrome.tabs.create({ url: sessionData.url });
+        return { success: true, redirected: true };
+      } else {
+        throw new Error('No checkout URL available');
       }
-
-      if (!this.clientSecret) {
-        throw new Error('No client secret available');
-      }
-
-      const { error, paymentIntent } = await this.stripe.confirmPayment({
-        elements: this.elements,
-        clientSecret: this.clientSecret,
-        confirmParams: {
-          return_url: chrome.runtime.getURL('src/popup/popup.html?payment_success=true')
-        },
-        redirect: 'if_required'
-      });
-
-      if (error) {
-        console.error('[LISA Stripe] Payment confirmation error:', error);
-        throw new Error(error.message || 'Payment failed');
-      }
-
-      console.log('[LISA Stripe] Payment confirmed:', paymentIntent);
-      return paymentIntent;
     } catch (error) {
-      console.error('[LISA Stripe] Payment confirmation failed:', error);
+      console.error('[LISA Stripe] Failed to open checkout:', error);
       throw error;
     }
+  }
+
+  /**
+   * Verify checkout session after payment
+   */
+  async verifyCheckoutSession(sessionId) {
+    try {
+      const userID = await this.getUserID();
+      
+      const response = await fetch(`${this.apiBaseUrl}/stripe/verify-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          user_id: userID
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Verification failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[LISA Stripe] Session verified:', data);
+      
+      if (data.status === 'complete' || data.payment_status === 'paid') {
+        // Activate premium
+        await chrome.storage.sync.set({
+          userTier: 'premium',
+          subscriptionId: data.subscription_id || data.subscription,
+          subscriptionStatus: 'active',
+          subscriptionUpdatedAt: new Date().toISOString()
+        });
+        return { success: true, data };
+      }
+      
+      return { success: false, data };
+    } catch (error) {
+      console.error('[LISA Stripe] Session verification failed:', error);
+      throw error;
+    }
+  }
+
+  // Legacy methods kept for compatibility but deprecated
+  
+  /**
+   * @deprecated Use createCheckoutSession instead
+   */
+  async createSubscription(priceId, billingCycle = 'month') {
+    console.warn('[LISA Stripe] createSubscription is deprecated, use createCheckoutSession');
+    return this.createCheckoutSession(priceId, billingCycle);
+  }
+
+  /**
+   * @deprecated Payment Element not supported in Chrome Extensions
+   */
+  async createPaymentElement(containerId, clientSecret) {
+    console.warn('[LISA Stripe] Payment Element not supported in Chrome Extensions. Use Checkout Sessions.');
+    throw new Error('Payment Element not supported. Please use the Subscribe button to open Stripe Checkout.');
+  }
+
+  /**
+   * @deprecated Use openCheckout instead
+   */
+  async confirmPayment() {
+    console.warn('[LISA Stripe] confirmPayment is deprecated, use openCheckout');
+    throw new Error('Direct payment confirmation not supported. Please use Stripe Checkout.');
   }
 
   /**

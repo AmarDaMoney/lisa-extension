@@ -1,6 +1,7 @@
 /**
  * LISA Core - Stripe Payment Integration Manager
  * Handles all Stripe payment flows and subscription management
+ * Updated: Uses Stripe Checkout Sessions for Chrome Extension compatibility
  */
 
 class StripePaymentManager {
@@ -9,9 +10,6 @@ class StripePaymentManager {
     this.config = config;
     this.currentPlan = 'month'; // 'month' or 'year'
     this.isProcessing = false;
-    this.isTogglingPlan = false;
-    this.currentClientSecret = null;
-    this.currentSubscriptionId = null;
   }
 
   /**
@@ -19,7 +17,7 @@ class StripePaymentManager {
    */
   async init() {
     try {
-      // Initialize Stripe
+      // Initialize Stripe client
       await this.stripe.init();
       
       // Inject modal HTML and CSS into popup
@@ -28,10 +26,10 @@ class StripePaymentManager {
       // Setup event listeners
       this.setupEventListeners();
       
-      // Check for payment success parameters
-      this.checkPaymentSuccess();
+      // Check for payment success/cancel parameters
+      this.checkUrlParameters();
       
-      console.log('[LISA] Stripe Payment Manager initialized');
+      console.log('[LISA] Stripe Payment Manager initialized (Checkout Session mode)');
       return true;
     } catch (error) {
       console.error('[LISA] Failed to initialize Stripe:', error);
@@ -44,11 +42,12 @@ class StripePaymentManager {
    */
   injectModalUI() {
     try {
-      // Import modal content (loaded from stripe-subscription-modal.js)
-      const { STRIPE_SUBSCRIPTION_MODAL_HTML, STRIPE_SUBSCRIPTION_MODAL_CSS } = 
-        typeof STRIPE_SUBSCRIPTION_MODAL !== 'undefined' 
-          ? window 
-          : require('./stripe-subscription-modal.js');
+      // Check if modal content exists in window (from stripe-subscription-modal.js)
+      if (typeof STRIPE_SUBSCRIPTION_MODAL_HTML === 'undefined' || 
+          typeof STRIPE_SUBSCRIPTION_MODAL_CSS === 'undefined') {
+        console.warn('[LISA] Stripe modal templates not found');
+        return;
+      }
 
       // Add modal HTML to body
       const container = document.createElement('div');
@@ -84,7 +83,7 @@ class StripePaymentManager {
       });
     });
 
-    // Payment form submission
+    // Payment form submission - now redirects to Stripe Checkout
     const form = document.getElementById('stripePaymentForm');
     if (form) {
       form.addEventListener('submit', (e) => this.handlePaymentSubmit(e));
@@ -92,6 +91,26 @@ class StripePaymentManager {
 
     // Modal close events
     this.setupModalCloseListeners();
+
+    // Success modal events
+    const goBackBtn = document.getElementById('goBackBtn');
+    if (goBackBtn) {
+      goBackBtn.addEventListener('click', () => {
+        const modal = document.getElementById('stripeSuccessModal');
+        if (modal) modal.style.display = 'none';
+        // Reload popup to reflect premium status
+        window.location.reload();
+      });
+    }
+
+    const closeSuccessBtn = document.getElementById('closeSuccessModalBtn');
+    if (closeSuccessBtn) {
+      closeSuccessBtn.addEventListener('click', () => {
+        const modal = document.getElementById('stripeSuccessModal');
+        if (modal) modal.style.display = 'none';
+        window.location.reload();
+      });
+    }
   }
 
   /**
@@ -111,14 +130,28 @@ class StripePaymentManager {
   }
 
   /**
-   * Open subscription modal
+   * Open subscription modal - simplified for Checkout Sessions
    */
   async openSubscriptionModal() {
     const modal = document.getElementById('stripeSubscriptionModal');
     if (modal) {
+      // Hide the payment element container since we're using Checkout
+      const paymentElementContainer = document.getElementById('payment-element');
+      if (paymentElementContainer) {
+        paymentElementContainer.innerHTML = `
+          <div style="text-align: center; padding: 20px; color: #666;">
+            <p>Click "Subscribe" to proceed to secure checkout</p>
+            <p style="font-size: 12px; margin-top: 10px;">
+              🔒 You'll be redirected to Stripe's secure payment page
+            </p>
+          </div>
+        `;
+      }
+      
+      // Update button text
+      this.updateSubmitButtonText();
+      
       modal.style.display = 'flex';
-      // Initialize payment element (creates subscription first to get clientSecret)
-      await this.initializePaymentElement();
     }
   }
 
@@ -129,65 +162,25 @@ class StripePaymentManager {
     const modal = document.getElementById('stripeSubscriptionModal');
     if (modal) {
       modal.style.display = 'none';
-      this.stripe.cleanup();
-      this.currentClientSecret = null;
     }
   }
 
   /**
-   * Initialize Stripe Payment Element (creates subscription first to get clientSecret)
+   * Update submit button text based on plan
    */
-  async initializePaymentElement() {
-    try {
-      this.showPaymentMessage('Loading payment form...', 'info');
-      
-      // Get the correct price ID based on selected plan
-      const priceId = this.currentPlan === 'month'
-        ? this.config.products.premium_monthly.priceId
-        : this.config.products.premium_annual.priceId;
-
-      // Create subscription on server to get clientSecret
-      const subData = await this.stripe.createSubscription(priceId, this.currentPlan);
-      console.log('[LISA] Subscription created for payment element:', subData);
-      
-      if (!subData.client_secret) {
-        throw new Error('No client secret returned from server');
-      }
-
-      this.currentClientSecret = subData.client_secret;
-      this.currentSubscriptionId = subData.subscription_id;
-
-      // Now create payment element with the clientSecret
-      await this.stripe.createPaymentElement('payment-element', subData.client_secret);
-      
-      // Hide the loading message
-      const messageEl = document.getElementById('payment-message');
-      if (messageEl) {
-        messageEl.style.display = 'none';
-      }
-      
-      console.log('[LISA] Payment element mounted');
-    } catch (error) {
-      console.error('[LISA] Failed to initialize payment element:', error);
-      this.showPaymentMessage('Failed to load payment form: ' + error.message, 'error');
+  updateSubmitButtonText() {
+    const price = this.currentPlan === 'month' ? '$9.00/month' : '$79.00/year';
+    const buttonText = document.getElementById('submit-button-text');
+    if (buttonText) {
+      buttonText.textContent = `Subscribe - ${price}`;
     }
-  }
-
-  /**
-   * Mount Stripe Payment Element (legacy - now use initializePaymentElement)
-   */
-  async mountPaymentElement() {
-    // Redirect to the new initialization flow
-    await this.initializePaymentElement();
   }
 
   /**
    * Handle billing cycle toggle
    */
-  async handleBillingToggle(button) {
-    // Prevent multiple clicks while processing
-    if (this.isTogglingPlan) return;
-    this.isTogglingPlan = true;
+  handleBillingToggle(button) {
+    if (!button) return;
 
     // Update active state
     document.querySelectorAll('.billing-toggle').forEach(btn => {
@@ -197,32 +190,15 @@ class StripePaymentManager {
 
     // Update plan
     this.currentPlan = button.dataset.period;
-
+    
     // Update button text
-    const submitBtn = document.getElementById('submit-stripe-form');
-    const price = this.currentPlan === 'month' 
-      ? '$9.00/month' 
-      : '$79.00/year';
-    const buttonText = document.getElementById('submit-button-text');
-    if (buttonText) {
-      buttonText.textContent = `Subscribe - ${price}`;
-    }
+    this.updateSubmitButtonText();
 
     console.log('[LISA] Billing plan changed to:', this.currentPlan);
-
-    // Reinitialize payment element with new price
-    try {
-      this.stripe.cleanup();
-      await this.initializePaymentElement();
-    } catch (error) {
-      console.error('[LISA] Failed to reinitialize payment element:', error);
-    } finally {
-      this.isTogglingPlan = false;
-    }
   }
 
   /**
-   * Handle payment form submission
+   * Handle payment form submission - opens Stripe Checkout
    */
   async handlePaymentSubmit(e) {
     e.preventDefault();
@@ -236,48 +212,35 @@ class StripePaymentManager {
 
     try {
       // Show loading state
-      submitBtn.disabled = true;
-      spinnerEl.style.display = 'inline-block';
-      textEl.style.display = 'none';
+      if (submitBtn) submitBtn.disabled = true;
+      if (spinnerEl) spinnerEl.style.display = 'inline-block';
+      if (textEl) textEl.style.display = 'none';
 
-      this.showPaymentMessage('Processing payment...', 'info');
+      this.showPaymentMessage('Redirecting to checkout...', 'info');
 
-      // Check if we have a client secret (subscription already created when modal opened)
-      if (!this.currentClientSecret) {
-        throw new Error('Payment not properly initialized. Please close and try again.');
-      }
+      // Get the correct price ID based on selected plan
+      const priceId = this.currentPlan === 'month'
+        ? this.config.products.premium_monthly.priceId
+        : this.config.products.premium_annual.priceId;
 
-      // Confirm payment (subscription was already created when modal opened)
-      const paymentResult = await this.stripe.confirmPayment();
-      console.log('[LISA] Payment confirmed:', paymentResult);
-
-      // Show success message
-      this.showPaymentMessage('Payment successful!', 'success');
-
-      // Close subscription modal
-      this.closeSubscriptionModal();
-
-      // Show success modal
-      await this.showSuccessModal();
-
-      // Track event
-      if (typeof chrome !== 'undefined' && chrome.runtime) {
-        chrome.runtime.sendMessage({
-          action: 'trackEvent',
-          event: 'subscription_completed',
-          data: { plan: this.currentPlan }
-        }).catch(() => {});
+      // Open Stripe Checkout in a new tab
+      const result = await this.stripe.openCheckout(priceId, this.currentPlan);
+      
+      if (result.redirected) {
+        // Close the modal since user is redirected to Stripe
+        this.closeSubscriptionModal();
+        console.log('[LISA] User redirected to Stripe Checkout');
       }
 
     } catch (error) {
-      console.error('[LISA] Payment failed:', error);
-      this.showPaymentMessage(error.message || 'Payment failed. Please try again.', 'error');
+      console.error('[LISA] Failed to open checkout:', error);
+      this.showPaymentMessage('Failed to open checkout: ' + error.message, 'error');
     } finally {
       // Reset loading state
       this.isProcessing = false;
-      submitBtn.disabled = false;
-      spinnerEl.style.display = 'none';
-      textEl.style.display = 'inline';
+      if (submitBtn) submitBtn.disabled = false;
+      if (spinnerEl) spinnerEl.style.display = 'none';
+      if (textEl) textEl.style.display = 'inline';
     }
   }
 
@@ -290,6 +253,47 @@ class StripePaymentManager {
       messageEl.textContent = message;
       messageEl.className = `message ${type}`;
       messageEl.style.display = 'block';
+    }
+  }
+
+  /**
+   * Check URL parameters for payment success/cancel
+   */
+  checkUrlParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    if (urlParams.has('payment_cancelled')) {
+      console.log('[LISA] Payment was cancelled');
+      // Clear URL parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    if (urlParams.has('session_id')) {
+      // This shouldn't happen in popup.html, but handle it just in case
+      const sessionId = urlParams.get('session_id');
+      this.handleCheckoutSuccess(sessionId);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
+
+  /**
+   * Handle checkout success (called from success.html)
+   */
+  async handleCheckoutSuccess(sessionId) {
+    try {
+      console.log('[LISA] Verifying checkout session:', sessionId);
+      
+      const result = await this.stripe.verifyCheckoutSession(sessionId);
+      
+      if (result.success) {
+        console.log('[LISA] Payment verified successfully!');
+        this.showSuccessModal();
+      } else {
+        console.warn('[LISA] Payment verification pending');
+      }
+      
+    } catch (error) {
+      console.error('[LISA] Error verifying checkout:', error);
     }
   }
 
@@ -314,17 +318,6 @@ class StripePaymentManager {
         modal.style.display = 'flex';
       }
 
-      // Handle go back button
-      const goBackBtn = document.getElementById('goBackBtn');
-      if (goBackBtn) {
-        goBackBtn.onclick = () => {
-          modal.style.display = 'none';
-        };
-      }
-
-      // Verify and activate premium
-      await this.stripe.verifyAndActivatePremium();
-
     } catch (error) {
       console.error('[LISA] Failed to show success modal:', error);
     }
@@ -337,7 +330,7 @@ class StripePaymentManager {
     try {
       const subscription = await this.stripe.getSubscription();
 
-      if (!subscription.active) {
+      if (!subscription.active && subscription.status !== 'active') {
         console.warn('[LISA] No active subscription');
         return;
       }
@@ -354,9 +347,9 @@ class StripePaymentManager {
       }
 
       const amountEl = document.getElementById('subAmount');
-      if (amountEl) {
+      if (amountEl && subscription.amount) {
         const amount = this.stripe.formatPrice(subscription.amount);
-        amountEl.textContent = amount + `/${subscription.interval}`;
+        amountEl.textContent = amount + `/${subscription.interval || 'month'}`;
       }
 
       const renewDateEl = document.getElementById('subRenewDate');
@@ -369,7 +362,6 @@ class StripePaymentManager {
       const updatePaymentBtn = document.getElementById('updatePaymentBtn');
       if (updatePaymentBtn) {
         updatePaymentBtn.onclick = () => {
-          // TODO: Implement payment method update
           alert('Payment method update coming soon!');
         };
       }
@@ -435,43 +427,13 @@ class StripePaymentManager {
 
       alert('Subscription cancelled successfully');
       console.log('[LISA] Subscription cancelled:', result);
+      
+      // Reload to update UI
+      window.location.reload();
 
     } catch (error) {
       console.error('[LISA] Failed to cancel subscription:', error);
       alert('Failed to cancel subscription: ' + error.message);
-    }
-  }
-
-  /**
-   * Check for payment success parameters in URL
-   */
-  checkPaymentSuccess() {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('payment_success')) {
-      this.handlePaymentSuccess();
-      // Clear URL parameter
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }
-
-  /**
-   * Handle payment success from redirect
-   */
-  async handlePaymentSuccess() {
-    try {
-      const result = await this.stripe.handlePaymentSuccess();
-      console.log('[LISA] Payment success handled:', result);
-      
-      // Show success notification
-      if (typeof chrome !== 'undefined' && chrome.runtime) {
-        chrome.runtime.sendMessage({
-          action: 'trackEvent',
-          event: 'payment_success_confirmed'
-        }).catch(() => {});
-      }
-
-    } catch (error) {
-      console.error('[LISA] Error handling payment success:', error);
     }
   }
 

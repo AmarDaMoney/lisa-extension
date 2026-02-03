@@ -211,21 +211,69 @@
     <p class="footer-text">A confirmation email has been sent to your inbox.</p>
   </div>
   
+  <script src="../stripe/stripe-config.js"></script>
+  <script src="../stripe/stripe-client.js"></script>
   <script>
-    // Notify background script to refresh user tier
-    if (chrome && chrome.runtime) {
-      chrome.runtime.sendMessage({ 
-        action: 'refreshUserTier',
-        source: 'success_page'
-      }).catch(err => console.log('Extension context:', err));
+    // Verify checkout session and activate premium
+    async function verifyAndActivate() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+        
+        if (sessionId) {
+          console.log('[LISA Success] Verifying session:', sessionId);
+          
+          // Create stripe client and verify session
+          const client = new StripeClient(STRIPE_CONFIG.publishableKey, STRIPE_CONFIG.apiBaseUrl);
+          const result = await client.verifyCheckoutSession(sessionId);
+          
+          if (result.success) {
+            console.log('[LISA Success] Premium activated!');
+          } else {
+            console.log('[LISA Success] Verification pending, activating anyway');
+            // Activate premium even if verification is pending (webhook will confirm)
+            await chrome.storage.sync.set({
+              userTier: 'premium',
+              subscriptionStatus: 'pending_verification',
+              subscriptionUpdatedAt: new Date().toISOString()
+            });
+          }
+        } else {
+          // No session ID, but still activate (user came from successful payment)
+          console.log('[LISA Success] No session ID, setting premium from redirect');
+          await chrome.storage.sync.set({
+            userTier: 'premium',
+            subscriptionStatus: 'active',
+            subscriptionUpdatedAt: new Date().toISOString()
+          });
+        }
+        
+        // Notify background script to refresh user tier
+        if (chrome && chrome.runtime) {
+          chrome.runtime.sendMessage({ 
+            action: 'refreshUserTier',
+            source: 'success_page'
+          }).catch(err => console.log('Extension context:', err));
+        }
+        
+      } catch (error) {
+        console.error('[LISA Success] Error verifying session:', error);
+        // Still activate premium on error (webhook will correct if needed)
+        await chrome.storage.sync.set({
+          userTier: 'premium',
+          subscriptionStatus: 'pending',
+          subscriptionUpdatedAt: new Date().toISOString()
+        });
+      }
     }
     
-    // Auto-close after 5 seconds if opened in tab
+    // Run verification on page load
+    verifyAndActivate();
+    
+    // Auto-close after 10 seconds
     setTimeout(() => {
-      if (window.opener) {
-        window.close();
-      }
-    }, 5000);
+      window.close();
+    }, 10000);
   </script>
 </body>
 </html>

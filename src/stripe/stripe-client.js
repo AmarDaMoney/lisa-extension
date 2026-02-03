@@ -43,7 +43,8 @@ class StripeClient {
       
       console.log('[LISA Stripe] Creating checkout session...', { priceId, billingCycle });
       
-      const response = await fetch(`${this.apiBaseUrl}/stripe/create-checkout-session`, {
+      // Use the website checkout endpoint (not /stripe/ prefix)
+      const response = await fetch(`${this.apiBaseUrl}/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -598,14 +598,26 @@ class LISAPopup {
 
   initiateSubscription() {
     this.trackEvent('subscription_initiated');
-
-    // Redirect to the web app pricing page
-    // Users can purchase there and get a license key that works for both app and extension
-    const pricingUrl = 'https://lisa-web-backend-production.up.railway.app/pricing';
-    chrome.tabs.create({ url: pricingUrl });
     
-    // Close the upgrade modal if open
-    this.closeUpgradeModal();
+    // Open the upgrade modal to let user choose plan, then redirect to Stripe Checkout
+    this.openStripeCheckout('month');
+  }
+
+  async openStripeCheckout(plan = 'month') {
+    try {
+      const priceId = plan === 'month' 
+        ? STRIPE_CONFIG.products.premium_monthly.priceId 
+        : STRIPE_CONFIG.products.premium_annual.priceId;
+
+      const client = new StripeClient(STRIPE_CONFIG.publishableKey, STRIPE_CONFIG.apiBaseUrl);
+      await client.openCheckout(priceId, plan);
+      
+      // Close modals after redirect initiated
+      this.closeUpgradeModal();
+    } catch (error) {
+      console.error('[LISA] Checkout error:', error);
+      this.showError('Failed to open checkout. Please try again.');
+    }
   }
 
   openAppPage() {

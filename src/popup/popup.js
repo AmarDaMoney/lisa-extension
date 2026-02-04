@@ -631,7 +631,7 @@ class LISAPopup {
   }
 
   openAppPage() {
-    const appUrl = 'https://lisa-web-backend-production.up.railway.app';
+    const appUrl = 'https://lisa-web-backend-production.up.railway.app/landing';
     this.trackEvent('app_page_clicked');
     chrome.tabs.create({ url: appUrl });
   }

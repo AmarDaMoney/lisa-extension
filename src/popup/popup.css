@@ -1,7 +1,6 @@
-/* LISA Core Extension - Popup Styles */
-
 :root {
   --primary-color: #2563eb;
+  --primary-dark: #1d4ed8;
   --secondary-color: #64748b;
   --success-color: #10b981;
   --premium-color: #f59e0b;
@@ -12,6 +11,25 @@
   --text-secondary: #64748b;
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+
+/* Dark mode - follows system preference */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary-color: #3b82f6;
+    --primary-dark: #2563eb;
+    --secondary-color: #94a3b8;
+    --success-color: #34d399;
+    --premium-color: #fbbf24;
+    --background: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+  }
 }
 
 * {
@@ -270,7 +288,7 @@ header {
   font-size: 10px;
   word-break: break-all;
   color: var(--text-primary);
-  background: white;
+  background: var(--background);
   padding: 8px;
   border-radius: 4px;
   display: block;
@@ -411,7 +429,7 @@ footer {
 }
 
 .modal-content {
-  background: white;
+  background: var(--background);
   border-radius: 12px;
   max-width: 600px;
   max-height: 80vh;
@@ -607,7 +625,7 @@ footer {
 }
 
 .prompt-box {
-  background: white;
+  background: var(--background);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 12px;
@@ -1045,7 +1063,7 @@ footer {
 
 .license-input:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: var(--primary-color);
 }
 
 .license-input::placeholder {
@@ -1058,7 +1076,7 @@ footer {
   font-size: 13px;
   font-weight: 600;
   color: white;
-  background: var(--primary);
+  background: var(--primary-color);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -1128,7 +1146,7 @@ footer {
 
 #currentTierDisplay {
   font-weight: 600;
-  color: var(--primary);
+  color: var(--primary-color);
 }
 
 #currentTierDisplay.premium {
@@ -1260,7 +1278,7 @@ footer {
 }
 
 input:checked + .toggle-slider {
-  background-color: var(--primary);
+  background-color: var(--primary-color);
 }
 
 input:checked + .toggle-slider:before {
@@ -1332,7 +1350,7 @@ input:checked + .toggle-slider:before {
 }
 
 .snapshot-btn.send {
-  background: var(--primary);
+  background: var(--primary-color);
   color: white;
 }
 
@@ -1340,7 +1358,7 @@ input:checked + .toggle-slider:before {
   background: var(--primary-dark);
 }
 .snapshot-btn.download {
-  background: var(--primary);
+  background: var(--primary-color);
   color: white;
 }
 

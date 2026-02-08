@@ -446,6 +446,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         data.url = data.url || tab.url;
         data.title = data.title || tab.title || 'Untitled';
         data.messageCount = data.messageCount || (data.messages?.length || 0);
+        // Cache for auto-save on tab close
+        conversationCache.set(tab.id, JSON.parse(JSON.stringify(data)));
 
         // Save snapshot
         const snapshot = await snapshotManager.saveSnapshot(data, 'floating-button');
@@ -776,6 +778,7 @@ setInterval(() => {
 
 // Track tabs with AI platforms for auto-save
 const aiPlatformTabs = new Map();
+const conversationCache = new Map(); // Cache last extraction per tab
 
 // Detect when user navigates to AI platform
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -825,17 +828,28 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     // Note: This may not always work if tab is already gone
     console.log(`[LISA] Tab closed: ${tabInfo.platform} - attempting auto-save`);
     
-    // Since tab is closing, we save what we tracked
-    // Full extraction would need to happen BEFORE close (future enhancement)
-    const snapshot = {
-      platform: tabInfo.platform,
-      url: tabInfo.url,
-      title: tabInfo.title,
-      messageCount: 0,
-      messages: [],
-      extractedAt: new Date().toISOString(),
-      note: 'Tab closed - metadata only. Use manual export for full conversation.'
-    };
+    // Check cache for last extracted conversation
+    const cachedData = conversationCache.get(tabId);
+    conversationCache.delete(tabId); // Clean up
+    
+    let snapshot;
+    if (cachedData && cachedData.messages && cachedData.messages.length > 0) {
+      snapshot = {
+        ...cachedData,
+        extractedAt: new Date().toISOString(),
+        note: "Tab closed - restored from cache"
+      };
+    } else {
+      snapshot = {
+        platform: tabInfo.platform,
+        url: tabInfo.url,
+        title: tabInfo.title,
+        messageCount: 0,
+        messages: [],
+        extractedAt: new Date().toISOString(),
+        note: "Tab closed - metadata only. Use manual export for full conversation."
+      };
+    }
     
     await snapshotManager.saveSnapshot(snapshot, 'auto-close');
     showNotification('LISA Auto-Save', `📸 Saved: ${tabInfo.title || tabInfo.platform}`);
@@ -845,4 +859,4 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   }
 });
 
-console.log('[LISA] Core compression engine initialized v0.42');
+console.log('[LISA] Core compression engine initialized v0.44');

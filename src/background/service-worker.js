@@ -1,6 +1,6 @@
 // LISA Core - Semantic Compression Engine
 // Background Service Worker (Manifest V3)
-// v0.42 - Version update
+// v0.44 - Version update
 
 class LISACompressor {
   constructor() {
@@ -110,7 +110,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.42',
+        lisaVersion: '0.44',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,

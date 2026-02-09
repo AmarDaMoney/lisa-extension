@@ -248,7 +248,7 @@ header {
 }
 
 .info-box.success {
-  background: #f0fdf4;
+  background: var(--surface);
   border-color: #86efac;
 }
 
@@ -351,7 +351,7 @@ header {
 .upload-instructions {
   margin-top: 12px;
   padding: 12px;
-  background: #f0f9ff;
+  background: var(--surface);
   border-left: 3px solid var(--primary-color);
   border-radius: 4px;
 }
@@ -517,7 +517,7 @@ footer {
 }
 
 .example-box, .highlight-box {
-  background: #f0f9ff;
+  background: var(--surface);
   border-left: 4px solid var(--primary-color);
   padding: 12px;
   margin: 12px 0;
@@ -593,7 +593,7 @@ footer {
 }
 
 .instructions-box {
-  background: #f0f9ff;
+  background: var(--surface);
   border: 2px solid var(--primary-color);
   border-radius: 8px;
   padding: 16px;
@@ -675,7 +675,7 @@ footer {
 }
 
 .shortcut-info {
-  background: #f0fdf4;
+  background: var(--surface);
   border-left: 4px solid var(--success-color);
   padding: 10px;
   margin-top: 12px;
@@ -698,7 +698,7 @@ footer {
 
 .quick-tips-toggle {
   width: 100%;
-  background: #f0fdf4;
+  background: var(--surface);
   border: none;
   padding: 10px 12px;
   display: flex;
@@ -726,7 +726,7 @@ footer {
 .quick-tips-content {
   max-height: 0;
   overflow: hidden;
-  background: #f0fdf4;
+  background: var(--surface);
   transition: max-height 0.3s ease, padding 0.3s ease;
 }
 
@@ -1399,4 +1399,27 @@ input:checked + .toggle-slider:before {
   border-radius: 8px;
   font-size: 13px;
   color: var(--text-primary);
+}
+/* Dark mode fixes for highlight boxes */
+@media (prefers-color-scheme: dark) {
+  .disclaimer {
+    background: #422006;
+    border-left-color: #f59e0b;
+  }
+  .disclaimer small {
+    color: #fcd34d;
+  }
+  .value-highlight {
+    background: #422006;
+    border-left-color: #f59e0b;
+  }
+  .value-highlight p {
+    color: #fcd34d;
+  }
+  .shortcut-info {
+    border-left-color: var(--success-color);
+  }
+  .shortcut-info p {
+    color: var(--text-primary);
+  }
 }

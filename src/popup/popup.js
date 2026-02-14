@@ -1052,7 +1052,7 @@ class LISAPopup {
   }
   
   openFeedback() {
-    chrome.tabs.create({ url: 'https://sat-chain.com/lisa-feedback' });
+    chrome.tabs.create({ url: 'mailto:contact@sat-chain.com?subject=LISA%20Feedback' });
   }
 
   formatBytes(bytes) {

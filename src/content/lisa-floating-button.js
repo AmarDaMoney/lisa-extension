@@ -233,7 +233,7 @@ class LISAFloatingButton {
     const menu = document.createElement("div");
     menu.className = "lisa-action-menu";
     menu.innerHTML = `
-      <div class="lisa-menu-item" data-action="save-json">💾 Save Raw JSON</div>
+      <div class="lisa-menu-item" data-action="save-json">📄 Save Raw JSON</div>
       <div class="lisa-menu-item" data-action="save-lisav">📝 Save LISA-V</div>
       
     `;

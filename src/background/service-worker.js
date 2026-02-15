@@ -458,16 +458,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         // Ensure required fields exist
-        const data = extractResponse.data || {};
-        data.platform = data.platform || snapshotManager.getPlatformName(tab.url);
-        data.url = data.url || tab.url;
-        data.title = data.title || tab.title || 'Untitled';
-        data.messageCount = data.messageCount || (data.messages?.length || 0);
-        // Cache for auto-save on tab close
-        conversationCache.set(tab.id, JSON.parse(JSON.stringify(data)));
+          const data = request.data || extractResponse.data || {};
+          data.platform = data.platform || snapshotManager.getPlatformName(tab.url);
+          data.url = data.url || tab.url;
+          data.title = data.title || tab.title || 'Untitled';
+          data.messageCount = data.messageCount || (data.messages?.length || 0);
+          
+          // Cache for auto-save on tab close (only if extracted from page)
+          if (!request.data) {
+            conversationCache.set(tab.id, JSON.parse(JSON.stringify(data)));
+          }
 
-        // Save snapshot
-        const snapshot = await snapshotManager.saveSnapshot(data, 'floating-button');
+          // Save snapshot with appropriate source
+          const source = request.data ? 'extension-compressed' : 'floating-button';
+          const snapshot = await snapshotManager.saveSnapshot(data, source);
         sendResponse({ success: true, snapshot });
         
       } catch (error) {

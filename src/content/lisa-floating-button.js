@@ -20,7 +20,56 @@ class LISAFloatingButton {
       console.log('[LISA] Could not check premium status');
     }
   }
+  
+  async checkFloatingLimit(type) {
+    // Premium users have no limits
+    if (this.isPremium) return { allowed: true };
+    
+    const storageKey = `floating_${type}_today`;
+    const dateKey = 'floating_limit_date';
+    
+    try {
+      const result = await chrome.storage.sync.get([storageKey, dateKey]);
+      const today = new Date().toDateString();
+      
+      // Reset if new day
+      if (result[dateKey] !== today) {
+        await chrome.storage.sync.set({ 
+          [dateKey]: today,
+          floating_lisav_today: 0,
+          floating_rawjson_today: 0
+        });
+        return { allowed: true, remaining: 5 };
+      }
+      
+      const count = result[storageKey] || 0;
+      if (count >= 5) {
+        return { 
+          allowed: false, 
+          message: `Free tier: 5 ${type} saves per day. Upgrade for unlimited!`
+        };
+      }
+      
+      return { allowed: true, remaining: 5 - count };
+    } catch (error) {
+      console.log('[LISA] Limit check error:', error);
+      return { allowed: true };
+    }
+  }
 
+  async incrementFloatingLimit(type) {
+    if (this.isPremium) return;
+    
+    const storageKey = `floating_${type}_today`;
+    try {
+      const result = await chrome.storage.sync.get([storageKey]);
+      const count = (result[storageKey] || 0) + 1;
+      await chrome.storage.sync.set({ [storageKey]: count });
+      return 5 - count;
+    } catch (error) {
+      console.log('[LISA] Limit increment error:', error);
+    }
+  }
   createButton() {
     if (document.getElementById('lisa-floating-btn')) return;
 
@@ -228,6 +277,13 @@ class LISAFloatingButton {
 
   async saveLisaV() {
     try {
+      // Check free tier limit
+        const limitCheck = await this.checkFloatingLimit('lisav');
+        if (!limitCheck.allowed) {
+          this.showToast(limitCheck.message, true);
+          this.showUpgradePrompt();
+          return;
+        }
       this.showToast("Extracting LISA-V...");
       
       // Use LISA-V parser for verbatim extraction
@@ -251,6 +307,10 @@ class LISAFloatingButton {
       
       if (response?.success) {
         this.showToast("✅ LISA-V saved! " + stats.totalBlocks + " blocks");
+        const remaining = await this.incrementFloatingLimit('lisav');
+          if (remaining !== undefined && remaining <= 2) {
+            setTimeout(() => this.showToast(`${remaining} LISA-V saves remaining today`), 2000);
+          }
       } else {
         this.showToast("❌ " + (response?.error || "Save failed"), true);
       }
@@ -295,12 +355,23 @@ class LISAFloatingButton {
 
   async saveConversation() {
     try {
+      // Check free tier limit
+        const limitCheck = await this.checkFloatingLimit('rawjson');
+        if (!limitCheck.allowed) {
+          this.showToast(limitCheck.message, true);
+          this.showUpgradePrompt();
+          return;
+        }
       this.showToast('Saving...');
       
       const response = await chrome.runtime.sendMessage({ action: 'extractAndSave' });
       
       if (response && response.success) {
         this.showToast('✅ Saved to LISA library!');
+        const remaining = await this.incrementFloatingLimit('rawjson');
+          if (remaining !== undefined && remaining <= 2) {
+            setTimeout(() => this.showToast(`${remaining} Raw JSON saves remaining today`), 2000);
+          }
       } else {
         this.showToast('❌ ' + (response?.error || 'Save failed'), true);
       }
@@ -322,6 +393,26 @@ class LISAFloatingButton {
     if (!message.includes('Saving')) {
       setTimeout(() => toast.remove(), 3000);
     }
+  }
+  showUpgradePrompt() {
+    const existing = document.querySelector('.lisa-upgrade-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'lisa-upgrade-modal';
+    modal.innerHTML = `
+      <div class="lisa-modal-content">
+        <div class="lisa-modal-title">⚡ Upgrade to Premium</div>
+        <div class="lisa-modal-text">
+          Get unlimited LISA-V and Raw JSON saves, plus all premium features!
+        </div>
+        <div class="lisa-modal-buttons">
+          <button class="lisa-modal-btn" onclick="this.closest('.lisa-upgrade-modal').remove()">Maybe Later</button>
+          <button class="lisa-modal-btn primary" onclick="window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank'); this.closest('.lisa-upgrade-modal').remove()">Upgrade Now</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
   }
 }
 

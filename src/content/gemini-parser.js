@@ -3,7 +3,7 @@
 
 class GeminiParser {
   constructor() {
-    this.platform = 'gemini.google.com';
+    this.platform = 'Gemini';
     this.conversationId = this.extractConversationId();
   }
 
@@ -92,5 +92,5 @@ parser.initializeListener();
 
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
-  platform: 'gemini.google.com' 
+  platform: 'Gemini' 
 });

@@ -114,9 +114,10 @@ class LISACompressor {
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
+        title: conversation.title,
         compressedAt: new Date().toISOString(),
         messageCount: conversation.messageCount
-      },
+},
       semanticTokens: []
     };
 

@@ -3,7 +3,7 @@
 
 class MistralParser {
   constructor() {
-    this.platform = 'mistral.ai';
+    this.platform = 'Mistral AI';
     this.conversationId = this.extractConversationId();
   }
 
@@ -98,5 +98,5 @@ parser.initializeListener();
 
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
-  platform: 'mistral.ai' 
+  platform: 'Mistral AI' 
 });

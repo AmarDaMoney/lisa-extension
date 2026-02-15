@@ -3,7 +3,7 @@
 
 class GrokParser {
   constructor() {
-    this.platform = 'grok.com';
+    this.platform = 'Grok';
     this.conversationId = this.extractConversationId();
   }
 
@@ -94,5 +94,5 @@ parser.initializeListener();
 
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
-  platform: 'grok.com' 
+  platform: 'Grok' 
 });

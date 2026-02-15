@@ -3,7 +3,7 @@
 
 class PerplexityParser {
   constructor() {
-    this.platform = 'perplexity.ai';
+    this.platform = 'Perplexity';
     this.conversationId = this.extractConversationId();
   }
 
@@ -98,5 +98,5 @@ parser.initializeListener();
 
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
-  platform: 'perplexity.ai' 
+  platform: 'Perplexity' 
 });

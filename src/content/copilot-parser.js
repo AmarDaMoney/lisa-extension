@@ -3,7 +3,7 @@
 
 class CopilotParser {
   constructor() {
-    this.platform = 'copilot.microsoft.com';
+    this.platform = 'Microsoft Copilot';
     this.conversationId = this.extractConversationId();
   }
 
@@ -100,5 +100,5 @@ parser.initializeListener();
 
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
-  platform: 'copilot.microsoft.com' 
+  platform: 'Microsoft Copilot' 
 });

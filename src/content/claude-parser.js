@@ -3,7 +3,7 @@
 
 class ClaudeParser {
   constructor() {
-    this.platform = 'claude.ai';
+    this.platform = 'Claude';
     this.conversationId = this.extractConversationId();
   }
 
@@ -98,5 +98,5 @@ parser.initializeListener();
 // Signal that parser is ready
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
-  platform: 'claude.ai' 
+  platform: 'Claude' 
 });

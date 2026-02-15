@@ -3,7 +3,7 @@
 
 class ChatGPTParser {
   constructor() {
-    this.platform = 'chatgpt.com';
+    this.platform = 'ChatGPT';
     this.conversationId = this.extractConversationId();
   }
 
@@ -115,5 +115,5 @@ parser.initializeListener();
 
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
-  platform: 'chatgpt.com' 
+  platform: 'ChatGPT' 
 });

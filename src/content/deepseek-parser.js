@@ -3,7 +3,7 @@
 
 class DeepSeekParser {
   constructor() {
-    this.platform = 'deepseek.com';
+    this.platform = 'DeepSeek';
     this.conversationId = this.extractConversationId();
   }
 
@@ -99,5 +99,5 @@ parser.initializeListener();
 
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
-  platform: 'deepseek.com' 
+  platform: 'DeepSeek' 
 });

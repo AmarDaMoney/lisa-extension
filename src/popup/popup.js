@@ -213,9 +213,6 @@ class LISAPopup {
     document.getElementById('downloadBtn').addEventListener('click', () => {
       this.downloadJSON();
     });
-    document.getElementById('saveToLibraryBtn').addEventListener('click', () => {
-      this.saveToLibrary();
-    });
 
     // Copy suggested prompt
     document.getElementById('copyPromptBtn').addEventListener('click', () => {

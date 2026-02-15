@@ -13,9 +13,9 @@ class LISAFloatingButton {
       const result = await chrome.storage.sync.get(['userTier']);
       this.isPremium = result.userTier === 'premium';
       
-      if (this.isPremium) {
-        this.createButton();
-      }
+        // Floating button for all users (free gets 5/day limits)
+      this.createButton();  
+      
     } catch (error) {
       console.log('[LISA] Could not check premium status');
     }

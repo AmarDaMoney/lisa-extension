@@ -55,7 +55,7 @@ class LISAPopup {
 
   isNewWeek(lastDate, currentDate) {
     const daysSinceReset = Math.floor((currentDate - lastDate) / (1000 * 60 * 60 * 24));
-    return daysSinceReset >= 7;
+    return daysSinceReset >= 1;
   }
 
   async updateUsageStats(type) {
@@ -74,14 +74,14 @@ class LISAPopup {
 
     const limits = {
       export: { max: 5, current: this.usageStats.exportsThisWeek },
-      import: { max: 2, current: this.usageStats.importsThisWeek }
+      import: { max: 5, current: this.usageStats.importsThisWeek }
     };
 
     const limit = limits[type];
     if (limit.current >= limit.max) {
       return {
         allowed: false,
-        message: `Free tier limit: ${limit.max} ${type}s per week. Upgrade to Premium for unlimited access!`,
+        message: `Free tier limit: ${limit.max} ${type}s per day. Upgrade to Premium for unlimited access!`,
         current: limit.current,
         max: limit.max
       };
@@ -554,6 +554,7 @@ class LISAPopup {
     const limitCheck = this.checkUsageLimits('export');
     if (!limitCheck.allowed) {
       this.showError(limitCheck.message);
+        this.openUpgradeModal();
       return;
     }
 
@@ -589,22 +590,12 @@ class LISAPopup {
         // Show remaining exports for free users
         if (this.userTier === 'free') {
           const remaining = 5 - this.usageStats.exportsThisWeek;
-          if (remaining <= 2) {
-            this.updatePlatformStatus(`${remaining} free exports remaining this week`, true);
-          }
+            this.updatePlatformStatus(`${remaining} free exports remaining today`, true);
         }
       }
     });
   }
-
-  openUpgradeModal() {
-    document.getElementById('upgradeModal').style.display = 'flex';
-    this.trackEvent('upgrade_modal_opened');
-  }
-
-  closeUpgradeModal() {
-    document.getElementById('upgradeModal').style.display = 'none';
-  }
+sed -i '592d' /workspaces/lisa-extension/src/popup/popup.js
 
   initiateSubscription() {
     this.trackEvent('subscription_initiated');

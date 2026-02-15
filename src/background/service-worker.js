@@ -308,7 +308,7 @@ class SnapshotManager {
     if (!url) return 'Unknown';
     if (url.includes('claude.ai')) return 'Claude';
     if (url.includes('chatgpt.com')) return 'ChatGPT';
-    if (url.includes('gemini.google.com')) return 'Google Gemini';
+    if (url.includes('gemini.google.com')) return 'Gemini';
     if (url.includes('grok.com')) return 'Grok';
     if (url.includes('chat.mistral.ai')) return 'Mistral AI';
     if (url.includes('chat.deepseek.com')) return 'DeepSeek';
@@ -459,7 +459,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         // Ensure required fields exist
         const data = extractResponse.data || {};
-        data.platform = data.platform || new URL(tab.url).hostname;
+        data.platform = data.platform || snapshotManager.getPlatformName(tab.url);
         data.url = data.url || tab.url;
         data.title = data.title || tab.title || 'Untitled';
         data.messageCount = data.messageCount || (data.messages?.length || 0);
@@ -817,7 +817,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       aiPlatformTabs.set(tabId, {
         url: tab.url,
         title: tab.title,
-        platform: aiPlatforms.find(p => tab.url.includes(p)),
+        platform: snapshotManager.getPlatformName(tab.url),
         lastSeen: Date.now()
       });
     }

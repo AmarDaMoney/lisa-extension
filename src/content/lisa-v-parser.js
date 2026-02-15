@@ -20,7 +20,7 @@ class LisaVParser {
     const host = window.location.hostname;
     if (host.includes('claude.ai')) return 'Claude';
     if (host.includes('chatgpt.com')) return 'ChatGPT';
-    if (host.includes('gemini.google.com')) return 'Google Gemini';
+    if (host.includes('gemini.google.com')) return 'Gemini';
     if (host.includes('grok.com')) return 'Grok';
     if (host.includes('chat.mistral.ai')) return 'Mistral AI';
     if (host.includes('chat.deepseek.com')) return 'DeepSeek';

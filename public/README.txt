@@ -4,3 +4,5 @@ Place your icon files here:
 - icon128.png (128x128)
 
 Copy from your existing extension's public folder.
+
+LISA Core v0.45

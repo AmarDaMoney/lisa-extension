@@ -23,6 +23,9 @@ LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into
 - 📤 **One-Click Export** - Extract full conversations with a single click
 - ✂️ **Selection Export** - Right-click to export selected text snippets
 - 🗜️ **Semantic Compression** - 4:1 to 5:1 compression ratio
+- 💾 **Floating Save Button** - Quick access LISA-V and Raw JSON exports
+- 📋 **LISA-V Format** - Verbatim conversation capture with code separation
+- 📸 **Auto-Snapshots** - Automatically save when closing AI chat tabs
 - 🔐 **LISA Hash** - Cryptographic integrity verification (Premium)
 - ☁️ **Web App Sync** - Connect with LISA Core Web App
 - 📜 **Version History** - Git-style tracking of conversation evolution
@@ -31,7 +34,11 @@ LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into
 
 ## 🚀 Installation
 
-### Developer Mode (Current)
+### Chrome Web Store (Recommended)
+
+[**Install from Chrome Web Store**](https://chromewebstore.google.com/detail/lisa-core-ai-memory-libra/dmgnookddagimdcggdlbjmaobmoofhbj)
+
+### Developer Mode
 
 1. Download this repository (Code → Download ZIP)
 2. Extract the ZIP file
@@ -40,10 +47,6 @@ LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into
 5. Click **Load unpacked**
 6. Select the extracted folder
 
-### Chrome Web Store (Coming Soon)
-
-One-click install from Chrome Web Store - stay tuned!
-
 ## 📖 How to Use
 
 ### Export Full Conversation
@@ -51,6 +54,11 @@ One-click install from Chrome Web Store - stay tuned!
 2. Click the LISA extension icon
 3. Click **Export Conversation**
 4. Save the JSON file
+
+### Floating Button (LISA-V & Raw JSON)
+1. Look for the floating 💾 LISA button on any AI chat
+2. Click to choose **Save Raw JSON** or **Save LISA-V**
+3. Access saved conversations in the extension library
 
 ### Export Selected Text
 1. Select any text on a page
@@ -67,16 +75,16 @@ One-click install from Chrome Web Store - stay tuned!
 
 | Tier | Price | Features |
 |------|-------|----------|
-| **Free** | $0 | 5 exports/week, basic compression |
+| **Free** | $0 | 5 exports/day, 5 LISA-V/day, 5 Raw JSON/day, basic compression |
 | **Premium** | $9/mo | Unlimited exports, LISA Hash, priority support |
 
 ## 🔗 Links
 
-- **Web App:** [lisa-web-backend-production.up.railway.app](https://lisa-web-backend-production.up.railway.app)
+- **Chrome Web Store:** [Install LISA Core](https://chromewebstore.google.com/detail/lisa-core-ai-memory-libra/dmgnookddagimdcggdlbjmaobmoofhbj)
+- **Web App:** [Lisa Core - AI Memory Library](https://lisa-web-backend-production.up.railway.app/landing)
 - **Company:** [SAT-CHAIN LLC](https://sat-chain.com)
 
 ## 📁 Project Structure
-
 ```
 lisa-extension/
 ├── manifest.json           # Extension configuration
@@ -87,6 +95,8 @@ lisa-extension/
 │   │   ├── claude-parser.js
 │   │   ├── chatgpt-parser.js
 │   │   ├── gemini-parser.js
+│   │   ├── lisa-floating-button.js
+│   │   ├── lisa-v-parser.js
 │   │   └── ... (9 total)
 │   └── popup/             # Extension UI
 │       ├── popup.html
@@ -96,7 +106,6 @@ lisa-extension/
 ```
 
 ## 🛠️ Development
-
 ```bash
 # Clone the repo
 git clone https://github.com/AmarDaMoney/lisa-extension.git

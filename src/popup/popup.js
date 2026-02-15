@@ -335,6 +335,13 @@ class LISAPopup {
     document.getElementById('loadingText').textContent = message;
     document.getElementById('loadingOverlay').style.display = 'flex';
   }
+  openUpgradeModal() {
+    document.getElementById('upgradeModal').style.display = 'flex';
+  }
+
+  closeUpgradeModal() {
+    document.getElementById('upgradeModal').style.display = 'none';
+  }
 
   hideLoading() {
     document.getElementById('loadingOverlay').style.display = 'none';

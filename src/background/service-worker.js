@@ -243,14 +243,15 @@ class SnapshotManager {
       // Store RAW conversation (not compressed) so App can compress with user's settings
       const snapshot = {
         id: 'snap-' + Date.now(),
-        platform: conversation.platform,
+        platform: conversation.platform || this.getPlatformName(conversation.url),
         url: conversation.url,
         title: conversation.title || 'Untitled',
         messageCount: conversation.messageCount,
         savedAt: new Date().toISOString(),
         source: source,
+        format: conversation.format || null,
         raw: conversation // Store full raw conversation
-      };
+    };
 
       // Phase 6: Add versioning fields
       if (existing) {
@@ -302,7 +303,23 @@ class SnapshotManager {
   async clearAllSnapshots() {
     await chrome.storage.local.remove(this.STORAGE_KEY);
   }
-
+// Get friendly platform name from URL
+  getPlatformName(url) {
+    if (!url) return 'Unknown';
+    if (url.includes('claude.ai')) return 'Claude';
+    if (url.includes('chatgpt.com')) return 'ChatGPT';
+    if (url.includes('gemini.google.com')) return 'Google Gemini';
+    if (url.includes('grok.com')) return 'Grok';
+    if (url.includes('chat.mistral.ai')) return 'Mistral AI';
+    if (url.includes('chat.deepseek.com')) return 'DeepSeek';
+    if (url.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
+    if (url.includes('perplexity.ai')) return 'Perplexity';
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return 'Unknown';
+    }
+  }
   // Phase 6: Generate content hash for version integrity
   async hashContent(content) {
     const encoder = new TextEncoder();

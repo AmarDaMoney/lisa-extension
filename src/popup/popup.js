@@ -205,10 +205,16 @@ class LISAPopup {
     document.getElementById('copyHashBtn').addEventListener('click', () => {
       this.copyHash();
     });
+    document.getElementById('saveToLibraryBtn').addEventListener('click', () => {
+      this.saveToLibrary();
+    });
 
     // Download
     document.getElementById('downloadBtn').addEventListener('click', () => {
       this.downloadJSON();
+    });
+    document.getElementById('saveToLibraryBtn').addEventListener('click', () => {
+      this.saveToLibrary();
     });
 
     // Copy suggested prompt
@@ -622,7 +628,43 @@ class LISAPopup {
       }
     });
   }
+  async saveToLibrary() {
+    if (!this.compressedData) {
+      this.showError('No compressed data to save');
+      return;
+    }
 
+    try {
+      this.showLoading('Saving to library...');
+      
+      const data = {
+        platform: this.compressedData.metadata?.platform || 'Unknown',
+        url: this.compressedData.metadata?.url || window.location.href,
+        title: this.compressedData.metadata?.title || 'Compressed Conversation',
+        messageCount: this.compressedData.metadata?.messageCount || 0,
+        messages: this.compressedData.compressed || [],
+        format: 'compressed'
+      };
+
+      const response = await chrome.runtime.sendMessage({ 
+        action: 'extractAndSave',
+        data: data
+      });
+
+      this.hideLoading();
+
+      if (response && response.success) {
+        this.updatePlatformStatus('✅ Saved to library!', true);
+        this.loadSnapshots();
+      } else {
+        this.showError(response?.error || 'Failed to save');
+      }
+    } catch (error) {
+      this.hideLoading();
+      console.error('[LISA] Save to library error:', error);
+      this.showError('Could not save to library');
+    }
+  }
   initiateSubscription() {
     this.trackEvent('subscription_initiated');
     

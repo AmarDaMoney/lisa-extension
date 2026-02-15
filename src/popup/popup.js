@@ -111,6 +111,14 @@ class LISAPopup {
       upgradeBtn.style.display = 'none';
     } else {
       upgradeBtn.style.display = 'inline-block';
+      // Show remaining exports for free users
+      const remaining = 5 - this.usageStats.exportsThisWeek;
+      const exportBtn = document.getElementById('exportBtn');
+      if (exportBtn && remaining > 0) {
+        exportBtn.textContent = `Export Conversation (${remaining} left)`;
+      } else if (exportBtn && remaining <= 0) {
+        exportBtn.textContent = `Export Conversation (limit reached)`;
+      }
     }
   }
 

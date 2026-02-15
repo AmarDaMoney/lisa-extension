@@ -51,15 +51,23 @@
         <p><strong>Compression Ratio:</strong> <span id="compressionRatio">-</span>:1</p>
         <p><strong>Original Size:</strong> <span id="originalSize">-</span></p>
         <p><strong>Compressed Size:</strong> <span id="compressedSize">-</span></p>
+</div>
+
+      <!-- Download Actions -->
+      <div id="downloadSection" style="display: none;">
+        <button id="downloadBtn" class="btn btn-success">
+          <span class="icon">💾</span>
+          Download LISA JSON
+        </button>
       </div>
 
-      <!-- Premium Feature: Hashing -->
+      <!-- Premium Feature: Hashing (smaller) -->
       <div id="hashingSection" class="premium-section" style="display: none;">
-        <div class="premium-badge">
+        <div class="premium-badge" style="padding: 6px 10px; font-size: 11px;">
           <span class="icon">⭐</span>
           <span>Premium Feature</span>
         </div>
-        <button id="generateHashBtn" class="btn btn-premium">
+        <button id="generateHashBtn" class="btn btn-premium" style="padding: 8px 12px; font-size: 12px;">
           <span class="icon">🔐</span>
           Generate LISA Hash
         </button>
@@ -68,14 +76,6 @@
           <p><strong>Algorithm:</strong> SHA-256</p>
           <button id="copyHashBtn" class="btn btn-small">Copy Hash</button>
         </div>
-      </div>
-
-      <!-- Download Actions -->
-      <div id="downloadSection" style="display: none;">
-        <button id="downloadBtn" class="btn btn-success">
-          <span class="icon">💾</span>
-          Download LISA JSON
-        </button>
       </div>
 
       <!-- How to Use Section -->

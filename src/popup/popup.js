@@ -595,7 +595,6 @@ class LISAPopup {
       }
     });
   }
-sed -i '592d' /workspaces/lisa-extension/src/popup/popup.js
 
   initiateSubscription() {
     this.trackEvent('subscription_initiated');

@@ -891,7 +891,7 @@ class LISAPopup {
     container.innerHTML = snapshots.map(snap => `
       <div class="snapshot-item" data-id="${snap.id}">
         <div class="snapshot-info">
-          <div class="snapshot-title">${this.escapeHtml(snap.title || snap.platform)}</div>
+          <div class="snapshot-title">${this.escapeHtml(snap.title === snap.platform || !snap.title ? 'Untitled Conversation' : snap.title)}</div>
           <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}${snap.format === 'lisa-v' ? ' • 📝 LISA-V' : snap.format === 'compressed' ? ' • 🗜️ Comp' : snap.source === 'floating-button' ? ' • 📄 Raw' : ''}</div>
         </div>
         <div class="snapshot-actions">

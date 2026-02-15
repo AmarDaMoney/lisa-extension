@@ -80,11 +80,12 @@
 
       <!-- How to Use Section -->
       <div class="how-to-use-section">
-        <div class="section-divider">
+        <div class="section-divider collapsible" id="howToToggle" style="cursor: pointer;">
           <span>How to Use LISA JSON</span>
+          <span class="toggle-arrow">▼</span>
         </div>
         
-        <div class="instructions-box">
+        <div class="instructions-box" id="howToContent" style="display: none;">
           <h4>💡 To Use Your Compressed Conversation:</h4>
           <ol class="usage-steps">
             <li>
@@ -128,7 +129,7 @@
     <!-- Snapshots Section -->
     <div class="section snapshots-section">
       <div class="section-header">
-        <h3>📸 Auto-Snapshots</h3>
+        <h3>📚 Sync to Library</h3>
         <label class="toggle-switch">
           <input type="checkbox" id="autoSaveToggle" checked>
           <span class="toggle-slider"></span>

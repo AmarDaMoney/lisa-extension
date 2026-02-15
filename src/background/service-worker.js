@@ -238,7 +238,7 @@ class SnapshotManager {
       const snapshots = data[this.STORAGE_KEY] || [];
 
       // Phase 6: Check if this is an update to existing conversation (same URL)
-      const existing = snapshots.find(s => s.url === conversation.url);
+      const existing = snapshots.find(s => s.url === conversation.url && s.source === source);
 
       // Store RAW conversation (not compressed) so App can compress with user's settings
       const snapshot = {

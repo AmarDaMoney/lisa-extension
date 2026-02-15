@@ -306,6 +306,18 @@ class LISAPopup {
       e.preventDefault();
       this.openFeedback();
     });
+    // How to Use collapsible toggle
+    document.getElementById('howToToggle').addEventListener('click', () => {
+      const content = document.getElementById('howToContent');
+      const arrow = document.querySelector('.toggle-arrow');
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
   }
 
   copyPrompt() {
@@ -838,7 +850,7 @@ class LISAPopup {
       <div class="snapshot-item" data-id="${snap.id}">
         <div class="snapshot-info">
           <div class="snapshot-title">${this.escapeHtml(snap.title || snap.platform)}</div>
-          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}</div>
+          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}${snap.format === 'lisa-v' ? ' • 📋 LISA-V' : snap.source === 'floating-button' ? ' • 📄 Raw' : ''}</div>
         </div>
         <div class="snapshot-actions">
           <button class="snapshot-btn history" data-root-id="${snap.rootId || snap.id}" title="Version History">📜</button>

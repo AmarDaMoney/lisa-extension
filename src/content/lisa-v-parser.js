@@ -18,14 +18,14 @@ class LisaVParser {
   // Detect platform from URL
   detectPlatform() {
     const host = window.location.hostname;
-    if (host.includes('claude.ai')) return 'claude';
-    if (host.includes('chatgpt.com')) return 'chatgpt';
-    if (host.includes('gemini.google.com')) return 'gemini';
-    if (host.includes('grok.com')) return 'grok';
-    if (host.includes('chat.mistral.ai')) return 'mistral';
-    if (host.includes('chat.deepseek.com')) return 'deepseek';
-    if (host.includes('copilot.microsoft.com')) return 'copilot';
-    if (host.includes('perplexity.ai')) return 'perplexity';
+    if (host.includes('claude.ai')) return 'Claude';
+    if (host.includes('chatgpt.com')) return 'ChatGPT';
+    if (host.includes('gemini.google.com')) return 'Google Gemini';
+    if (host.includes('grok.com')) return 'Grok';
+    if (host.includes('chat.mistral.ai')) return 'Mistral AI';
+    if (host.includes('chat.deepseek.com')) return 'DeepSeek';
+    if (host.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
+    if (host.includes('perplexity.ai')) return 'Perplexity';
     return 'unknown';
   }
 

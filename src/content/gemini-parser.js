@@ -55,11 +55,17 @@ class GeminiParser {
       return null;
     }
 
+    // Get title from first user message if document.title is just "Gemini"
+    const firstUserMsg = messages.find(m => m.role === 'user');
+    const title = document.title === 'Gemini' && firstUserMsg 
+    ? firstUserMsg.content.slice(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '')
+    : document.title;
+
     return {
       platform: this.platform,
       conversationId: this.conversationId,
       url: window.location.href,
-      title: document.title,
+      title: title,
       extractedAt: new Date().toISOString(),
       messageCount: messages.length,
       messages: messages

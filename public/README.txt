@@ -5,4 +5,4 @@ Place your icon files here:
 
 Copy from your existing extension's public folder.
 
-LISA Core v0.45
+LISA Core v0.46

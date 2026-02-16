@@ -122,6 +122,7 @@ class LisaVParser {
 
   // Main extraction method - platform agnostic
   async extractConversation() {
+    try {
     this.blocks = [];
     const platform = this.detectPlatform();
     
@@ -154,6 +155,10 @@ class LisaVParser {
       this.blocks.push(...msg);
     }
     return this.blocks;
+    } catch (error) {
+      console.error("[LISA] Extraction error:", error);
+      return this.blocks;
+    }
   }
 
   async extractClaudeMessages() {

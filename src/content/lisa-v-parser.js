@@ -138,11 +138,11 @@ class LisaVParser {
     // Platform-specific message extraction
     let messages = [];
     
-    if (platform === 'claude') {
+    if (platform === 'Claude') {
       messages = await this.extractClaudeMessages();
-    } else if (platform === 'chatgpt') {
+    } else if (platform === 'ChatGPT') {
       messages = await this.extractChatGPTMessages();
-    } else if (platform === 'gemini') {
+    } else if (platform === 'Gemini') {
       messages = await this.extractGeminiMessages();
     } else {
       // Generic fallback

@@ -981,7 +981,7 @@ class LISAPopup {
       
       if (isLisaV) {
         // LISA-V: output the raw JSONL content directly
-        fileContent = snapshot.content;
+        fileContent = snapshot.content || snapshot.raw?.content;
         mimeType = 'application/jsonl';
         extension = 'jsonl';
       } else {

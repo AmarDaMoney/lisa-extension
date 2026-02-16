@@ -981,7 +981,13 @@ class LISAPopup {
       
       if (isLisaV) {
         // LISA-V: output the raw JSONL content directly
-        fileContent = snapshot.content || snapshot.raw?.content;
+        // Convert array to JSONL string for download
+        const contentData = snapshot.content || snapshot.raw?.content;
+        if (Array.isArray(contentData)) {
+          fileContent = contentData.map(item => JSON.stringify(item)).join('\n');
+        } else {
+          fileContent = contentData; // Already string
+        }
         mimeType = 'application/jsonl';
         extension = 'jsonl';
       } else {

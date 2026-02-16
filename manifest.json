@@ -5,6 +5,7 @@
   "description": "Semantic compression for AI conversations. Export from 8 AI platforms. Premium features include cloud sync and integrity verification.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "activeTab",
     "scripting",
     "downloads",

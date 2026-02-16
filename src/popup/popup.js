@@ -636,11 +636,12 @@ class LISAPopup {
       
       const data = {
         platform: this.compressedData.metadata?.platform || 'Unknown',
-        url: this.compressedData.metadata?.url || window.location.href,
+        url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || window.location.href,
         title: this.compressedData.metadata?.title || 'Compressed Conversation',
         messageCount: this.compressedData.metadata?.messageCount || 0,
-        messages: this.compressedData.compressed || [],
-        format: 'compressed'
+        messages: this.compressedData.semanticTokens || this.compressedData.compressed || [],
+        format: 'compressed',
+        raw: this.compressedData
       };
 
       const response = await chrome.runtime.sendMessage({ 

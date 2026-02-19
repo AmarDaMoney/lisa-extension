@@ -10,16 +10,16 @@ const STRIPE_CONFIG = {
   // Stripe products configuration (use your Price IDs)
   products: {
     premium_monthly: {
-      priceId: 'price_1Sw03YRCWqG97BQiCZBiVsu4',
+      priceId: 'price_1T2dkFRCWqG97BQicrv4DIOX',
       name: 'LISA Core Extension Pro - Monthly',
-      amount: 900, // $9.00 in cents
+      amount: 1900, // $19.00 in cents
       interval: 'month',
       description: 'LISA Pro: 50 compressions/day, cloud sync, 1M character limit, priority support'
     },
     premium_annual: {
-      priceId: 'price_1Sw04JRCWqG97BQi9KwysKEK',
+      priceId: 'price_1T2dqQRCWqG97BQi80BwKgtR',
       name: 'LISA Core Extension Pro - Annual',
-      amount: 7900, // $79.00 in cents (save ~27%)
+      amount: 7900, // $79.00 in cents
       interval: 'year',
       description: 'Annual LISA Pro: 50 compressions/day, cloud sync, 1M character limit, priority support'
     }

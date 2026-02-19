@@ -263,6 +263,14 @@ class LISAPopup {
       this.initiateSubscription();
     });
 
+    document.getElementById('subscribeMonthlyBtn').addEventListener('click', () => {
+      this.openStripeCheckout('month');
+    });
+
+    document.getElementById('subscribeAnnualBtn').addEventListener('click', () => {
+      this.openStripeCheckout('annual');
+    });
+
     document.getElementById('learnMoreAppBtn').addEventListener('click', () => {
       this.openAppPage();
     });
@@ -699,9 +707,9 @@ class LISAPopup {
 
   async openStripeCheckout(plan = 'month') {
     try {
-      const priceId = plan === 'month' 
-        ? STRIPE_CONFIG.products.premium_monthly.priceId 
-        : STRIPE_CONFIG.products.premium_annual.priceId;
+      const priceId = plan === 'annual' 
+        ? STRIPE_CONFIG.products.premium_annual.priceId 
+        : STRIPE_CONFIG.products.premium_monthly.priceId;
 
       const client = new StripeClient(STRIPE_CONFIG.publishableKey, STRIPE_CONFIG.apiBaseUrl);
       await client.openCheckout(priceId, plan);

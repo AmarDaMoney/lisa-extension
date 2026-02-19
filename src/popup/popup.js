@@ -114,10 +114,20 @@ class LISAPopup {
       // Show remaining exports for free users
       const remaining = 5 - this.usageStats.exportsThisWeek;
       const exportBtn = document.getElementById('exportBtn');
+      const saveToLibraryBtn = document.getElementById('saveToLibraryBtn');
+      
       if (exportBtn && remaining > 0) {
         exportBtn.textContent = `Export Conversation (${remaining} left)`;
       } else if (exportBtn && remaining <= 0) {
         exportBtn.textContent = `Export Conversation (limit reached)`;
+        exportBtn.disabled = true;
+      }
+      
+      if (saveToLibraryBtn && remaining > 0) {
+        saveToLibraryBtn.textContent = `💾 Save to Library (${remaining} left)`;
+      } else if (saveToLibraryBtn && remaining <= 0) {
+        saveToLibraryBtn.textContent = `💾 Save to Library (limit reached)`;
+        saveToLibraryBtn.disabled = true;
       }
     }
   }
@@ -611,6 +621,7 @@ class LISAPopup {
       
       if (downloadId) {
         this.updateUsageStats('export');
+        this.setupUI(); // Refresh button texts with new count
         
         this.trackEvent('download', { 
           platform: platform, 
@@ -659,7 +670,8 @@ class LISAPopup {
       this.hideLoading();
 
       if (response && response.success) {
-        this.updateUsageStats('export');
+        await this.updateUsageStats('export');
+        this.setupUI(); // Refresh button texts with new count
         
         this.updatePlatformStatus('✅ Saved to library!', true);
         this.loadSnapshots();

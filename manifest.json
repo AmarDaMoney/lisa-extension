@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LISA Core - AI Memory Library",
-  "version": "0.46",
+  "version": "0.47",
   "description": "Semantic compression for AI conversations. Export from 8 AI platforms. Premium features include cloud sync and integrity verification.",
   "permissions": [
     "storage",

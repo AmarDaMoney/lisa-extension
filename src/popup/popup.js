@@ -631,6 +631,13 @@ class LISAPopup {
       return;
     }
 
+    const limitCheck = this.checkUsageLimits('export');
+    if (!limitCheck.allowed) {
+      this.showError(limitCheck.message);
+      this.openUpgradeModal();
+      return;
+    }
+
     try {
       this.showLoading('Saving to library...');
       
@@ -652,8 +659,16 @@ class LISAPopup {
       this.hideLoading();
 
       if (response && response.success) {
+        this.updateUsageStats('export');
+        
         this.updatePlatformStatus('✅ Saved to library!', true);
         this.loadSnapshots();
+        
+        // Show remaining exports for free users
+        if (this.userTier === 'free') {
+          const remaining = 5 - this.usageStats.exportsThisWeek;
+          this.updatePlatformStatus(`✅ Saved! ${remaining} free exports remaining today`, true);
+        }
       } else {
         this.showError(response?.error || 'Failed to save');
       }

@@ -259,10 +259,6 @@ class LISAPopup {
       this.closeUpgradeModal();
     });
 
-    document.getElementById('subscribeBtn').addEventListener('click', () => {
-      this.initiateSubscription();
-    });
-
     document.getElementById('subscribeMonthlyBtn').addEventListener('click', () => {
       this.openStripeCheckout('month');
     });

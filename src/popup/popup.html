@@ -55,10 +55,22 @@
 
       <!-- Download Actions -->
       <div id="downloadSection" style="display: none;">
-        <div style="display: flex; gap: 8px;">
+        <!-- Export Format Selector (Beta) -->
+        <div class="export-format-selector">
+          <label for="exportFormat" class="format-label">
+            📄 Export Format: <span class="beta-tag">BETA</span>
+          </label>
+          <select id="exportFormat" class="format-select">
+            <option value="json">JSON (Default)</option>
+            <option value="markdown">Markdown (.md)</option>
+            <option value="txt">Plain Text (.txt)</option>
+          </select>
+        </div>
+        
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
           <button id="downloadBtn" class="btn btn-success" style="flex: 1;">
             <span class="icon">💾</span>
-            Download LISA JSON
+            Download
           </button>
           <button id="saveToLibraryBtn" class="btn btn-primary" style="flex: 1;">
             <span class="icon">📚</span>
@@ -462,6 +474,7 @@
   </div>
 
   <!-- Stripe integration scripts -->
+  <script src="../export/export-manager.js"></script>
   <script src="../stripe/stripe-config.js"></script>
   <script src="../stripe/stripe-client.js"></script>
   <script src="../stripe/stripe-subscription-modal.js"></script>

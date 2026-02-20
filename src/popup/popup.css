@@ -238,6 +238,44 @@ header {
   font-size: 18px;
 }
 
+/* Export Format Selector (Beta Feature) */
+.export-format-selector {
+  background: var(--surface);
+  border: 2px solid #818cf8;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.format-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.format-select {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.format-select:hover {
+  border-color: var(--primary-color);
+}
+
+.format-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
 /* Info Boxes */
 .info-box {
   background: var(--surface);

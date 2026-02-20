@@ -6,6 +6,7 @@ class LISAPopup {
     this.currentConversation = null;
     this.compressedData = null;
     this.userTier = 'free';
+    this.exportManager = new ExportManager(); // Beta: Smart export formats
     this.usageStats = {
       exportsThisWeek: 0,
       importsThisWeek: 0,
@@ -615,44 +616,53 @@ class LISAPopup {
       return;
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const platform = (this.compressedData.metadata.platform || 'unknown').replace(/[.\s()]/g, '-');
-    const filename = `lisa-${platform}-${timestamp}.json`;
+    // Get selected export format
+    const formatSelect = document.getElementById('exportFormat');
+    const selectedFormat = formatSelect ? formatSelect.value : 'json';
 
-    const dataStr = JSON.stringify(this.compressedData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
+    try {
+      // Use ExportManager to convert format
+      const exported = this.exportManager.export(this.compressedData, selectedFormat);
+      
+      const dataBlob = new Blob([exported.content], { type: exported.mimeType });
+      const url = URL.createObjectURL(dataBlob);
 
-    chrome.downloads.download({
-      url: url,
-      filename: filename,
-      saveAs: true
-    }, (downloadId) => {
-      URL.revokeObjectURL(url);
-      
-      if (chrome.runtime.lastError) {
-        console.error('[LISA] Download error:', chrome.runtime.lastError);
-        this.showError('Download failed');
-        return;
-      }
-      
-      if (downloadId) {
-        this.updateUsageStats('export');
-        this.setupUI(); // Refresh button texts with new count
+      chrome.downloads.download({
+        url: url,
+        filename: exported.filename,
+        saveAs: true
+      }, (downloadId) => {
+        URL.revokeObjectURL(url);
         
-        this.trackEvent('download', { 
-          platform: platform, 
-          hasHash: !!this.compressedData.lisaHash 
-        });
-        
-        // Show remaining exports for free users
-        if (this.userTier === 'free') {
-          const remaining = 5 - this.usageStats.exportsThisWeek;
-            this.updatePlatformStatus(`${remaining} free exports remaining today`, true);
+        if (chrome.runtime.lastError) {
+          console.error('[LISA] Download error:', chrome.runtime.lastError);
+          this.showError('Download failed');
+          return;
         }
-      }
-    });
+        
+        if (downloadId) {
+          this.updateUsageStats('export');
+          this.setupUI(); // Refresh button texts with new count
+          
+          this.trackEvent('download', { 
+            platform: this.compressedData.metadata?.platform,
+            format: selectedFormat,
+            hasHash: !!this.compressedData.lisaHash 
+          });
+          
+          // Show remaining exports for free users
+          if (this.userTier === 'free') {
+            const remaining = 5 - this.usageStats.exportsThisWeek;
+            this.updatePlatformStatus(`${remaining} free exports remaining today`, true);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('[LISA] Export error:', error);
+      this.showError('Failed to export conversation');
+    }
   }
+  
   async saveToLibrary() {
     if (!this.compressedData) {
       this.showError('No compressed data to save');

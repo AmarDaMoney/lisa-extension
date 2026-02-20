@@ -314,6 +314,42 @@ class StripeClient {
   }
 
   /**
+   * Create and open Stripe Customer Portal session
+   * Allows customers to manage billing, cancel subscriptions, update payment methods, etc.
+   */
+  async createPortalSession(licenseKey, subscriptionId) {
+    try {
+      console.log('[LISA Stripe] Creating customer portal session...');
+      
+      const response = await fetch(`${this.apiBaseUrl}/create-portal-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          licenseKey: licenseKey,
+          subscriptionId: subscriptionId,
+          returnUrl: chrome.runtime.getURL('src/popup/popup.html')
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[LISA Stripe] Portal session error:', response.status, errorText);
+        throw new Error(`Portal creation failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('[LISA Stripe] Portal session created');
+      
+      return data;
+    } catch (error) {
+      console.error('[LISA Stripe] Failed to create portal session:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Cleanup Stripe elements
    */
   cleanup() {

@@ -34,6 +34,7 @@ const STRIPE_CONFIG = {
     getSubscription: '/stripe/get-subscription',
     cancelSubscription: '/stripe/cancel-subscription',
     verifySubscription: '/stripe/verify-subscription',
+    createPortalSession: '/create-portal-session', // Customer portal for manage/cancel
     webhookSecret: '/stripe/webhook-secret' // Optional: for local webhook verification
   },
 

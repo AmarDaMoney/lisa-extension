@@ -1,5 +1,5 @@
 // LISA Core Extension - Popup Logic
-// v0.47 - Version update
+// v0.48 - Added subscription auto-renewal/cancellation notice
 
 class LISAPopup {
   constructor() {
@@ -732,6 +732,18 @@ class LISAPopup {
     // Load current license key if exists
     this.loadLicenseKey();
     this.updateTierDisplay();
+    
+    // Show subscription management for premium users
+    if (this.userTier === 'premium') {
+      this.displaySubscriptionInfo();
+    } else {
+      // Hide subscription info for free users
+      const subscriptionInfo = document.getElementById('subscriptionInfo');
+      if (subscriptionInfo) {
+        subscriptionInfo.style.display = 'none';
+      }
+    }
+    
     document.getElementById('settingsModal').style.display = 'flex';
     this.trackEvent('settings_modal_opened');
   }
@@ -755,6 +767,77 @@ class LISAPopup {
     const tierDisplay = document.getElementById('currentTierDisplay');
     tierDisplay.textContent = this.userTier === 'premium' ? 'Premium' : 'Free';
     tierDisplay.className = this.userTier === 'premium' ? 'premium' : '';
+  }
+
+  displaySubscriptionInfo() {
+    const subscriptionInfo = document.getElementById('subscriptionInfo');
+    if (subscriptionInfo) {
+      subscriptionInfo.style.display = 'block';
+      subscriptionInfo.innerHTML = `
+        <div class="subscription-management">
+          <h3>💼 Subscription Management</h3>
+          <p>Your subscription auto-renews unless cancelled.</p>
+          <p><strong>To cancel or manage your subscription:</strong></p>
+          <ul>
+            <li>Use the "Manage Billing" link in your Stripe receipt email, or</li>
+            <li>Email <a href="mailto:cancellation@sat-chain.com">cancellation@sat-chain.com</a></li>
+          </ul>
+          <button id="manageSubscriptionBtn" class="btn btn-secondary">
+            Manage via Stripe Portal
+          </button>
+        </div>
+      `;
+      
+      // Add event listener for manage button
+      const manageBtn = document.getElementById('manageSubscriptionBtn');
+      if (manageBtn) {
+        manageBtn.addEventListener('click', () => {
+          this.openStripePortal();
+        });
+      }
+    }
+  }
+
+  async openStripePortal() {
+    try {
+      const storage = await chrome.storage.sync.get(['licenseKey', 'subscriptionId']);
+      if (!storage.licenseKey && !storage.subscriptionId) {
+        this.showError('No active subscription found');
+        return;
+      }
+      
+      this.showLoading('Opening billing portal...');
+      
+      // Call backend to create a portal session
+      const response = await fetch(`${STRIPE_CONFIG.apiBaseUrl}/create-portal-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          licenseKey: storage.licenseKey,
+          subscriptionId: storage.subscriptionId
+        })
+      });
+      
+      this.hideLoading();
+      
+      if (!response.ok) {
+        throw new Error(`Portal creation failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.url) {
+        chrome.tabs.create({ url: data.url });
+        this.trackEvent('stripe_portal_opened');
+      } else {
+        this.showError('Could not open billing portal');
+      }
+    } catch (error) {
+      console.error('[LISA] Portal error:', error);
+      this.hideLoading();
+      this.showError('Failed to open billing portal. Please email cancellation@sat-chain.com');
+    }
   }
 
   async validateLicenseKey() {

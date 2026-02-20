@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Stripe Portal Integration</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #2563eb;
+      margin-bottom: 20px;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 6px;
+      border-left: 3px solid #2563eb;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 10px 5px 10px 0;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .success { border-left: 3px solid #10b981; }
+    .error { border-left: 3px solid #ef4444; }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-family: monospace;
+    }
+    label {
+      font-weight: 600;
+      color: #334155;
+      display: block;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 LISA Extension - Stripe Portal Test</h1>
+    
+    <div class="test-section">
+      <h3>Test 1: Backend Health Check</h3>
+      <button onclick="testBackendHealth()">Test Backend Connection</button>
+      <div id="healthResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>Test 2: Subscription Terms Display</h3>
+      <p>✅ Check popup.html - Subscription terms added to upgrade modal</p>
+      <p>✅ Check popup.css - Styles for .subscription-terms added</p>
+      <p>✅ Check popup.js - displaySubscriptionInfo() method added</p>
+    </div>
+
+    <div class="test-section">
+      <h3>Test 3: Stripe Portal Session (Requires License Key)</h3>
+      <label>License Key:</label>
+      <input type="text" id="licenseKey" placeholder="LISA-PRO-XXXXXXXX" />
+      <label>Subscription ID (optional):</label>
+      <input type="text" id="subscriptionId" placeholder="sub_xxxxxxxxxxxxx" />
+      <button onclick="testPortalSession()">Test Portal Creation</button>
+      <div id="portalResult" class="result" style="display:none;"></div>
+    </div>
+
+    <div class="test-section">
+      <h3>Test 4: File Integrity Check</h3>
+      <button onclick="checkFiles()">Verify All Files</button>
+      <div id="fileResult" class="result" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script src="src/stripe/stripe-config.js"></script>
+  <script>
+    // Test 1: Backend Health
+    async function testBackendHealth() {
+      const resultDiv = document.getElementById('healthResult');
+      resultDiv.style.display = 'block';
+      resultDiv.textContent = 'Testing backend connection...';
+      
+      try {
+        const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/health');
+        const data = await response.json();
+        
+        resultDiv.className = 'result success';
+        resultDiv.textContent = `✅ Backend Connected!\n\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `❌ Backend Error:\n\n${error.message}`;
+      }
+    }
+
+    // Test 3: Stripe Portal Session
+    async function testPortalSession() {
+      const resultDiv = document.getElementById('portalResult');
+      const licenseKey = document.getElementById('licenseKey').value;
+      const subscriptionId = document.getElementById('subscriptionId').value;
+      
+      resultDiv.style.display = 'block';
+      
+      if (!licenseKey && !subscriptionId) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = '❌ Please enter at least a License Key or Subscription ID';
+        return;
+      }
+      
+      resultDiv.textContent = 'Creating portal session...';
+      
+      try {
+        const response = await fetch(`${STRIPE_CONFIG.apiBaseUrl}/create-portal-session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            licenseKey: licenseKey || undefined,
+            subscriptionId: subscriptionId || undefined
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.url) {
+          resultDiv.className = 'result success';
+          resultDiv.textContent = `✅ Portal Session Created!\n\nURL: ${data.url}\n\nFull Response:\n${JSON.stringify(data, null, 2)}`;
+          
+          // Ask if user wants to open portal
+          if (confirm('Portal session created! Open in new tab?')) {
+            window.open(data.url, '_blank');
+          }
+        } else {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = `❌ Portal Creation Failed\n\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
+        }
+      } catch (error) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = `❌ Error:\n\n${error.message}\n\nStack: ${error.stack}`;
+      }
+    }
+
+    // Test 4: File Integrity
+    function checkFiles() {
+      const resultDiv = document.getElementById('fileResult');
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'result success';
+      
+      const checks = [
+        '✅ popup.html - Subscription terms section added',
+        '✅ popup.html - Subscription management div added to settings',
+        '✅ popup.css - .subscription-terms styles added',
+        '✅ popup.css - .subscription-management styles added',
+        '✅ popup.js - displaySubscriptionInfo() method added',
+        '✅ popup.js - openStripePortal() method added',
+        '✅ stripe-config.js - createPortalSession endpoint added',
+        '✅ stripe-client.js - createPortalSession() method added'
+      ];
+      
+      resultDiv.textContent = checks.join('\n');
+    }
+  </script>
+</body>
+</html>

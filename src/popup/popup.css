@@ -975,6 +975,32 @@ footer {
   color: var(--text-secondary);
 }
 
+/* Subscription Terms Notice */
+.subscription-terms {
+  margin: 20px 0 0 0;
+  padding: 15px;
+  background: rgba(37, 99, 235, 0.05);
+  border-left: 3px solid var(--primary-color);
+  border-radius: 6px;
+}
+
+.terms-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.terms-text a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.terms-text a:hover {
+  text-decoration: underline;
+}
+
 /* App Teaser Section */
 .app-teaser {
   margin-top: 24px;
@@ -1209,6 +1235,47 @@ footer {
 
 #currentTierDisplay.premium {
   color: #f59e0b;
+}
+
+/* Subscription Management */
+.subscription-management {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.subscription-management h3 {
+  margin: 0 0 12px 0;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.subscription-management p {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.subscription-management ul {
+  margin: 8px 0 16px 20px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.subscription-management li {
+  margin: 4px 0;
+}
+
+.subscription-management a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.subscription-management a:hover {
+  text-decoration: underline;
 }
 
 /* Settings Buttons */

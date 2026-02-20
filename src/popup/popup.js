@@ -24,6 +24,7 @@ class LISAPopup {
     this.loadSnapshots();
     this.setupAutoSaveToggle();
     this.setupChatSwitchToggle();
+    this.loadTemplates(); // Beta: Load conversation templates
   }
 
   async loadUsageStats() {
@@ -348,6 +349,24 @@ class LISAPopup {
         content.style.display = 'none';
         arrow.textContent = '▼';
       }
+    });
+
+    // Templates collapsible toggle
+    document.getElementById('templatesToggle')?.addEventListener('click', () => {
+      const content = document.getElementById('templatesContent');
+      const arrow = document.querySelectorAll('.toggle-arrow')[2];
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
+
+    // Template category filter
+    document.getElementById('templateCategory')?.addEventListener('change', (e) => {
+      this.filterTemplates(e.target.value);
     });
   }
 
@@ -1272,6 +1291,70 @@ class LISAPopup {
     }).catch(() => {
       // Ignore tracking errors
     });
+  }
+
+  // Beta Feature #3: Conversation Templates
+  loadTemplates() {
+    if (typeof LISA_TEMPLATES === 'undefined') {
+      console.warn('[LISA] Templates not loaded');
+      return;
+    }
+
+    const templatesList = document.getElementById('templatesList');
+    if (!templatesList) return;
+
+    this.renderTemplates('all');
+  }
+
+  renderTemplates(category = 'all') {
+    const templatesList = document.getElementById('templatesList');
+    if (!templatesList) return;
+
+    templatesList.innerHTML = '';
+
+    Object.values(LISA_TEMPLATES).forEach(template => {
+      if (category !== 'all' && template.category !== category) {
+        return;
+      }
+
+      const templateItem = document.createElement('div');
+      templateItem.className = 'template-item';
+      templateItem.dataset.templateId = template.id;
+      
+      templateItem.innerHTML = `
+        <div class="template-title">${template.title}</div>
+        <div class="template-description">${template.description}</div>
+      `;
+
+      templateItem.addEventListener('click', () => {
+        this.copyTemplate(template, templateItem);
+      });
+
+      templatesList.appendChild(templateItem);
+    });
+  }
+
+  filterTemplates(category) {
+    this.renderTemplates(category);
+  }
+
+  async copyTemplate(template, element) {
+    try {
+      await navigator.clipboard.writeText(template.prompt);
+      
+      // Visual feedback
+      element.classList.add('template-copied');
+      setTimeout(() => {
+        element.classList.remove('template-copied');
+      }, 2000);
+
+      // Show notification
+      this.showSuccess(`✓ ${template.title} copied!`);
+      this.trackEvent('template_copied', { templateId: template.id });
+    } catch (error) {
+      console.error('[LISA] Failed to copy template:', error);
+      this.showError('Failed to copy template');
+    }
   }
 }
 

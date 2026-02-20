@@ -1,5 +1,5 @@
 // LISA Core Extension - Popup Logic
-// v0.48 - Added subscription auto-renewal/cancellation notice
+// v0.49-beta - Experimental features
 
 class LISAPopup {
   constructor() {

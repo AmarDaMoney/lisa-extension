@@ -8,6 +8,7 @@ class LISAPopup {
     this.userTier = 'free';
     this.exportManager = new ExportManager(); // Beta: Smart export formats
     this.analyticsTracker = new AnalyticsTracker(); // Beta: Analytics dashboard
+    this.searchEngine = new SearchEngine(); // Beta: Smart search
     this.usageStats = {
       exportsThisWeek: 0,
       importsThisWeek: 0,
@@ -20,6 +21,7 @@ class LISAPopup {
     await this.loadUserTier();
     await this.loadUsageStats();
     await this.analyticsTracker.init(); // Beta: Initialize analytics
+    await this.searchEngine.init(); // Beta: Initialize search
     this.setupUI();
     this.detectPlatform();
     this.setupEventListeners();
@@ -393,6 +395,41 @@ class LISAPopup {
         this.loadAnalytics();
         this.showSuccess('✓ Analytics data reset successfully');
       }
+    });
+
+    // Smart Search collapsible toggle (Beta Feature #5)
+    document.getElementById('searchToggle')?.addEventListener('click', () => {
+      const content = document.getElementById('searchContent');
+      const arrow = document.querySelectorAll('.toggle-arrow')[4];
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
+
+    // Search input (search on enter key)
+    document.getElementById('searchInput')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        this.performSearch();
+      }
+    });
+
+    // Search button
+    document.getElementById('searchBtn')?.addEventListener('click', () => {
+      this.performSearch();
+    });
+
+    // Platform filter
+    document.getElementById('platformFilter')?.addEventListener('change', () => {
+      this.performSearch();
+    });
+
+    // Date filter
+    document.getElementById('dateFilter')?.addEventListener('change', () => {
+      this.performSearch();
     });
   }
 
@@ -1490,6 +1527,152 @@ class LISAPopup {
     document.getElementById('jsonCount').textContent = formats.json || 0;
     document.getElementById('markdownCount').textContent = formats.markdown || 0;
     document.getElementById('textCount').textContent = formats.text || 0;
+  }
+
+  // Beta Feature #5: Smart Search
+  async performSearch() {
+    const query = document.getElementById('searchInput').value.trim();
+    const platformFilter = document.getElementById('platformFilter').value;
+    const dateFilter = document.getElementById('dateFilter').value;
+
+    const startTime = performance.now();
+
+    try {
+      const filters = {
+        platform: platformFilter,
+        dateRange: dateFilter,
+        minScore: 0.1
+      };
+
+      const results = await this.searchEngine.search(query, filters);
+      const endTime = performance.now();
+      const searchTime = Math.round(endTime - startTime);
+
+      this.renderSearchResults(results, query, searchTime);
+    } catch (error) {
+      console.error('[LISA] Search error:', error);
+      this.showError('Search failed. Please try again.');
+    }
+  }
+
+  renderSearchResults(results, query, searchTime) {
+    const resultsContainer = document.getElementById('searchResults');
+    const statsContainer = document.getElementById('searchStats');
+    const statsText = document.getElementById('searchStatsText');
+
+    // Update stats
+    if (results.length > 0 || query) {
+      statsContainer.style.display = 'block';
+      statsText.textContent = `${results.length} result${results.length !== 1 ? 's' : ''} (${searchTime}ms)`;
+    } else {
+      statsContainer.style.display = 'none';
+    }
+
+    // Clear previous results
+    resultsContainer.innerHTML = '';
+
+    // Show empty state if no results
+    if (results.length === 0) {
+      if (query) {
+        resultsContainer.innerHTML = `
+          <div class="empty-search-state">
+            <div class="empty-search-icon">😞</div>
+            <p class="empty-search-text">No results found</p>
+            <p class="empty-search-hint">Try different keywords or filters</p>
+          </div>
+        `;
+      } else {
+        resultsContainer.innerHTML = `
+          <div class="empty-search-state">
+            <div class="empty-search-icon">🔍</div>
+            <p class="empty-search-text">Search your conversation library</p>
+            <p class="empty-search-hint">Try searching by keywords, platform, or topics</p>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    // Render results
+    results.forEach((result, index) => {
+      const conv = result.conversation;
+      const preview = result.preview;
+      const score = result.score;
+
+      const resultItem = document.createElement('div');
+      resultItem.className = 'search-result-item';
+      resultItem.dataset.index = index;
+      
+      const platform = this.formatPlatformName(conv.platform || 'unknown');
+      const title = this.searchEngine.getConversationTitle(conv);
+      const timestamp = this.getRelativeTime(conv.timestamp || conv.metadata?.timestamp || Date.now());
+      const messageCount = (conv.messages || []).length;
+
+      resultItem.innerHTML = `
+        <div class="result-header">
+          <div class="result-title">${this.escapeHtml(title)}</div>
+          <div class="result-score">${Math.round(score * 100)}%</div>
+        </div>
+        <div class="result-meta">
+          <span class="result-platform">${platform}</span>
+          <span class="result-divider">•</span>
+          <span class="result-time">${timestamp}</span>
+          <span class="result-divider">•</span>
+          <span class="result-messages">${messageCount} messages</span>
+        </div>
+        <div class="result-preview">
+          <span class="preview-role">${preview.role}:</span>
+          <span class="preview-text">${this.escapeHtml(preview.text)}</span>
+        </div>
+      `;
+
+      // Click to load conversation (future feature)
+      resultItem.addEventListener('click', () => {
+        this.loadConversationFromSearch(conv);
+      });
+
+      resultsContainer.appendChild(resultItem);
+    });
+  }
+
+  loadConversationFromSearch(conversation) {
+    // Future enhancement: Load conversation into viewer
+    console.log('[LISA] Loading conversation:', conversation);
+    this.showSuccess('✓ Conversation loaded (preview feature)');
+    
+    // For now, just show a notification
+    const title = this.searchEngine.getConversationTitle(conversation);
+    alert(`Conversation: ${title}\n\nPlatform: ${conversation.platform}\nMessages: ${(conversation.messages || []).length}\n\nFull viewer coming soon!`);
+  }
+
+  getRelativeTime(timestamp) {
+    if (!timestamp) return 'Unknown';
+    
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const weeks = Math.floor(days / 7);
+    const months = Math.floor(days / 30);
+    
+    if (seconds < 60) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    if (weeks < 4) return `${weeks}w ago`;
+    if (months < 12) return `${months}mo ago`;
+    
+    const years = Math.floor(days / 365);
+    return `${years}y ago`;
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 }
 

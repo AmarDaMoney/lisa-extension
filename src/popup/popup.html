@@ -268,6 +268,72 @@
           </div>
         </div>
       </div>
+
+      <!-- Smart Search Section (Beta Feature #5) -->
+      <div class="search-section">
+        <div class="section-divider collapsible" id="searchToggle" style="cursor: pointer;">
+          <span>🔍 Smart Search <span class="beta-tag">BETA</span></span>
+          <span class="toggle-arrow">▼</span>
+        </div>
+        
+        <div class="search-container" id="searchContent" style="display: none;">
+          <!-- Search Input -->
+          <div class="search-input-wrapper">
+            <input 
+              type="text" 
+              id="searchInput" 
+              class="search-input" 
+              placeholder="Search conversations..."
+              autocomplete="off"
+            />
+            <button id="searchBtn" class="search-btn">
+              <span class="search-icon">🔍</span>
+            </button>
+          </div>
+
+          <!-- Search Filters -->
+          <div class="search-filters">
+            <div class="filter-group">
+              <label class="filter-label">Platform:</label>
+              <select id="platformFilter" class="filter-select">
+                <option value="all">All Platforms</option>
+                <option value="chatgpt">ChatGPT</option>
+                <option value="claude">Claude</option>
+                <option value="gemini">Gemini</option>
+                <option value="copilot">Copilot</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="grok">Grok</option>
+                <option value="perplexity">Perplexity</option>
+                <option value="mistral">Mistral</option>
+              </select>
+            </div>
+            
+            <div class="filter-group">
+              <label class="filter-label">Date:</label>
+              <select id="dateFilter" class="filter-select">
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Search Stats -->
+          <div class="search-stats" id="searchStats" style="display: none;">
+            <span id="searchStatsText">0 results</span>
+          </div>
+
+          <!-- Search Results -->
+          <div class="search-results" id="searchResults">
+            <div class="empty-search-state">
+              <div class="empty-search-icon">🔍</div>
+              <p class="empty-search-text">Search your conversation library</p>
+              <p class="empty-search-hint">Try searching by keywords, platform, or topics</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Snapshots Section -->
@@ -573,6 +639,7 @@
   <script src="../shared/templates.js"></script>
   <script src="../export/export-manager.js"></script>
   <script src="../analytics/analytics-tracker.js"></script>
+  <script src="../search/search-engine.js"></script>
   <script src="../stripe/stripe-config.js"></script>
   <script src="../stripe/stripe-client.js"></script>
   <script src="../stripe/stripe-subscription-modal.js"></script>

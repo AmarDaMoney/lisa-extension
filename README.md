@@ -19,6 +19,7 @@ LISA (Linguistic Intelligent Semantic Assistant) compresses AI conversations int
 
 ## ✨ Features
 
+### Core Features
 - 🔄 **9 Platform Support** - Claude, ChatGPT, Gemini, Grok, Mistral, DeepSeek, Copilot, Perplexity + Universal
 - 📤 **One-Click Export** - Extract full conversations with a single click
 - ✂️ **Selection Export** - Right-click to export selected text snippets
@@ -31,6 +32,13 @@ LISA (Linguistic Intelligent Semantic Assistant) compresses AI conversations int
 - 📜 **Version History** - Git-style tracking of conversation evolution
 - 🔗 **Hash Chain** - SHA-256 integrity verification for each snapshot
 - ⏪ **Time Machine** - View and restore previous versions
+
+### Beta Features (v0.49-beta)
+- ⌨️ **Keyboard Shortcuts** - Quick access with Ctrl+Shift+E (extract), Ctrl+Shift+S (quick save), Ctrl+Shift+L (open popup)
+- 📄 **Smart Export Formats** - Export conversations as JSON, Markdown, or Plain Text
+- 📋 **Conversation Templates** - 10 pre-built prompts (Code Review, Documentation, Debugging, Explain, Summarize, Improve, Translate, Compare, Brainstorm, Learn)
+- 📊 **Analytics Dashboard** - Track export stats, compression metrics, top platforms, and usage trends
+- 🔍 **Smart Search** - Full-text search with platform filters, date ranges, and smart content preview
 
 ## 🚀 Installation
 
@@ -89,6 +97,8 @@ LISA (Linguistic Intelligent Semantic Assistant) compresses AI conversations int
 lisa-extension/
 ├── manifest.json           # Extension configuration
 ├── src/
+│   ├── analytics/         # Usage tracking (v0.49-beta)
+│   │   └── analytics-tracker.js
 │   ├── background/        # Service worker
 │   │   └── service-worker.js
 │   ├── content/           # Platform parsers
@@ -98,10 +108,23 @@ lisa-extension/
 │   │   ├── lisa-floating-button.js
 │   │   ├── lisa-v-parser.js
 │   │   └── ... (9 total)
-│   └── popup/             # Extension UI
-│       ├── popup.html
-│       ├── popup.css
-│       └── popup.js
+│   ├── export/            # Multi-format exports (v0.49-beta)
+│   │   └── export-manager.js
+│   ├── popup/             # Extension UI
+│   │   ├── popup.html
+│   │   ├── popup.css
+│   │   └── popup.js
+│   ├── search/            # Search engine (v0.49-beta)
+│   │   └── search-engine.js
+│   ├── shared/            # Shared utilities
+│   │   ├── captureConfig.js
+│   │   ├── templates.js   # Conversation templates (v0.49-beta)
+│   │   └── types.js
+│   └── stripe/            # Subscription management
+│       ├── stripe-client.js
+│       ├── stripe-config.js
+│       ├── stripe-payment-manager.js
+│       └── stripe-subscription-modal.js
 └── public/                # Icons
 ```
 

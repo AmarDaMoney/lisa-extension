@@ -335,6 +335,19 @@ class LISAPopup {
         arrow.textContent = '▼';
       }
     });
+
+    // Keyboard Shortcuts collapsible toggle
+    document.getElementById('shortcutsToggle')?.addEventListener('click', () => {
+      const content = document.getElementById('shortcutsContent');
+      const arrow = document.querySelectorAll('.toggle-arrow')[1];
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
   }
 
   copyPrompt() {

@@ -881,4 +881,52 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   }
 });
 
+// Keyboard shortcuts handler
+chrome.commands.onCommand.addListener(async (command) => {
+  console.log('[LISA] Keyboard shortcut triggered:', command);
+  
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab) {
+      console.log('[LISA] No active tab found');
+      return;
+    }
+    
+    switch (command) {
+      case 'extract-conversation':
+        // Send extract command to active tab
+        await chrome.tabs.sendMessage(tab.id, { 
+          type: 'EXTRACT_CONVERSATION',
+          source: 'keyboard-shortcut'
+        });
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'public/icon128.png',
+          title: 'LISA Extract',
+          message: '⌨️ Extracting conversation...',
+          priority: 1
+        });
+        break;
+        
+      case 'quick-save':
+        // Quick compress and save
+        await chrome.tabs.sendMessage(tab.id, { 
+          type: 'QUICK_SAVE',
+          source: 'keyboard-shortcut'
+        });
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'public/icon128.png',
+          title: 'LISA Quick Save',
+          message: '⌨️ Saving conversation...',
+          priority: 1
+        });
+        break;
+    }
+  } catch (error) {
+    console.error('[LISA] Keyboard shortcut error:', error);
+  }
+});
+
 console.log('[LISA] Core compression engine initialized v0.49-beta');

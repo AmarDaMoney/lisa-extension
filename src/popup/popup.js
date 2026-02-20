@@ -1,11 +1,14 @@
 // LISA Core Extension - Popup Logic
-// v0.48 - Added subscription auto-renewal/cancellation notice
+// v0.49-beta - Experimental features
 
 class LISAPopup {
   constructor() {
     this.currentConversation = null;
     this.compressedData = null;
     this.userTier = 'free';
+    this.exportManager = new ExportManager(); // Beta: Smart export formats
+    this.analyticsTracker = new AnalyticsTracker(); // Beta: Analytics dashboard
+    this.searchEngine = new SearchEngine(); // Beta: Smart search
     this.usageStats = {
       exportsThisWeek: 0,
       importsThisWeek: 0,
@@ -17,12 +20,16 @@ class LISAPopup {
   async init() {
     await this.loadUserTier();
     await this.loadUsageStats();
+    await this.analyticsTracker.init(); // Beta: Initialize analytics
+    await this.searchEngine.init(); // Beta: Initialize search
     this.setupUI();
     this.detectPlatform();
     this.setupEventListeners();
     this.loadSnapshots();
     this.setupAutoSaveToggle();
     this.setupChatSwitchToggle();
+    this.loadTemplates(); // Beta: Load conversation templates
+    this.loadAnalytics(); // Beta: Load analytics dashboard
   }
 
   async loadUsageStats() {
@@ -335,6 +342,95 @@ class LISAPopup {
         arrow.textContent = '▼';
       }
     });
+
+    // Keyboard Shortcuts collapsible toggle
+    document.getElementById('shortcutsToggle')?.addEventListener('click', () => {
+      const content = document.getElementById('shortcutsContent');
+      const arrow = document.querySelectorAll('.toggle-arrow')[1];
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
+
+    // Templates collapsible toggle
+    document.getElementById('templatesToggle')?.addEventListener('click', () => {
+      const content = document.getElementById('templatesContent');
+      const arrow = document.querySelectorAll('.toggle-arrow')[2];
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
+
+    // Analytics Dashboard collapsible toggle
+    document.getElementById('analyticsToggle')?.addEventListener('click', () => {
+      const content = document.getElementById('analyticsContent');
+      const arrow = document.querySelectorAll('.toggle-arrow')[3];
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+        this.loadAnalytics(); // Reload analytics when opened
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
+
+    // Template category filter
+    document.getElementById('templateCategory')?.addEventListener('change', (e) => {
+      this.filterTemplates(e.target.value);
+    });
+
+    // Reset analytics button
+    document.getElementById('resetAnalyticsBtn')?.addEventListener('click', async () => {
+      if (confirm('Are you sure you want to reset all analytics data? This cannot be undone.')) {
+        await this.analyticsTracker.reset();
+        this.loadAnalytics();
+        this.showSuccess('✓ Analytics data reset successfully');
+      }
+    });
+
+    // Smart Search collapsible toggle (Beta Feature #5)
+    document.getElementById('searchToggle')?.addEventListener('click', () => {
+      const content = document.getElementById('searchContent');
+      const arrow = document.querySelectorAll('.toggle-arrow')[4];
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
+
+    // Search input (search on enter key)
+    document.getElementById('searchInput')?.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        this.performSearch();
+      }
+    });
+
+    // Search button
+    document.getElementById('searchBtn')?.addEventListener('click', () => {
+      this.performSearch();
+    });
+
+    // Platform filter
+    document.getElementById('platformFilter')?.addEventListener('change', () => {
+      this.performSearch();
+    });
+
+    // Date filter
+    document.getElementById('dateFilter')?.addEventListener('change', () => {
+      this.performSearch();
+    });
   }
 
   copyPrompt() {
@@ -480,6 +576,11 @@ class LISAPopup {
       if (response.success && response.data) {
         this.currentConversation = response.data;
         
+        // Track conversation capture
+        const platform = (response.data.platform || 'unknown').toLowerCase();
+        const charCount = JSON.stringify(response.data).length;
+        await this.analyticsTracker.trackConversation(platform, charCount);
+        
         // Update UI
         document.getElementById('messageCount').textContent = response.data.messageCount || 0;
         document.getElementById('detectedPlatform').textContent = response.data.platform || 'Unknown';
@@ -589,7 +690,7 @@ class LISAPopup {
     });
   }
 
-  downloadJSON() {
+  async downloadJSON() {
     if (!this.compressedData) {
       this.showError('No compressed data to download');
       return;
@@ -602,44 +703,58 @@ class LISAPopup {
       return;
     }
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const platform = (this.compressedData.metadata.platform || 'unknown').replace(/[.\s()]/g, '-');
-    const filename = `lisa-${platform}-${timestamp}.json`;
+    // Get selected export format
+    const formatSelect = document.getElementById('exportFormat');
+    const selectedFormat = formatSelect ? formatSelect.value : 'json';
 
-    const dataStr = JSON.stringify(this.compressedData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
+    try {
+      // Use ExportManager to convert format
+      const exported = this.exportManager.export(this.compressedData, selectedFormat);
+      
+      const dataBlob = new Blob([exported.content], { type: exported.mimeType });
+      const url = URL.createObjectURL(dataBlob);
 
-    chrome.downloads.download({
-      url: url,
-      filename: filename,
-      saveAs: true
-    }, (downloadId) => {
-      URL.revokeObjectURL(url);
-      
-      if (chrome.runtime.lastError) {
-        console.error('[LISA] Download error:', chrome.runtime.lastError);
-        this.showError('Download failed');
-        return;
-      }
-      
-      if (downloadId) {
-        this.updateUsageStats('export');
-        this.setupUI(); // Refresh button texts with new count
+      chrome.downloads.download({
+        url: url,
+        filename: exported.filename,
+        saveAs: true
+      }, async (downloadId) => {
+        URL.revokeObjectURL(url);
         
-        this.trackEvent('download', { 
-          platform: platform, 
-          hasHash: !!this.compressedData.lisaHash 
-        });
-        
-        // Show remaining exports for free users
-        if (this.userTier === 'free') {
-          const remaining = 5 - this.usageStats.exportsThisWeek;
-            this.updatePlatformStatus(`${remaining} free exports remaining today`, true);
+        if (chrome.runtime.lastError) {
+          console.error('[LISA] Download error:', chrome.runtime.lastError);
+          this.showError('Download failed');
+          return;
         }
-      }
-    });
+        
+        if (downloadId) {
+          this.updateUsageStats('export');
+          this.setupUI(); // Refresh button texts with new count
+          
+          // Track analytics
+          const originalSize = JSON.stringify(this.currentConversation).length;
+          const compressedSize = JSON.stringify(this.compressedData).length;
+          await this.analyticsTracker.trackExport(selectedFormat, originalSize, compressedSize);
+          
+          this.trackEvent('download', { 
+            platform: this.compressedData.metadata?.platform,
+            format: selectedFormat,
+            hasHash: !!this.compressedData.lisaHash 
+          });
+          
+          // Show remaining exports for free users
+          if (this.userTier === 'free') {
+            const remaining = 5 - this.usageStats.exportsThisWeek;
+            this.updatePlatformStatus(`${remaining} free exports remaining today`, true);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('[LISA] Export error:', error);
+      this.showError('Failed to export conversation');
+    }
   }
+  
   async saveToLibrary() {
     if (!this.compressedData) {
       this.showError('No compressed data to save');
@@ -1249,6 +1364,315 @@ class LISAPopup {
     }).catch(() => {
       // Ignore tracking errors
     });
+  }
+
+  // Beta Feature #3: Conversation Templates
+  loadTemplates() {
+    if (typeof LISA_TEMPLATES === 'undefined') {
+      console.warn('[LISA] Templates not loaded');
+      return;
+    }
+
+    const templatesList = document.getElementById('templatesList');
+    if (!templatesList) return;
+
+    this.renderTemplates('all');
+  }
+
+  renderTemplates(category = 'all') {
+    const templatesList = document.getElementById('templatesList');
+    if (!templatesList) return;
+
+    templatesList.innerHTML = '';
+
+    Object.values(LISA_TEMPLATES).forEach(template => {
+      if (category !== 'all' && template.category !== category) {
+        return;
+      }
+
+      const templateItem = document.createElement('div');
+      templateItem.className = 'template-item';
+      templateItem.dataset.templateId = template.id;
+      
+      templateItem.innerHTML = `
+        <div class="template-title">${template.title}</div>
+        <div class="template-description">${template.description}</div>
+      `;
+
+      templateItem.addEventListener('click', () => {
+        this.copyTemplate(template, templateItem);
+      });
+
+      templatesList.appendChild(templateItem);
+    });
+  }
+
+  filterTemplates(category) {
+    this.renderTemplates(category);
+  }
+
+  async copyTemplate(template, element) {
+    try {
+      await navigator.clipboard.writeText(template.prompt);
+      
+      // Visual feedback
+      element.classList.add('template-copied');
+      setTimeout(() => {
+        element.classList.remove('template-copied');
+      }, 2000);
+
+      // Show notification
+      this.showSuccess(`✓ ${template.title} copied!`);
+      this.trackEvent('template_copied', { templateId: template.id });
+      await this.analyticsTracker.trackFeature('templates');
+    } catch (error) {
+      console.error('[LISA] Failed to copy template:', error);
+      this.showError('Failed to copy template');
+    }
+  }
+
+  // Beta Feature #4: Analytics Dashboard
+  async loadAnalytics() {
+    try {
+      const summary = await this.analyticsTracker.getSummary();
+      const data = await this.analyticsTracker.getData();
+
+      // Update summary stats
+      document.getElementById('totalConversations').textContent = summary.totalConversations;
+      document.getElementById('totalExports').textContent = summary.totalExports;
+      document.getElementById('compressionSavings').textContent = summary.compressionSavings + '%';
+      document.getElementById('daysSinceStart').textContent = summary.daysSinceFirstUse;
+
+      // Update timeline stats
+      this.updateTimeline(summary.timeline);
+
+      // Update top platforms
+      this.updateTopPlatforms(summary.topPlatforms);
+
+      // Update export format breakdown
+      this.updateFormatBreakdown(data.exports.byFormat);
+    } catch (error) {
+      console.error('[LISA] Failed to load analytics:', error);
+    }
+  }
+
+  updateTimeline(timeline) {
+    const maxCount = Math.max(timeline.thisWeek, timeline.thisMonth, timeline.allTime, 1);
+    
+    // Update week
+    const weekBar = document.getElementById('weekBar');
+    const weekCount = document.getElementById('weekCount');
+    const weekPercent = (timeline.thisWeek / maxCount) * 100;
+    weekBar.style.width = weekPercent + '%';
+    weekCount.textContent = timeline.thisWeek;
+
+    // Update month
+    const monthBar = document.getElementById('monthBar');
+    const monthCount = document.getElementById('monthCount');
+    const monthPercent = (timeline.thisMonth / maxCount) * 100;
+    monthBar.style.width = monthPercent + '%';
+    monthCount.textContent = timeline.thisMonth;
+
+    // Update all time
+    const allTimeBar = document.getElementById('allTimeBar');
+    const allTimeCount = document.getElementById('allTimeCount');
+    allTimeBar.style.width = '100%';
+    allTimeCount.textContent = timeline.allTime;
+  }
+
+  updateTopPlatforms(platforms) {
+    const platformsList = document.getElementById('topPlatformsList');
+    if (!platformsList) return;
+
+    if (platforms.length === 0 || platforms.every(p => p.count === 0)) {
+      platformsList.innerHTML = '<div class="empty-analytics">No data yet. Start capturing conversations!</div>';
+      return;
+    }
+
+    platformsList.innerHTML = '';
+    platforms.forEach((platform, index) => {
+      if (platform.count === 0) return;
+
+      const platformItem = document.createElement('div');
+      platformItem.className = 'platform-item';
+      
+      const medals = ['🥇', '🥈', '🥉'];
+      const medal = medals[index] || '📊';
+
+      platformItem.innerHTML = `
+        <span class="platform-medal">${medal}</span>
+        <span class="platform-name">${this.formatPlatformName(platform.name)}</span>
+        <span class="platform-count">${platform.count}</span>
+      `;
+
+      platformsList.appendChild(platformItem);
+    });
+  }
+
+  formatPlatformName(name) {
+    const names = {
+      chatgpt: 'ChatGPT',
+      claude: 'Claude',
+      copilot: 'Copilot',
+      gemini: 'Gemini',
+      deepseek: 'DeepSeek',
+      grok: 'Grok',
+      perplexity: 'Perplexity',
+      mistral: 'Mistral'
+    };
+    return names[name] || name;
+  }
+
+  updateFormatBreakdown(formats) {
+    document.getElementById('jsonCount').textContent = formats.json || 0;
+    document.getElementById('markdownCount').textContent = formats.markdown || 0;
+    document.getElementById('textCount').textContent = formats.text || 0;
+  }
+
+  // Beta Feature #5: Smart Search
+  async performSearch() {
+    const query = document.getElementById('searchInput').value.trim();
+    const platformFilter = document.getElementById('platformFilter').value;
+    const dateFilter = document.getElementById('dateFilter').value;
+
+    const startTime = performance.now();
+
+    try {
+      const filters = {
+        platform: platformFilter,
+        dateRange: dateFilter,
+        minScore: 0.1
+      };
+
+      const results = await this.searchEngine.search(query, filters);
+      const endTime = performance.now();
+      const searchTime = Math.round(endTime - startTime);
+
+      this.renderSearchResults(results, query, searchTime);
+    } catch (error) {
+      console.error('[LISA] Search error:', error);
+      this.showError('Search failed. Please try again.');
+    }
+  }
+
+  renderSearchResults(results, query, searchTime) {
+    const resultsContainer = document.getElementById('searchResults');
+    const statsContainer = document.getElementById('searchStats');
+    const statsText = document.getElementById('searchStatsText');
+
+    // Update stats
+    if (results.length > 0 || query) {
+      statsContainer.style.display = 'block';
+      statsText.textContent = `${results.length} result${results.length !== 1 ? 's' : ''} (${searchTime}ms)`;
+    } else {
+      statsContainer.style.display = 'none';
+    }
+
+    // Clear previous results
+    resultsContainer.innerHTML = '';
+
+    // Show empty state if no results
+    if (results.length === 0) {
+      if (query) {
+        resultsContainer.innerHTML = `
+          <div class="empty-search-state">
+            <div class="empty-search-icon">😞</div>
+            <p class="empty-search-text">No results found</p>
+            <p class="empty-search-hint">Try different keywords or filters</p>
+          </div>
+        `;
+      } else {
+        resultsContainer.innerHTML = `
+          <div class="empty-search-state">
+            <div class="empty-search-icon">🔍</div>
+            <p class="empty-search-text">Search your conversation library</p>
+            <p class="empty-search-hint">Try searching by keywords, platform, or topics</p>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    // Render results
+    results.forEach((result, index) => {
+      const conv = result.conversation;
+      const preview = result.preview;
+      const score = result.score;
+
+      const resultItem = document.createElement('div');
+      resultItem.className = 'search-result-item';
+      resultItem.dataset.index = index;
+      
+      const platform = this.formatPlatformName(conv.platform || 'unknown');
+      const title = this.searchEngine.getConversationTitle(conv);
+      const timestamp = this.getRelativeTime(conv.timestamp || conv.metadata?.timestamp || Date.now());
+      const messageCount = (conv.messages || []).length;
+
+      resultItem.innerHTML = `
+        <div class="result-header">
+          <div class="result-title">${this.escapeHtml(title)}</div>
+          <div class="result-score">${Math.round(score * 100)}%</div>
+        </div>
+        <div class="result-meta">
+          <span class="result-platform">${platform}</span>
+          <span class="result-divider">•</span>
+          <span class="result-time">${timestamp}</span>
+          <span class="result-divider">•</span>
+          <span class="result-messages">${messageCount} messages</span>
+        </div>
+        <div class="result-preview">
+          <span class="preview-role">${preview.role}:</span>
+          <span class="preview-text">${this.escapeHtml(preview.text)}</span>
+        </div>
+      `;
+
+      // Click to load conversation (future feature)
+      resultItem.addEventListener('click', () => {
+        this.loadConversationFromSearch(conv);
+      });
+
+      resultsContainer.appendChild(resultItem);
+    });
+  }
+
+  loadConversationFromSearch(conversation) {
+    // Future enhancement: Load conversation into viewer
+    console.log('[LISA] Loading conversation:', conversation);
+    this.showSuccess('✓ Conversation loaded (preview feature)');
+    
+    // For now, just show a notification
+    const title = this.searchEngine.getConversationTitle(conversation);
+    alert(`Conversation: ${title}\n\nPlatform: ${conversation.platform}\nMessages: ${(conversation.messages || []).length}\n\nFull viewer coming soon!`);
+  }
+
+  getRelativeTime(timestamp) {
+    if (!timestamp) return 'Unknown';
+    
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const weeks = Math.floor(days / 7);
+    const months = Math.floor(days / 30);
+    
+    if (seconds < 60) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    if (weeks < 4) return `${weeks}w ago`;
+    if (months < 12) return `${months}mo ago`;
+    
+    const years = Math.floor(days / 365);
+    return `${years}y ago`;
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 }
 

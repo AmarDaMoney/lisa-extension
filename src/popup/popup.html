@@ -14,7 +14,7 @@
           <img src="../../public/logo.png" alt="LISA Core" class="header-logo">
         <h1>LISA Core</h1>
         <span class="subtitle">AI Memory Library</span>
-        <span class="version">v0.48</span>
+        <span class="version">v0.49β</span>
       </div>
       <div class="user-status">
         <span id="userTier" class="tier-badge">Free</span>
@@ -55,10 +55,22 @@
 
       <!-- Download Actions -->
       <div id="downloadSection" style="display: none;">
-        <div style="display: flex; gap: 8px;">
+        <!-- Export Format Selector (Beta) -->
+        <div class="export-format-selector">
+          <label for="exportFormat" class="format-label">
+            📄 Export Format: <span class="beta-tag">BETA</span>
+          </label>
+          <select id="exportFormat" class="format-select">
+            <option value="json">JSON (Default)</option>
+            <option value="markdown">Markdown (.md)</option>
+            <option value="txt">Plain Text (.txt)</option>
+          </select>
+        </div>
+        
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
           <button id="downloadBtn" class="btn btn-success" style="flex: 1;">
             <span class="icon">💾</span>
-            Download LISA JSON
+            Download
           </button>
           <button id="saveToLibraryBtn" class="btn btn-primary" style="flex: 1;">
             <span class="icon">📚</span>
@@ -130,6 +142,198 @@
           </div>
         </div>
       </div>
+
+      <!-- Keyboard Shortcuts Section (Beta Feature) -->
+      <div class="keyboard-shortcuts-section">
+        <div class="section-divider collapsible" id="shortcutsToggle" style="cursor: pointer;">
+          <span>⌨️ Keyboard Shortcuts <span class="beta-tag">BETA</span></span>
+          <span class="toggle-arrow">▼</span>
+        </div>
+        
+        <div class="shortcuts-box" id="shortcutsContent" style="display: none;">
+          <div class="shortcut-item">
+            <div class="shortcut-keys">
+              <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>E</kbd>
+            </div>
+            <div class="shortcut-desc">Extract conversation</div>
+          </div>
+          <div class="shortcut-item">
+            <div class="shortcut-keys">
+              <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>S</kbd>
+            </div>
+            <div class="shortcut-desc">Quick save to library</div>
+          </div>
+          <div class="shortcut-item">
+            <div class="shortcut-keys">
+              <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd>
+            </div>
+            <div class="shortcut-desc">Open LISA popup</div>
+          </div>
+          <p class="shortcuts-note">💡 On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd></p>
+        </div>
+      </div>
+
+      <!-- Analytics Dashboard Section (Beta Feature #4) -->
+      <div class="analytics-section">
+        <div class="section-divider collapsible" id="analyticsToggle" style="cursor: pointer;">
+          <span>📊 Analytics Dashboard <span class="beta-tag">BETA</span></span>
+          <span class="toggle-arrow">▼</span>
+        </div>
+        
+        <div class="analytics-dashboard" id="analyticsContent" style="display: none;">
+          <!-- Summary Stats -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">💬</div>
+              <div class="stat-value" id="totalConversations">0</div>
+              <div class="stat-label">Conversations</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📤</div>
+              <div class="stat-value" id="totalExports">0</div>
+              <div class="stat-label">Exports</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🗜️</div>
+              <div class="stat-value" id="compressionSavings">0%</div>
+              <div class="stat-label">Avg Savings</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📅</div>
+              <div class="stat-value" id="daysSinceStart">0</div>
+              <div class="stat-label">Days Active</div>
+            </div>
+          </div>
+
+          <!-- Timeline Stats -->
+          <div class="timeline-stats">
+            <h4>📈 Activity Timeline</h4>
+            <div class="timeline-bars">
+              <div class="timeline-item">
+                <div class="timeline-label">This Week</div>
+                <div class="timeline-bar">
+                  <div class="timeline-fill" id="weekBar" style="width: 0%;"></div>
+                  <span class="timeline-count" id="weekCount">0</span>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-label">This Month</div>
+                <div class="timeline-bar">
+                  <div class="timeline-fill" id="monthBar" style="width: 0%;"></div>
+                  <span class="timeline-count" id="monthCount">0</span>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-label">All Time</div>
+                <div class="timeline-bar">
+                  <div class="timeline-fill" id="allTimeBar" style="width: 100%;"></div>
+                  <span class="timeline-count" id="allTimeCount">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Platforms -->
+          <div class="top-platforms">
+            <h4>⭐ Top Platforms</h4>
+            <div class="platform-list" id="topPlatformsList">
+              <div class="empty-analytics">No data yet. Start capturing conversations!</div>
+            </div>
+          </div>
+
+          <!-- Export Formats -->
+          <div class="export-stats">
+            <h4>📄 Export Formats</h4>
+            <div class="format-breakdown" id="formatBreakdown">
+              <div class="format-stat">
+                <span class="format-name">JSON</span>
+                <span class="format-count" id="jsonCount">0</span>
+              </div>
+              <div class="format-stat">
+                <span class="format-name">Markdown</span>
+                <span class="format-count" id="markdownCount">0</span>
+              </div>
+              <div class="format-stat">
+                <span class="format-name">Text</span>
+                <span class="format-count" id="textCount">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reset Button -->
+          <div class="analytics-actions">
+            <button id="resetAnalyticsBtn" class="btn-reset-analytics">
+              🔄 Reset Analytics
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Smart Search Section (Beta Feature #5) -->
+      <div class="search-section">
+        <div class="section-divider collapsible" id="searchToggle" style="cursor: pointer;">
+          <span>🔍 Smart Search <span class="beta-tag">BETA</span></span>
+          <span class="toggle-arrow">▼</span>
+        </div>
+        
+        <div class="search-container" id="searchContent" style="display: none;">
+          <!-- Search Input -->
+          <div class="search-input-wrapper">
+            <input 
+              type="text" 
+              id="searchInput" 
+              class="search-input" 
+              placeholder="Search conversations..."
+              autocomplete="off"
+            />
+            <button id="searchBtn" class="search-btn">
+              <span class="search-icon">🔍</span>
+            </button>
+          </div>
+
+          <!-- Search Filters -->
+          <div class="search-filters">
+            <div class="filter-group">
+              <label class="filter-label">Platform:</label>
+              <select id="platformFilter" class="filter-select">
+                <option value="all">All Platforms</option>
+                <option value="chatgpt">ChatGPT</option>
+                <option value="claude">Claude</option>
+                <option value="gemini">Gemini</option>
+                <option value="copilot">Copilot</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="grok">Grok</option>
+                <option value="perplexity">Perplexity</option>
+                <option value="mistral">Mistral</option>
+              </select>
+            </div>
+            
+            <div class="filter-group">
+              <label class="filter-label">Date:</label>
+              <select id="dateFilter" class="filter-select">
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Search Stats -->
+          <div class="search-stats" id="searchStats" style="display: none;">
+            <span id="searchStatsText">0 results</span>
+          </div>
+
+          <!-- Search Results -->
+          <div class="search-results" id="searchResults">
+            <div class="empty-search-state">
+              <div class="empty-search-icon">🔍</div>
+              <p class="empty-search-text">Search your conversation library</p>
+              <p class="empty-search-hint">Try searching by keywords, platform, or topics</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Snapshots Section -->
@@ -168,7 +372,7 @@
       <div class="modal-body">
         <section class="help-section">
           <h3>🎯 What is LISA Core?</h3>
-          <p>LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into semantic tokens, saving up to 80% of tokens while preserving full meaning.</p>
+          <p>LISA (Linguistic Intelligent Semantic Assistant) compresses AI conversations into semantic tokens, saving up to 80% of tokens while preserving full meaning.</p>
           <div class="example-box">
             <p><strong>Example:</strong></p>
             <p>📊 Original conversation: 10,000 tokens</p>
@@ -432,6 +636,10 @@
   </div>
 
   <!-- Stripe integration scripts -->
+  <script src="../shared/templates.js"></script>
+  <script src="../export/export-manager.js"></script>
+  <script src="../analytics/analytics-tracker.js"></script>
+  <script src="../search/search-engine.js"></script>
   <script src="../stripe/stripe-config.js"></script>
   <script src="../stripe/stripe-client.js"></script>
   <script src="../stripe/stripe-subscription-modal.js"></script>

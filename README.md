@@ -11,7 +11,7 @@
 
 ## 🎯 What is LISA Core?
 
-LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into portable semantic tokens, saving up to 80% of tokens while preserving full meaning.
+LISA (Linguistic Intelligent Semantic Assistant) compresses AI conversations into portable semantic tokens, saving up to 80% of tokens while preserving full meaning.
 
 **The Problem:** Your AI conversations are trapped in silos. Different platforms, no portability, no backup.
 

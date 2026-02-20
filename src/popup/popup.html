@@ -172,6 +172,102 @@
           <p class="shortcuts-note">💡 On Mac, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd></p>
         </div>
       </div>
+
+      <!-- Analytics Dashboard Section (Beta Feature #4) -->
+      <div class="analytics-section">
+        <div class="section-divider collapsible" id="analyticsToggle" style="cursor: pointer;">
+          <span>📊 Analytics Dashboard <span class="beta-tag">BETA</span></span>
+          <span class="toggle-arrow">▼</span>
+        </div>
+        
+        <div class="analytics-dashboard" id="analyticsContent" style="display: none;">
+          <!-- Summary Stats -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">💬</div>
+              <div class="stat-value" id="totalConversations">0</div>
+              <div class="stat-label">Conversations</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📤</div>
+              <div class="stat-value" id="totalExports">0</div>
+              <div class="stat-label">Exports</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🗜️</div>
+              <div class="stat-value" id="compressionSavings">0%</div>
+              <div class="stat-label">Avg Savings</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📅</div>
+              <div class="stat-value" id="daysSinceStart">0</div>
+              <div class="stat-label">Days Active</div>
+            </div>
+          </div>
+
+          <!-- Timeline Stats -->
+          <div class="timeline-stats">
+            <h4>📈 Activity Timeline</h4>
+            <div class="timeline-bars">
+              <div class="timeline-item">
+                <div class="timeline-label">This Week</div>
+                <div class="timeline-bar">
+                  <div class="timeline-fill" id="weekBar" style="width: 0%;"></div>
+                  <span class="timeline-count" id="weekCount">0</span>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-label">This Month</div>
+                <div class="timeline-bar">
+                  <div class="timeline-fill" id="monthBar" style="width: 0%;"></div>
+                  <span class="timeline-count" id="monthCount">0</span>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <div class="timeline-label">All Time</div>
+                <div class="timeline-bar">
+                  <div class="timeline-fill" id="allTimeBar" style="width: 100%;"></div>
+                  <span class="timeline-count" id="allTimeCount">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Platforms -->
+          <div class="top-platforms">
+            <h4>⭐ Top Platforms</h4>
+            <div class="platform-list" id="topPlatformsList">
+              <div class="empty-analytics">No data yet. Start capturing conversations!</div>
+            </div>
+          </div>
+
+          <!-- Export Formats -->
+          <div class="export-stats">
+            <h4>📄 Export Formats</h4>
+            <div class="format-breakdown" id="formatBreakdown">
+              <div class="format-stat">
+                <span class="format-name">JSON</span>
+                <span class="format-count" id="jsonCount">0</span>
+              </div>
+              <div class="format-stat">
+                <span class="format-name">Markdown</span>
+                <span class="format-count" id="markdownCount">0</span>
+              </div>
+              <div class="format-stat">
+                <span class="format-name">Text</span>
+                <span class="format-count" id="textCount">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reset Button -->
+          <div class="analytics-actions">
+            <button id="resetAnalyticsBtn" class="btn-reset-analytics">
+              🔄 Reset Analytics
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Snapshots Section -->
@@ -476,6 +572,7 @@
   <!-- Stripe integration scripts -->
   <script src="../shared/templates.js"></script>
   <script src="../export/export-manager.js"></script>
+  <script src="../analytics/analytics-tracker.js"></script>
   <script src="../stripe/stripe-config.js"></script>
   <script src="../stripe/stripe-client.js"></script>
   <script src="../stripe/stripe-subscription-modal.js"></script>

@@ -7,6 +7,7 @@ class LISAPopup {
     this.compressedData = null;
     this.userTier = 'free';
     this.exportManager = new ExportManager(); // Beta: Smart export formats
+    this.analyticsTracker = new AnalyticsTracker(); // Beta: Analytics dashboard
     this.usageStats = {
       exportsThisWeek: 0,
       importsThisWeek: 0,
@@ -18,6 +19,7 @@ class LISAPopup {
   async init() {
     await this.loadUserTier();
     await this.loadUsageStats();
+    await this.analyticsTracker.init(); // Beta: Initialize analytics
     this.setupUI();
     this.detectPlatform();
     this.setupEventListeners();
@@ -25,6 +27,7 @@ class LISAPopup {
     this.setupAutoSaveToggle();
     this.setupChatSwitchToggle();
     this.loadTemplates(); // Beta: Load conversation templates
+    this.loadAnalytics(); // Beta: Load analytics dashboard
   }
 
   async loadUsageStats() {
@@ -364,9 +367,32 @@ class LISAPopup {
       }
     });
 
+    // Analytics Dashboard collapsible toggle
+    document.getElementById('analyticsToggle')?.addEventListener('click', () => {
+      const content = document.getElementById('analyticsContent');
+      const arrow = document.querySelectorAll('.toggle-arrow')[3];
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        arrow.textContent = '▲';
+        this.loadAnalytics(); // Reload analytics when opened
+      } else {
+        content.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    });
+
     // Template category filter
     document.getElementById('templateCategory')?.addEventListener('change', (e) => {
       this.filterTemplates(e.target.value);
+    });
+
+    // Reset analytics button
+    document.getElementById('resetAnalyticsBtn')?.addEventListener('click', async () => {
+      if (confirm('Are you sure you want to reset all analytics data? This cannot be undone.')) {
+        await this.analyticsTracker.reset();
+        this.loadAnalytics();
+        this.showSuccess('✓ Analytics data reset successfully');
+      }
     });
   }
 
@@ -513,6 +539,11 @@ class LISAPopup {
       if (response.success && response.data) {
         this.currentConversation = response.data;
         
+        // Track conversation capture
+        const platform = (response.data.platform || 'unknown').toLowerCase();
+        const charCount = JSON.stringify(response.data).length;
+        await this.analyticsTracker.trackConversation(platform, charCount);
+        
         // Update UI
         document.getElementById('messageCount').textContent = response.data.messageCount || 0;
         document.getElementById('detectedPlatform').textContent = response.data.platform || 'Unknown';
@@ -622,7 +653,7 @@ class LISAPopup {
     });
   }
 
-  downloadJSON() {
+  async downloadJSON() {
     if (!this.compressedData) {
       this.showError('No compressed data to download');
       return;
@@ -650,7 +681,7 @@ class LISAPopup {
         url: url,
         filename: exported.filename,
         saveAs: true
-      }, (downloadId) => {
+      }, async (downloadId) => {
         URL.revokeObjectURL(url);
         
         if (chrome.runtime.lastError) {
@@ -662,6 +693,11 @@ class LISAPopup {
         if (downloadId) {
           this.updateUsageStats('export');
           this.setupUI(); // Refresh button texts with new count
+          
+          // Track analytics
+          const originalSize = JSON.stringify(this.currentConversation).length;
+          const compressedSize = JSON.stringify(this.compressedData).length;
+          await this.analyticsTracker.trackExport(selectedFormat, originalSize, compressedSize);
           
           this.trackEvent('download', { 
             platform: this.compressedData.metadata?.platform,
@@ -1351,10 +1387,109 @@ class LISAPopup {
       // Show notification
       this.showSuccess(`✓ ${template.title} copied!`);
       this.trackEvent('template_copied', { templateId: template.id });
+      await this.analyticsTracker.trackFeature('templates');
     } catch (error) {
       console.error('[LISA] Failed to copy template:', error);
       this.showError('Failed to copy template');
     }
+  }
+
+  // Beta Feature #4: Analytics Dashboard
+  async loadAnalytics() {
+    try {
+      const summary = await this.analyticsTracker.getSummary();
+      const data = await this.analyticsTracker.getData();
+
+      // Update summary stats
+      document.getElementById('totalConversations').textContent = summary.totalConversations;
+      document.getElementById('totalExports').textContent = summary.totalExports;
+      document.getElementById('compressionSavings').textContent = summary.compressionSavings + '%';
+      document.getElementById('daysSinceStart').textContent = summary.daysSinceFirstUse;
+
+      // Update timeline stats
+      this.updateTimeline(summary.timeline);
+
+      // Update top platforms
+      this.updateTopPlatforms(summary.topPlatforms);
+
+      // Update export format breakdown
+      this.updateFormatBreakdown(data.exports.byFormat);
+    } catch (error) {
+      console.error('[LISA] Failed to load analytics:', error);
+    }
+  }
+
+  updateTimeline(timeline) {
+    const maxCount = Math.max(timeline.thisWeek, timeline.thisMonth, timeline.allTime, 1);
+    
+    // Update week
+    const weekBar = document.getElementById('weekBar');
+    const weekCount = document.getElementById('weekCount');
+    const weekPercent = (timeline.thisWeek / maxCount) * 100;
+    weekBar.style.width = weekPercent + '%';
+    weekCount.textContent = timeline.thisWeek;
+
+    // Update month
+    const monthBar = document.getElementById('monthBar');
+    const monthCount = document.getElementById('monthCount');
+    const monthPercent = (timeline.thisMonth / maxCount) * 100;
+    monthBar.style.width = monthPercent + '%';
+    monthCount.textContent = timeline.thisMonth;
+
+    // Update all time
+    const allTimeBar = document.getElementById('allTimeBar');
+    const allTimeCount = document.getElementById('allTimeCount');
+    allTimeBar.style.width = '100%';
+    allTimeCount.textContent = timeline.allTime;
+  }
+
+  updateTopPlatforms(platforms) {
+    const platformsList = document.getElementById('topPlatformsList');
+    if (!platformsList) return;
+
+    if (platforms.length === 0 || platforms.every(p => p.count === 0)) {
+      platformsList.innerHTML = '<div class="empty-analytics">No data yet. Start capturing conversations!</div>';
+      return;
+    }
+
+    platformsList.innerHTML = '';
+    platforms.forEach((platform, index) => {
+      if (platform.count === 0) return;
+
+      const platformItem = document.createElement('div');
+      platformItem.className = 'platform-item';
+      
+      const medals = ['🥇', '🥈', '🥉'];
+      const medal = medals[index] || '📊';
+
+      platformItem.innerHTML = `
+        <span class="platform-medal">${medal}</span>
+        <span class="platform-name">${this.formatPlatformName(platform.name)}</span>
+        <span class="platform-count">${platform.count}</span>
+      `;
+
+      platformsList.appendChild(platformItem);
+    });
+  }
+
+  formatPlatformName(name) {
+    const names = {
+      chatgpt: 'ChatGPT',
+      claude: 'Claude',
+      copilot: 'Copilot',
+      gemini: 'Gemini',
+      deepseek: 'DeepSeek',
+      grok: 'Grok',
+      perplexity: 'Perplexity',
+      mistral: 'Mistral'
+    };
+    return names[name] || name;
+  }
+
+  updateFormatBreakdown(formats) {
+    document.getElementById('jsonCount').textContent = formats.json || 0;
+    document.getElementById('markdownCount').textContent = formats.markdown || 0;
+    document.getElementById('textCount').textContent = formats.text || 0;
   }
 }
 

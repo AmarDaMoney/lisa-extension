@@ -265,8 +265,13 @@ class SnapshotManager {
         snapshot.rootId = snapshot.id;
       }
 
-      // Phase 6: Generate content hash
-      snapshot.hash = await this.hashContent(JSON.stringify(conversation));
+      // Phase 6: Generate content hash (non-fatal — save proceeds even if hashing fails)
+      try {
+        snapshot.hash = await this.hashContent(JSON.stringify(conversation));
+      } catch (hashError) {
+        console.warn('[LISA] Hash generation failed, saving without hash:', hashError);
+        snapshot.hash = null;
+      }
 
       snapshots.unshift(snapshot);
 
@@ -566,6 +571,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   
+  // Handle pre-cache request from content script on page hide (fixes tab-close race)
+  if (request.action === 'preCacheConversation') {
+    (async () => {
+      try {
+        const tab = sender.tab;
+        if (!tab) return;
+        const resp = await chrome.tabs.sendMessage(tab.id, { action: 'extractConversation' });
+        if (resp?.success && resp.data && resp.data.messages?.length > 0) {
+          conversationCache.set(tab.id, resp.data);
+          console.log(`[LISA] Pre-cached conversation for tab ${tab.id}`);
+        }
+      } catch (err) {
+        console.warn('[LISA] Pre-cache failed (tab may be closing):', err.message);
+      }
+    })();
+    sendResponse({ success: true });
+    return false;
+  }
+
   // Handle analytics tracking
   if (request.action === 'trackEvent') {
     console.log('[LISA] Event:', request.event, request.data);
@@ -878,6 +902,9 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
     
   } catch (error) {
     console.error('[LISA] Auto-save failed:', error);
+    try {
+      showNotification('LISA Auto-Save', `⚠️ Auto-save failed: ${error.message}`);
+    } catch (_) { /* notification may fail if extension context is gone */ }
   }
 });
 

@@ -30,7 +30,7 @@ class LISAFloatingButton {
     
     try {
       const result = await chrome.storage.sync.get([storageKey, dateKey]);
-      const today = new Date().toDateString();
+      const today = new Date().toISOString().slice(0, 10); // UTC YYYY-MM-DD, consistent across timezones
       
       // Reset if new day
       if (result[dateKey] !== today) {
@@ -440,7 +440,18 @@ class LISAChatMonitor {
   }
 
   startMonitoring() {
-    setInterval(() => this.checkUrlChange(), 500);
+    // Use native history events instead of polling — zero CPU cost when idle
+    window.addEventListener('popstate', () => this.checkUrlChange());
+    window.addEventListener('hashchange', () => this.checkUrlChange());
+
+    // Patch pushState/replaceState for SPA navigation (these don't fire popstate)
+    const wrap = (original) => (...args) => {
+      original.apply(history, args);
+      this.checkUrlChange();
+    };
+    history.pushState = wrap(history.pushState);
+    history.replaceState = wrap(history.replaceState);
+
     console.log('[LISA] Chat monitor started');
   }
 
@@ -538,3 +549,13 @@ if (document.readyState === 'loading') {
   floatingButton = new LISAFloatingButton();
   new LISAChatMonitor(floatingButton);
 }
+
+// Pre-cache conversation when page is hidden (tab close / navigation away)
+// Ensures the service worker auto-save has data even without an explicit save.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    try {
+      chrome.runtime.sendMessage({ action: 'preCacheConversation' });
+    } catch (_) { /* extension context may already be gone */ }
+  }
+});

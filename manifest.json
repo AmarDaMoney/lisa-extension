@@ -78,6 +78,9 @@
       "run_at": "document_idle"
     }
   ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://lisa-web-backend-production.up.railway.app https://api.stripe.com https://js.stripe.com"
+  },
   "icons": {
     "16": "public/icon16.png",
     "48": "public/icon48.png",

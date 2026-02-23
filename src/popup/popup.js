@@ -893,35 +893,16 @@ class LISAPopup {
       
     } catch (error) {
       console.error('[LISA] License validation error:', error);
-      
-      // Fallback: local validation for offline/API-down scenarios
-      if (this.localValidateLicense(licenseKey)) {
-        await chrome.storage.sync.set({ 
-          licenseKey: licenseKey,
-          userTier: 'premium',
-          licenseValidatedAt: new Date().toISOString()
-        });
-        
-        this.userTier = 'premium';
-        this.updateTierDisplay();
-        this.updateTierBadge();
-        
-        this.showLicenseStatus('valid', '✅', 'License accepted (offline mode)');
-      } else {
-        this.showLicenseStatus('invalid', '❌', 'Could not validate license. Check your key and try again.');
-      }
+      this.showLicenseStatus('invalid', '❌', 'Could not validate license. Check your internet connection and try again.');
     } finally {
       validateBtn.disabled = false;
       validateBtn.textContent = 'Validate';
     }
   }
 
-  localValidateLicense(key) {
-    // Basic format validation for offline scenarios
-    // Format: LISA-PRO-XXXXXXXX or LISA-TEAM-XXXXXXXX
-    const proPattern = /^LISA-PRO-[A-Z0-9]{8}$/;
-    const teamPattern = /^LISA-TEAM-[A-Z0-9]{8}$/;
-    return proPattern.test(key) || teamPattern.test(key);
+  localValidateLicense(_key) {
+    // Offline validation intentionally disabled — always require server verification
+    return false;
   }
 
   showLicenseStatus(type, icon, message) {

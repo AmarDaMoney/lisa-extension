@@ -1,6 +1,6 @@
 // LISA Core - Semantic Compression Engine
 // Background Service Worker (Manifest V3)
-// v0.48 - Added subscription auto-renewal/cancellation notice
+// v0.48.1 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
 
 class LISACompressor {
   constructor() {
@@ -110,7 +110,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.48',
+        lisaVersion: '0.48.1',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,

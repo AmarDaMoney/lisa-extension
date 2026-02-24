@@ -839,7 +839,7 @@ class LISAPopup {
       
       // Call backend to create a portal session
       const response = await fetch(`${STRIPE_CONFIG.apiBaseUrl}/create-portal-session`, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -856,6 +856,13 @@ class LISAPopup {
       }
       
       const data = await response.json();
+        
+        if (data.valid !== true) {
+          this.showLicenseStatus('invalid', '❌', 'Invalid license key');
+          validateBtn.disabled = false;
+          validateBtn.textContent = 'Validate';
+          return;
+        }
       if (data.url) {
         chrome.tabs.create({ url: data.url });
         this.trackEvent('stripe_portal_opened');
@@ -889,7 +896,7 @@ class LISAPopup {
     try {
       // Call the app API to validate the license
       const response = await fetch(`https://lisa-web-backend-production.up.railway.app/api/license/${encodeURIComponent(licenseKey)}`, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-License-Key': licenseKey
@@ -899,6 +906,13 @@ class LISAPopup {
 
       if (response.ok) {
         const data = await response.json();
+        
+        if (data.valid !== true) {
+          this.showLicenseStatus('invalid', '❌', 'Invalid license key');
+          validateBtn.disabled = false;
+          validateBtn.textContent = 'Validate';
+          return;
+        }
         
         // Store the validated license
         await chrome.storage.sync.set({ 
@@ -1170,7 +1184,7 @@ class LISAPopup {
       // Send to App API
       const appUrl = 'https://lisa-web-backend-production.up.railway.app';
       const apiResponse = await fetch(`${appUrl}/api/snapshots`, {
-        method: 'GET',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },

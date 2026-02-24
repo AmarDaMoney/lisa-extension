@@ -109,10 +109,12 @@ class LISAPopup {
     const upgradeBtn = document.getElementById('upgradeBtn');
     if (this.userTier === 'premium') {
       upgradeBtn.style.display = 'none';
-      const freeUpgradeSection = document.getElementById('freeUpgradeSection');
-      if (freeUpgradeSection) freeUpgradeSection.style.display = 'none';
+      const goPremiumBtn = document.getElementById('settingsSubscribeBtn');
+      if (goPremiumBtn) goPremiumBtn.style.display = 'none';
     } else {
       upgradeBtn.style.display = 'inline-block';
+      const goPremiumBtnShow = document.getElementById('settingsSubscribeBtn');
+      if (goPremiumBtnShow) goPremiumBtnShow.style.display = 'inline-block';
       // Show remaining exports for free users
       const remaining = 5 - this.usageStats.exportsThisWeek;
       const exportBtn = document.getElementById('exportBtn');
@@ -292,10 +294,6 @@ class LISAPopup {
 
     document.getElementById('validateKeyBtn').addEventListener('click', () => {
       this.validateLicenseKey();
-    });
-
-    document.getElementById('settingsSubscribeBtn').addEventListener('click', () => {
-      this.initiateSubscription();
     });
 
     document.getElementById('settingsOpenAppBtn').addEventListener('click', () => {
@@ -941,12 +939,14 @@ class LISAPopup {
       tierBadge.textContent = 'Premium';
       tierBadge.classList.add('premium');
       upgradeBtn.style.display = 'none';
-      const freeUpgradeSection = document.getElementById('freeUpgradeSection');
-      if (freeUpgradeSection) freeUpgradeSection.style.display = 'none';
+      const goPremiumBtn = document.getElementById('settingsSubscribeBtn');
+      if (goPremiumBtn) goPremiumBtn.style.display = 'none';
     } else {
       tierBadge.textContent = 'Free';
       tierBadge.classList.remove('premium');
       upgradeBtn.style.display = 'inline-block';
+      const goPremiumBtnShow = document.getElementById('settingsSubscribeBtn');
+      if (goPremiumBtnShow) goPremiumBtnShow.style.display = 'inline-block';
     }
   }
 

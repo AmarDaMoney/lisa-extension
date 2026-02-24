@@ -394,6 +394,21 @@ class LISAPopup {
     }, 3000);
   }
 
+  showUpgradePrompt(feature, description) {
+    this.hideLoading();
+    const status = document.getElementById('platformStatus');
+    const originalText = status.textContent;
+    const originalClass = status.className;
+    
+    status.innerHTML = `🔒 <strong>${feature}</strong> is a Premium feature. <a href="#" onclick="window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank'); return false;" style="color:#3b82f6;">Upgrade →</a>`;
+    status.className = 'status warning';
+    
+    setTimeout(() => {
+      status.textContent = originalText;
+      status.className = originalClass;
+    }, 5000);
+  }
+
   // Send message with timeout and retry
   async sendMessageToTab(tabId, message, timeout = 10000, retries = 2) {
     for (let attempt = 0; attempt <= retries; attempt++) {
@@ -551,7 +566,7 @@ class LISAPopup {
     }
 
     if (this.userTier !== 'premium') {
-      this.showError('LISA Hash is a premium feature');
+      this.showUpgradePrompt('LISA Hash', 'Get verified, tamper-proof output with cryptographic integrity');
       return;
     }
 

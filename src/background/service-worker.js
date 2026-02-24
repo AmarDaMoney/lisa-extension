@@ -369,14 +369,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Handle compression
   if (request.action === 'compress') {
+    (async () => {
     try {
       const compressed = compressor.compress(request.data);
+        
+        // Premium: auto-embed integrity block
+        const tierResult = await chrome.storage.sync.get(['userTier']);
+        if (tierResult.userTier === 'premium') {
+          const hashData = await hasher.generateHash(compressed);
+          compressed.integrity = {
+            hash: hashData.hash,
+            algorithm: hashData.algorithm,
+            generatedAt: hashData.generatedAt,
+            tokenCount: compressed.semanticTokens.length
+          };
+        }
       sendResponse({ success: true, compressed });
     } catch (error) {
       console.error('[LISA] Compression error:', error);
       sendResponse({ success: false, error: error.message });
     }
-    return false;
+    })();
+    return true;
   }
   
   // Handle reconstruction

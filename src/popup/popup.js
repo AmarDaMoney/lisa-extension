@@ -400,7 +400,7 @@ class LISAPopup {
     const originalText = status.textContent;
     const originalClass = status.className;
     
-    status.innerHTML = `🔒 <strong>${feature}</strong> is a Premium feature. <a href="#" onclick="window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank'); return false;" style="color:#3b82f6;">Upgrade →</a>`;
+    this.openUpgradeModal();
     status.className = 'status warning';
     
     setTimeout(() => {
@@ -827,7 +827,7 @@ class LISAPopup {
       
       // Call backend to create a portal session
       const response = await fetch(`${STRIPE_CONFIG.apiBaseUrl}/create-portal-session`, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -876,13 +876,13 @@ class LISAPopup {
 
     try {
       // Call the app API to validate the license
-      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/validate-license', {
-        method: 'POST',
+      const response = await fetch(`https://lisa-web-backend-production.up.railway.app/api/license/${encodeURIComponent(licenseKey)}`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'X-License-Key': licenseKey
         },
-        body: JSON.stringify({ license_key: licenseKey })
+
       });
 
       if (response.ok) {
@@ -1148,7 +1148,7 @@ class LISAPopup {
       // Send to App API
       const appUrl = 'https://lisa-web-backend-production.up.railway.app';
       const apiResponse = await fetch(`${appUrl}/api/snapshots`, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json'
         },

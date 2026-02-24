@@ -295,6 +295,9 @@ class LISAPopup {
     document.getElementById('validateKeyBtn').addEventListener('click', () => {
       this.validateLicenseKey();
     });
+    document.getElementById('settingsSubscribeBtn').addEventListener('click', () => {
+      window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank');
+    });
 
     document.getElementById('settingsOpenAppBtn').addEventListener('click', () => {
       this.openAppPage();

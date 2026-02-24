@@ -111,10 +111,18 @@ class LISAPopup {
       upgradeBtn.style.display = 'none';
       const goPremiumBtn = document.getElementById('settingsSubscribeBtn');
       if (goPremiumBtn) goPremiumBtn.style.display = 'none';
+      const upgradeHeader = document.getElementById('upgradeHeader');
+      if (upgradeHeader) upgradeHeader.innerHTML = '✅ Premium Active';
+      const upgradeDesc = document.querySelector('#freeUpgradeSection .settings-desc');
+      if (upgradeDesc) upgradeDesc.textContent = '50 compressions/day + LISA Hash. Access your library below.';
     } else {
       upgradeBtn.style.display = 'inline-block';
       const goPremiumBtnShow = document.getElementById('settingsSubscribeBtn');
       if (goPremiumBtnShow) goPremiumBtnShow.style.display = 'inline-block';
+      const upgradeHeaderFree = document.getElementById('upgradeHeader');
+      if (upgradeHeaderFree) upgradeHeaderFree.innerHTML = '🚀 Upgrade to Premium';
+      const upgradeDescFree = document.querySelector('#freeUpgradeSection .settings-desc');
+      if (upgradeDescFree) upgradeDescFree.textContent = 'Get 50 compressions/day + LISA Hash.';
       // Show remaining exports for free users
       const remaining = 5 - this.usageStats.exportsThisWeek;
       const exportBtn = document.getElementById('exportBtn');
@@ -737,7 +745,10 @@ class LISAPopup {
   }
 
   openAppPage() {
-    const appUrl = 'https://lisa-web-backend-production.up.railway.app/landing';
+    const appUrl = this.userTier === 'premium' 
+      ? 'https://lisa-web-backend-production.up.railway.app/app'
+      : 'https://lisa-web-backend-production.up.railway.app/landing';
+
     this.trackEvent('app_page_clicked');
     chrome.tabs.create({ url: appUrl });
   }
@@ -944,12 +955,20 @@ class LISAPopup {
       upgradeBtn.style.display = 'none';
       const goPremiumBtn = document.getElementById('settingsSubscribeBtn');
       if (goPremiumBtn) goPremiumBtn.style.display = 'none';
+      const upgradeHeader = document.getElementById('upgradeHeader');
+      if (upgradeHeader) upgradeHeader.innerHTML = '✅ Premium Active';
+      const upgradeDesc = document.querySelector('#freeUpgradeSection .settings-desc');
+      if (upgradeDesc) upgradeDesc.textContent = '50 compressions/day + LISA Hash. Access your library below.';
     } else {
       tierBadge.textContent = 'Free';
       tierBadge.classList.remove('premium');
       upgradeBtn.style.display = 'inline-block';
       const goPremiumBtnShow = document.getElementById('settingsSubscribeBtn');
       if (goPremiumBtnShow) goPremiumBtnShow.style.display = 'inline-block';
+      const upgradeHeaderFree = document.getElementById('upgradeHeader');
+      if (upgradeHeaderFree) upgradeHeaderFree.innerHTML = '🚀 Upgrade to Premium';
+      const upgradeDescFree = document.querySelector('#freeUpgradeSection .settings-desc');
+      if (upgradeDescFree) upgradeDescFree.textContent = 'Get 50 compressions/day + LISA Hash.';
     }
   }
 

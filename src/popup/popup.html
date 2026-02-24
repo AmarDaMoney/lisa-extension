@@ -239,7 +239,7 @@
         </section>
         
         <section class="help-section">
-          <h3>⭐ Premium Features ($9.00/mo)</h3>
+          <h3>⭐ Premium Features (save with annual plan)</h3>
           <ul class="feature-list">
             <li>🔐 <strong>LISA Hash:</strong> Cryptographic verification for compliance</li>
             <li>☁️ <strong>Cloud Sync:</strong> Access conversations across all devices</li>
@@ -351,7 +351,7 @@
       </div>
       
       <div class="modal-body">
-        <section class="settings-section">
+        <section class="settings-section" id="freeUpgradeSection">
           <h3>🔑 License Key</h3>
           <p class="settings-desc">Enter your license key to unlock Premium features.</p>
           
@@ -382,13 +382,13 @@
         
         <div class="settings-divider"></div>
         
-        <section class="settings-section">
-          <h3>🛒 Don't have a license key?</h3>
-          <p class="settings-desc">Subscribe to Premium to get your key.</p>
+        <section class="settings-section" id="freeUpgradeSection">
+          <h3 id="upgradeHeader">🚀 Upgrade to Premium</h3>
+          <p class="settings-desc">Get 50 compressions/day + LISA Hash.</p>
           
           <div class="settings-buttons">
-            <button id="settingsSubscribeBtn" class="btn btn-subscribe-small">
-              Subscribe ($9/mo)
+            <button id="settingsSubscribeBtn" class="btn btn-subscribe-small" onclick="window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank')">
+              Go Premium
             </button>
             <button id="settingsOpenAppBtn" class="btn btn-app-small">
               Open Web App
@@ -414,7 +414,7 @@
         </div>
         <div class="settings-divider"></div>
         
-        <section class="settings-section">
+        <section class="settings-section" id="freeUpgradeSection">
           <h3>🗑️ Reset</h3>
           <p class="settings-desc">Clear all local data and start fresh.</p>
           <button id="resetDataBtn" class="btn btn-danger">

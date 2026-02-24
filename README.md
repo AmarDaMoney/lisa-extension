@@ -76,7 +76,7 @@ LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into
 | Tier | Price | Features |
 |------|-------|----------|
 | **Free** | $0 | 5 exports/day, 5 LISA-V/day, 5 Raw JSON/day, basic compression |
-| **Premium** | $9/mo | Unlimited exports, LISA Hash, priority support |
+| **Premium** | See pricing | Unlimited exports, LISA Hash, priority support |
 
 ## 🔗 Links
 

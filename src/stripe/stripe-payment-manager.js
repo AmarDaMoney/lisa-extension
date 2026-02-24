@@ -169,7 +169,7 @@ class StripePaymentManager {
    * Update submit button text based on plan
    */
   updateSubmitButtonText() {
-    const price = this.currentPlan === 'month' ? '$9.00/month' : '$79.00/year';
+    const price = this.currentPlan === 'month' ? '$19.00/month' : '$79.00/year';
     const buttonText = document.getElementById('submit-button-text');
     if (buttonText) {
       buttonText.textContent = `Subscribe - ${price}`;

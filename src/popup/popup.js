@@ -109,6 +109,8 @@ class LISAPopup {
     const upgradeBtn = document.getElementById('upgradeBtn');
     if (this.userTier === 'premium') {
       upgradeBtn.style.display = 'none';
+      const freeUpgradeSection = document.getElementById('freeUpgradeSection');
+      if (freeUpgradeSection) freeUpgradeSection.style.display = 'none';
     } else {
       upgradeBtn.style.display = 'inline-block';
       // Show remaining exports for free users
@@ -924,6 +926,8 @@ class LISAPopup {
       tierBadge.textContent = 'Premium';
       tierBadge.classList.add('premium');
       upgradeBtn.style.display = 'none';
+      const freeUpgradeSection = document.getElementById('freeUpgradeSection');
+      if (freeUpgradeSection) freeUpgradeSection.style.display = 'none';
     } else {
       tierBadge.textContent = 'Free';
       tierBadge.classList.remove('premium');

@@ -5,7 +5,7 @@
 
 const STRIPE_CONFIG = {
   // Use live publishable key provided for the extension (do NOT include secret keys here)
-  publishableKey: 'pk_live_51SqXDpRCWqG97BQip7QBLUxs8UgWMjRqVgi3Xj0KS5jH48RvaxxVtnKcTr82KBb3AOZ9SvX3J5Kc6I5JSbaPvwVG00IeDxOIXq',
+  publishableKey: 'pk_live_51SqXDpRCWqG97BQitVvsFEYO4FWV2ugB7NO0Do8xs8OAPnoyMnHwrlsMCSzTAULwqs39HdEx1UNbmdyVhWtEpkUx002eCSHGWo',
   
   // Stripe products configuration (use your Price IDs)
   products: {

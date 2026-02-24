@@ -894,14 +894,13 @@ class LISAPopup {
     this.showLicenseStatus('validating', '🔄', 'Validating license key...');
 
     try {
-      // Call the app API to validate the license
-      const response = await fetch(`https://lisa-web-backend-production.up.railway.app/api/license/${encodeURIComponent(licenseKey)}`, {
+      // Call the app API to validate the license (key sent in body, not URL)
+      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/validate-license', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-License-Key': licenseKey
+          'Content-Type': 'application/json'
         },
-
+        body: JSON.stringify({ key: licenseKey })
       });
 
       if (response.ok) {

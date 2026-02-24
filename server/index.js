@@ -5,6 +5,7 @@
  - POST /api/stripe/verify-checkout-session (NEW - verify payment)
  - POST /api/stripe/create-portal-session
  - POST /api/stripe/webhook
+ - POST /api/validate-license (validate license key from request body)
 
  Copy .env.example -> .env and set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
 */
@@ -365,6 +366,55 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
   }
 
   res.json({ received: true });
+});
+
+// ============================================
+// Validate License Key (key read from body, not URL)
+// ============================================
+app.post('/api/validate-license', async (req, res) => {
+  try {
+    const { key } = req.body || {};
+
+    if (!key || typeof key !== 'string' || key.trim() === '') {
+      return res.status(400).json({ valid: false, error: 'Missing license key' });
+    }
+
+    const licenseKey = key.trim();
+
+    // Find customer by license_key metadata
+    const customers = await stripe.customers.search({
+      query: `metadata['license_key']:'${licenseKey}'`,
+      limit: 1
+    }).catch(() => ({ data: [] }));
+
+    if (!customers.data || customers.data.length === 0) {
+      return res.status(401).json({ valid: false });
+    }
+
+    const customer = customers.data[0];
+
+    // Verify an active subscription exists for this customer
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: 'active',
+      limit: 1
+    });
+
+    if (subscriptions.data.length === 0) {
+      return res.status(401).json({ valid: false });
+    }
+
+    const subscription = subscriptions.data[0];
+    const interval = subscription.items.data[0]?.price?.recurring?.interval;
+    const tier = interval === 'year' ? 'Pro Annual' : 'Pro';
+
+    console.log('[License] Valid key accepted for customer:', customer.id);
+
+    return res.json({ valid: true, tier });
+  } catch (err) {
+    console.error('[License] Validation error:', err);
+    res.status(500).json({ valid: false, error: 'Validation failed' });
+  }
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

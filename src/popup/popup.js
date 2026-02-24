@@ -92,8 +92,28 @@ class LISAPopup {
 
   async loadUserTier() {
     try {
-      const result = await chrome.storage.sync.get(['userTier']);
-      this.userTier = result.userTier || 'free';
+      const storage = await chrome.storage.sync.get(['userTier', 'licenseKey']);
+      // Server-side verification (H-2 fix)
+      if (storage.licenseKey) {
+        try {
+          const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/validate-license', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: storage.licenseKey })
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            this.userTier = (data.valid === true) ? 'premium' : 'free';
+            if (data.valid !== true) await chrome.storage.sync.set({ userTier: 'free' });
+          } else {
+            this.userTier = storage.userTier || 'free';
+          }
+        } catch (e) {
+          this.userTier = storage.userTier || 'free';
+        }
+      } else {
+        this.userTier = 'free';
+      }
       
       const tierBadge = document.getElementById('userTier');
       tierBadge.textContent = this.userTier === 'premium' ? 'Premium' : 'Free';

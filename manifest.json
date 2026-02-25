@@ -36,6 +36,11 @@
   },
   "content_scripts": [
     {
+      "matches": ["https://claude.ai/code/*"],
+      "js": ["src/content/claude-code-parser.js", "src/content/lisa-v-parser.js", "src/content/lisa-floating-button.js"],
+      "run_at": "document_idle"
+    },
+    {
       "matches": ["https://claude.ai/*"],
       "js": ["src/content/claude-parser.js", "src/content/lisa-v-parser.js", "src/content/lisa-floating-button.js"],
       "run_at": "document_idle"

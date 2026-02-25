@@ -727,7 +727,8 @@ async function ensureContentScriptLoaded(tab) {
     const url = tab.url || '';
     let scriptFile = 'src/content/universal-parser.js';
     
-    if (url.includes('claude.ai')) scriptFile = 'src/content/claude-parser.js';
+    if (url.includes('claude.ai/code/')) scriptFile = 'src/content/claude-code-parser.js';
+    else if (url.includes('claude.ai')) scriptFile = 'src/content/claude-parser.js';
     else if (url.includes('chatgpt.com')) scriptFile = 'src/content/chatgpt-parser.js';
     else if (url.includes('gemini.google.com')) scriptFile = 'src/content/gemini-parser.js';
     else if (url.includes('grok.com')) scriptFile = 'src/content/grok-parser.js';

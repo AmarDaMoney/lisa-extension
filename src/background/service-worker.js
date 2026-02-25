@@ -2,6 +2,9 @@
 // Background Service Worker (Manifest V3)
 // v0.48.1 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
 
+// Load the parser router (maps URLs to the correct content-script parser)
+importScripts('src/parsers/parser-router.js');
+
 class LISACompressor {
   constructor() {
     this.compressionRatio = null;
@@ -312,6 +315,7 @@ class SnapshotManager {
 // Get friendly platform name from URL
   getPlatformName(url) {
     if (!url) return 'Unknown';
+    if (url.includes('claude.ai/code/')) return 'Claude Code';
     if (url.includes('claude.ai')) return 'Claude';
     if (url.includes('chatgpt.com')) return 'ChatGPT';
     if (url.includes('gemini.google.com')) return 'Gemini';
@@ -723,18 +727,9 @@ async function ensureContentScriptLoaded(tab) {
       return true;
     }
     
-    // Determine which script to inject based on URL
+    // Determine which script to inject based on URL (via ParserRouter)
     const url = tab.url || '';
-    let scriptFile = 'src/content/universal-parser.js';
-    
-    if (url.includes('claude.ai')) scriptFile = 'src/content/claude-parser.js';
-    else if (url.includes('chatgpt.com')) scriptFile = 'src/content/chatgpt-parser.js';
-    else if (url.includes('gemini.google.com')) scriptFile = 'src/content/gemini-parser.js';
-    else if (url.includes('grok.com')) scriptFile = 'src/content/grok-parser.js';
-    else if (url.includes('chat.mistral.ai')) scriptFile = 'src/content/mistral-parser.js';
-    else if (url.includes('chat.deepseek.com')) scriptFile = 'src/content/deepseek-parser.js';
-    else if (url.includes('copilot.microsoft.com')) scriptFile = 'src/content/copilot-parser.js';
-    else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
+    const scriptFile = ParserRouter.getScript(url);
     
     // Inject the script
     await chrome.scripting.executeScript({

@@ -71,7 +71,7 @@ class ClaudeCodeParser {
 
     if (messages.length === 0) return null;
 
-    return {
+    const rawResult = {
       platform: this.platform,
       conversationId: this.extractConversationId(),
       url: window.location.href,
@@ -81,6 +81,8 @@ class ClaudeCodeParser {
       messages,
       tasks
     };
+    
+    return (typeof SemanticAnalyzer !== 'undefined') ? SemanticAnalyzer.analyze(rawResult) : rawResult;
   }
 
   initializeListener() {

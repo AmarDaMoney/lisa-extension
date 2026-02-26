@@ -18,7 +18,7 @@ const SemanticAnalyzer = {
 
   actionPatterns: [
     { regex: /\b(TODO|FIXME|HACK)\b:?\s*(.{10,80})/gi, type: 'todo' },
-    { regex: /\b(SET|DELETE|RUN|DEPLOY|COMMIT|PUSH|MERGE)\b\s+(.{5,60})/gi, type: 'command' },
+    { regex: /\b(SET|DELETE|RUN|DEPLOY|COMMIT|PUSH|MERGE)\b\s+(.{5,100})/gi, type: 'command' },
     { regex: /\bgit\s+(push|pull|commit|checkout|merge|rebase)\b[^.;\n]{0,40}/gi, type: 'git' },
     { regex: /\bnpm\s+(install|run|build|test)\b[^.;\n]{0,40}/gi, type: 'npm' }
   ],

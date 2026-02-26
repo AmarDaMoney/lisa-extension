@@ -18,6 +18,7 @@ class LisaVParser {
   // Detect platform from URL
   detectPlatform() {
     const host = window.location.hostname;
+    if (window.location.pathname.includes('/code/')) return 'Claude Code';
     if (host.includes('claude.ai')) return 'Claude';
     if (host.includes('chatgpt.com')) return 'ChatGPT';
     if (host.includes('gemini.google.com')) return 'Gemini';
@@ -139,7 +140,9 @@ class LisaVParser {
     // Platform-specific message extraction
     let messages = [];
     
-    if (platform === 'Claude') {
+    if (platform === 'Claude Code') {
+      messages = await this.extractClaudeCodeMessages();
+    } else if (platform === 'Claude') {
       messages = await this.extractClaudeMessages();
     } else if (platform === 'ChatGPT') {
       messages = await this.extractChatGPTMessages();
@@ -179,6 +182,25 @@ class LisaVParser {
     }
     
     return messages;
+
+  // Claude Code-specific extraction
+  async extractClaudeCodeMessages() {
+    const messages = [];
+    const messageContainers = document.querySelectorAll('[class*="group/message"]');
+    
+    for (const container of messageContainers) {
+      const classList = container.className;
+      const isUser = classList.includes('bg-bg-200') || container.querySelector('.bg-bg-200');
+      const role = isUser ? 'user' : 'assistant';
+      const blocks = await this.parseMessageContent(container, role);
+      if (blocks.length > 0) {
+        messages.push(blocks);
+      }
+    }
+    
+    return messages;
+  }
+  }
 
 
 

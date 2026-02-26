@@ -182,6 +182,7 @@ class LisaVParser {
     }
     
     return messages;
+  }
 
   // Claude Code-specific extraction
   async extractClaudeCodeMessages() {
@@ -199,9 +200,6 @@ class LisaVParser {
     }
     
     return messages;
-  }
-  }
-
 
 
 

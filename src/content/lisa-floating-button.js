@@ -245,6 +245,7 @@ class LISAFloatingButton {
 
     button.querySelector(".lisa-fab").addEventListener("click", () => this.showActionMenu());
     this.button = button;
+    button.querySelector(".lisa-token-counter").addEventListener("click", () => this.showHandoffPrompt());
     console.log('[LISA] Floating button ready');
     this.startTokenCounter();
   }
@@ -320,6 +321,95 @@ class LISAFloatingButton {
       this.updateTokenCount();
     });
     observer.observe(document.body, { childList: true, subtree: true });
+  }
+  
+  showHandoffPrompt() {
+    const text = this.getConversationText();
+    const tokens = this.estimateTokens(text);
+    const display = tokens < 1000 ? tokens : (tokens / 1000).toFixed(1) + "k";
+    
+    let status, advice;
+    if (tokens >= 70000) {
+      status = "🔴 CRITICAL";
+      advice = "Context degradation likely. Generate handoff NOW.";
+    } else if (tokens >= 50000) {
+      status = "🟠 HIGH";
+      advice = "Consider generating a handoff soon.";
+    } else if (tokens >= 30000) {
+      status = "🟡 MODERATE";
+      advice = "Context is building up. Plan for handoff.";
+    } else {
+      status = "🟢 OK";
+      advice = "Context length is healthy.";
+    }
+    
+    const existing = document.querySelector(".lisa-handoff-modal");
+    if (existing) existing.remove();
+    
+    const modal = document.createElement("div");
+    modal.className = "lisa-handoff-modal";
+    modal.innerHTML = `
+      <div class="lisa-handoff-content">
+        <h3>📊 Context Status</h3>
+        <p><strong>Estimated Tokens:</strong> ${display}</p>
+        <p><strong>Status:</strong> ${status}</p>
+        <p>${advice}</p>
+        <div class="lisa-handoff-actions">
+          <button class="lisa-btn-handoff" id="lisa-gen-handoff">📦 Generate Handoff JSON</button>
+          <button class="lisa-btn-close" id="lisa-close-modal">Close</button>
+        </div>
+      </div>
+    `;
+    
+    const style = document.createElement("style");
+    style.textContent = `
+      .lisa-handoff-modal {
+        position: fixed;
+        bottom: 140px;
+        right: 24px;
+        z-index: 100001;
+        background: #1e293b;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        color: white;
+        max-width: 280px;
+      }
+      .lisa-handoff-content h3 { margin: 0 0 12px 0; font-size: 16px; }
+      .lisa-handoff-content p { margin: 8px 0; font-size: 13px; }
+      .lisa-handoff-actions { display: flex; gap: 8px; margin-top: 16px; }
+      .lisa-btn-handoff {
+        flex: 1;
+        padding: 10px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .lisa-btn-handoff:hover { background: #1d4ed8; }
+      .lisa-btn-close {
+        padding: 10px 16px;
+        background: #475569;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(modal);
+    
+    modal.querySelector("#lisa-close-modal").addEventListener("click", () => modal.remove());
+    modal.querySelector("#lisa-gen-handoff").addEventListener("click", () => {
+      modal.remove();
+      this.showActionMenu();
+    });
   }
 
 

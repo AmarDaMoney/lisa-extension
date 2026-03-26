@@ -774,7 +774,8 @@ function sendMessageWithTimeout(tabId, message, timeout = 5000) {
 async function downloadCompressedData(compressed, prefix = null) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const platform = (compressed.metadata.platform || 'unknown').replace(/[.\s()]/g, '-');
-  const filePrefix = prefix || platform;
+  const title = (compressed.metadata.title || "").replace(/[^a-zA-Z0-9]/g, "-").substring(0, 30);
+  const filePrefix = prefix || (title ? platform + "-" + title : platform);
   const filename = `lisa-${filePrefix}-${timestamp}.json`;
   
   const dataStr = JSON.stringify(compressed, null, 2);

@@ -65,7 +65,7 @@ class LisaVParser {
     // Look for filename in header or nearby elements
     const header = element.previousElementSibling;
     if (header?.textContent?.includes('.')) {
-      const match = header.textContent.match(/[\w-]+\.\w+/);
+      const match = header.textContent.match(/[\w\-\/]+\.(js|ts|jsx|tsx|py|json|css|html|md|txt|yaml|yml|sh|sql|xml)/i);
       if (match) return match[0];
     }
     return null;
@@ -116,9 +116,18 @@ class LisaVParser {
         }
       }
     };
-
     await walkNode(element);
-    return blocks;
+    // Consolidate consecutive same-type text blocks
+    const consolidated = [];
+    for (const block of blocks) {
+      const last = consolidated[consolidated.length - 1];
+      if (last && last.t === block.t && (block.t === "u" || block.t === "a_text")) {
+        last.v += "\n" + block.v;
+      } else {
+        consolidated.push({...block});
+      }
+    }
+    return consolidated;
   }
 
   // Main extraction method - platform agnostic

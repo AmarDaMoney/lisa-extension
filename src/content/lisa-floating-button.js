@@ -80,6 +80,10 @@ class LISAFloatingButton {
         <span class="lisa-fab-icon">💾</span>
         <span class="lisa-fab-text">LISA</span>
       </button>
+      <div class="lisa-token-counter" id="lisa-token-pill" title="Estimated conversation tokens">
+        <span class="lisa-token-icon">🔢</span>
+        <span class="lisa-token-value" id="lisa-token-value">...</span>
+      </div>
     `;
 
     const styles = document.createElement('style');
@@ -127,6 +131,26 @@ class LISAFloatingButton {
         animation: lisa-slide-up 0.3s ease;
       }
       .lisa-toast.error { background: #ef4444; }
+      .lisa-token-counter {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        margin-top: 8px;
+        background: #22c55e;
+        color: white;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: background 0.3s ease;
+        cursor: pointer;
+      }
+      .lisa-token-counter.warning { background: #eab308; }
+      .lisa-token-counter.danger { background: #f97316; }
+      .lisa-token-counter.critical { background: #ef4444; }
+      .lisa-token-icon { font-size: 10px; }
+      .lisa-token-value { font-size: 11px; }
       @keyframes lisa-slide-up {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
@@ -222,6 +246,80 @@ class LISAFloatingButton {
     button.querySelector(".lisa-fab").addEventListener("click", () => this.showActionMenu());
     this.button = button;
     console.log('[LISA] Floating button ready');
+    this.startTokenCounter();
+  }
+  
+  // Token counter functionality
+  startTokenCounter() {
+    this.updateTokenCount();
+    // Update every 5 seconds
+    setInterval(() => this.updateTokenCount(), 5000);
+    // Also observe DOM changes
+    this.observeConversation();
+  }
+
+  estimateTokens(text) {
+    // Rough estimate: ~4 chars per token for English
+    return Math.ceil((text || "").length / 4);
+  }
+
+  getConversationText() {
+    // Try multiple selectors for different AI platforms
+    const selectors = [
+      "[data-test-render-count]",           // Claude
+      "[class*=\"group/message\"]",        // Claude Code
+      "[data-message-author-role]",         // ChatGPT
+      ".conversation-turn",                 // Gemini
+      ".message-content",                   // Generic
+      "article",                            // Fallback
+    ];
+    let text = "";
+    for (const selector of selectors) {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        elements.forEach(el => text += el.textContent + " ");
+        break;
+      }
+    }
+    return text;
+  }
+
+  updateTokenCount() {
+    const text = this.getConversationText();
+    const tokens = this.estimateTokens(text);
+    const pill = document.getElementById("lisa-token-pill");
+    const value = document.getElementById("lisa-token-value");
+    if (!pill || !value) return;
+
+    // Format: 12.5k, 125k, etc.
+    let display;
+    if (tokens < 1000) display = tokens.toString();
+    else if (tokens < 100000) display = (tokens / 1000).toFixed(1) + "k";
+    else display = Math.round(tokens / 1000) + "k";
+
+    value.textContent = display;
+
+    // Color coding
+    pill.classList.remove("warning", "danger", "critical");
+    if (tokens >= 70000) {
+      pill.classList.add("critical");
+      pill.title = "⚠️ Context very long! Consider handoff.";
+    } else if (tokens >= 50000) {
+      pill.classList.add("danger");
+      pill.title = "Context getting long. Handoff soon?";
+    } else if (tokens >= 30000) {
+      pill.classList.add("warning");
+      pill.title = "Moderate context length.";
+    } else {
+      pill.title = "Context length OK.";
+    }
+  }
+
+  observeConversation() {
+    const observer = new MutationObserver(() => {
+      this.updateTokenCount();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
 

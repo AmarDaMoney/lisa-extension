@@ -86,7 +86,7 @@ Audit the LISA Chrome Extension for March 2026 launch:
 
 ### Version Consistency
 - [ ] Version same in: manifest.json, popup.html, service-worker.js, README.md
-- [ ] Current version: 0.48.2
+- [ ] Current version: 0.48.3
 
 ---
 
@@ -132,7 +132,7 @@ Audit the LISA Chrome Extension for March 2026 launch:
 | Free | 5/day | Basic compression |
 | Pro | 50/day | + Integrity hash, sync |
 
-### Recent Changes (v0.48.2):
+### Recent Changes (v0.48.3):
 - Auto-embed integrity hash for Premium users
 - Upgrade prompt opens modal for Free users
 - License validation uses /api/license/{key} endpoint

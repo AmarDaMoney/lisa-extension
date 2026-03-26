@@ -775,7 +775,8 @@ async function downloadCompressedData(compressed, prefix = null) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const platform = (compressed.metadata.platform || 'unknown').replace(/[.\s()]/g, '-');
   const title = (compressed.metadata.title || "").replace(/[^a-zA-Z0-9]/g, "-").substring(0, 30);
-  const filePrefix = prefix || (title ? platform + "-" + title : platform);
+  const basePrefix = prefix || platform;
+  const filePrefix = title ? basePrefix + "-" + title : basePrefix;
   const filename = `lisa-${filePrefix}-${timestamp}.json`;
   
   const dataStr = JSON.stringify(compressed, null, 2);

@@ -486,6 +486,7 @@ class LISAChatMonitor {
   isChatUrl(url) {
     const chatPatterns = [
       /claude\.ai\/chat\//,
+      /claude\.ai\/code\//,
       /chatgpt\.com\/c\//,
       /gemini\.google\.com\/app\//,
       /grok\.com\/c\//,

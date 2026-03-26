@@ -250,13 +250,27 @@ class LISAFloatingButton {
     this.startTokenCounter();
   }
   
-  // Token counter functionality
+  // Token counter functionality (optimized)
   startTokenCounter() {
-    this.updateTokenCount();
-    // Update every 5 seconds
-    setInterval(() => this.updateTokenCount(), 5000);
-    // Also observe DOM changes
+    this.tokenDebounceTimer = null;
+    this.lastTokenCount = 0;
+    
+    // Initial count after short delay (let page settle)
+    setTimeout(() => this.updateTokenCount(), 1000);
+    
+    // Update every 10 seconds (not 5)
+    this.tokenInterval = setInterval(() => this.updateTokenCount(), 10000);
+    
+    // Debounced observer
     this.observeConversation();
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => this.cleanupTokenCounter());
+  }
+
+  cleanupTokenCounter() {
+    if (this.tokenInterval) clearInterval(this.tokenInterval);
+    if (this.tokenObserver) this.tokenObserver.disconnect();
   }
 
   estimateTokens(text) {
@@ -265,29 +279,33 @@ class LISAFloatingButton {
   }
 
   getConversationText() {
-    // Try multiple selectors for different AI platforms
+    // Try platform-specific selectors (most specific first)
     const selectors = [
       "[data-test-render-count]",           // Claude
-      "[class*=\"group/message\"]",        // Claude Code
+      "[class*=\"group/message\"]",         // Claude Code
       "[data-message-author-role]",         // ChatGPT
       ".conversation-turn",                 // Gemini
       ".message-content",                   // Generic
-      "article",                            // Fallback
     ];
-    let text = "";
+    
     for (const selector of selectors) {
       const elements = document.querySelectorAll(selector);
       if (elements.length > 0) {
-        elements.forEach(el => text += el.textContent + " ");
-        break;
+        // Use array join instead of string concat (faster)
+        return Array.from(elements).map(el => el.textContent).join(" ");
       }
     }
-    return text;
+    return "";
   }
 
   updateTokenCount() {
     const text = this.getConversationText();
     const tokens = this.estimateTokens(text);
+    
+    // Skip if unchanged (within 100 tokens)
+    if (Math.abs(tokens - this.lastTokenCount) < 100) return;
+    this.lastTokenCount = tokens;
+    
     const pill = document.getElementById("lisa-token-pill");
     const value = document.getElementById("lisa-token-value");
     if (!pill || !value) return;
@@ -317,11 +335,22 @@ class LISAFloatingButton {
   }
 
   observeConversation() {
-    const observer = new MutationObserver(() => {
-      this.updateTokenCount();
+    // Debounced observer - only fires 2 seconds after last change
+    this.tokenObserver = new MutationObserver(() => {
+      if (this.tokenDebounceTimer) clearTimeout(this.tokenDebounceTimer);
+      this.tokenDebounceTimer = setTimeout(() => this.updateTokenCount(), 2000);
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    
+    // Watch main content area only, not entire body
+    const mainContent = document.querySelector('main') || document.body;
+    this.tokenObserver.observe(mainContent, { 
+      childList: true, 
+      subtree: true,
+      characterData: false,  // Don't watch text changes
+      attributes: false      // Don't watch attribute changes
+    });
   }
+
   
   showHandoffPrompt() {
     const text = this.getConversationText();

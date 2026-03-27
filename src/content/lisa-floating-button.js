@@ -6,6 +6,12 @@ class LISAFloatingButton {
     this.button = null;
     this.isPremium = false;
     this.init();
+    // Listen for storage changes to re-init after popup sets premium
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "sync" && (changes.userTier || changes.askOnChatSwitch)) {
+        this.init();
+      }
+    });
   }
 
   async init() {
@@ -427,6 +433,12 @@ class LISAChatMonitor {
     this.lastPath = new URL(window.location.href).pathname;
     this.dontAskThisSession = false;
     this.init();
+    // Listen for storage changes to re-init after popup sets premium
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "sync" && (changes.userTier || changes.askOnChatSwitch)) {
+        this.init();
+      }
+    });
   }
 
   async init() {

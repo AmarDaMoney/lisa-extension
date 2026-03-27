@@ -20,7 +20,7 @@
     "https://chat.mistral.ai/*",
     "https://chat.deepseek.com/*",
     "https://copilot.microsoft.com/*",
-    "https://perplexity.ai/*",
+    "https://*.perplexity.ai/*",
     "https://lisa-web-backend-production.up.railway.app/*"
   ],
   "background": {
@@ -76,7 +76,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://perplexity.ai/*"],
+      "matches": ["https://*.perplexity.ai/*"],
       "js": ["src/content/perplexity-parser.js", "src/content/lisa-v-parser.js", "src/content/lisa-floating-button.js"],
       "run_at": "document_idle"
     }
@@ -92,7 +92,7 @@
   "web_accessible_resources": [
     {
       "resources": ["src/popup/*"],
-      "matches": ["https://claude.ai/*", "https://chatgpt.com/*", "https://gemini.google.com/*", "https://grok.com/*", "https://chat.mistral.ai/*", "https://chat.deepseek.com/*", "https://copilot.microsoft.com/*", "https://perplexity.ai/*"]
+      "matches": ["https://claude.ai/*", "https://chatgpt.com/*", "https://gemini.google.com/*", "https://grok.com/*", "https://chat.mistral.ai/*", "https://chat.deepseek.com/*", "https://copilot.microsoft.com/*", "https://*.perplexity.ai/*"]
     }
   ]
 }

@@ -447,21 +447,8 @@ class LISAChatMonitor {
     const isPremium = result.userTier === 'premium';
     console.log('[LISA DEBUG] Monitor init:', { enabled: this.enabled, isPremium, userTier: result.userTier, askOnChatSwitch: result.askOnChatSwitch });
     
-    // Autosave disabled - if (this.enabled && isPremium) {
+    if (this.enabled && isPremium) {
       this.startMonitoring();
-      console.log("[LISA] Monitor is active");
-      // Small dot indicator
-      const dot = document.createElement("div");
-      dot.id = "lisa-monitor-dot";
-      dot.style.cssText = "position:fixed; bottom:5px; right:5px; width:8px; height:8px; background:#10b981; border-radius:50%; z-index:999999; opacity:0.7;";
-      document.body.appendChild(dot);
-      console.log("[LISA] ✅ Auto-save monitoring ACTIVE");
-      // Visual indicator for debugging
-      const badge = document.createElement("div");
-      badge.textContent = "🔍 LISA Monitor Active";
-      badge.style.cssText = "position:fixed; bottom:10px; right:10px; background:#10b981; color:white; padding:4px 8px; border-radius:4px; font-size:10px; z-index:999999; font-family:monospace;";
-      setTimeout(() => badge.remove(), 3000);
-      document.body.appendChild(badge);
     }
   }
 
@@ -482,7 +469,6 @@ class LISAChatMonitor {
   }
 
   checkUrlChange() {
-    console.log("[LISA] URL changed, checking if should save...");
     console.log("[LISA DEBUG] checkUrlChange fired", { currentUrl: window.location.href, lastUrl: this.lastUrl, lastPath: this.lastPath, dontAsk: this.dontAskThisSession });
     const currentUrl = window.location.href;
     const currentPath = new URL(currentUrl).pathname;
@@ -508,12 +494,10 @@ class LISAChatMonitor {
     if (this.dontAskThisSession) return;
     
     // Show prompt after page loads
-    console.log("[LISA] About to call promptSave in 2 seconds");
     setTimeout(() => this.promptSave(), 2000);
   }
 
   isChatUrl(url) {
-    console.log("[LISA] isChatUrl checking:", url);
     const chatPatterns = [
       /claude\.ai\/chat\//,
       /claude\.ai\/code\//,

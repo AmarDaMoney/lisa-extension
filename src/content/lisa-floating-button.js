@@ -449,6 +449,13 @@ class LISAChatMonitor {
     
     if (this.enabled && isPremium) {
       this.startMonitoring();
+      console.log("[LISA] ✅ Auto-save monitoring ACTIVE");
+      // Visual indicator for debugging
+      const badge = document.createElement("div");
+      badge.textContent = "🔍 LISA Monitor Active";
+      badge.style.cssText = "position:fixed; bottom:10px; right:10px; background:#10b981; color:white; padding:4px 8px; border-radius:4px; font-size:10px; z-index:999999; font-family:monospace;";
+      setTimeout(() => badge.remove(), 3000);
+      document.body.appendChild(badge);
     }
   }
 

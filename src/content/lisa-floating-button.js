@@ -447,7 +447,7 @@ class LISAChatMonitor {
     const isPremium = result.userTier === 'premium';
     console.log('[LISA DEBUG] Monitor init:', { enabled: this.enabled, isPremium, userTier: result.userTier, askOnChatSwitch: result.askOnChatSwitch });
     
-    if (this.enabled && isPremium) {
+    // Autosave disabled - if (this.enabled && isPremium) {
       this.startMonitoring();
       console.log("[LISA] Monitor is active");
       // Small dot indicator

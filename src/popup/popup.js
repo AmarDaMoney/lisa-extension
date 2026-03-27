@@ -1115,19 +1115,15 @@ class LISAPopup {
   }
 
   async setupChatSwitchToggle() {
-    const toggle = document.getElementById('askOnChatSwitch');
     if (!toggle) return;
     
     try {
-      const result = await chrome.storage.sync.get(['askOnChatSwitch']);
-      toggle.checked = result.askOnChatSwitch !== false;
     } catch (error) {
       console.error('[LISA] Failed to get chat switch setting:', error);
     }
 
     toggle.addEventListener('change', async () => {
       try {
-        await chrome.storage.sync.set({ askOnChatSwitch: toggle.checked });
         this.trackEvent('chat_switch_toggled', { enabled: toggle.checked });
       } catch (error) {
         console.error('[LISA] Failed to set chat switch setting:', error);

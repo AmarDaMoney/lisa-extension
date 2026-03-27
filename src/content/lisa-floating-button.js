@@ -433,6 +433,7 @@ class LISAChatMonitor {
     const result = await chrome.storage.sync.get(['askOnChatSwitch', 'userTier']);
     this.enabled = result.askOnChatSwitch !== false;
     const isPremium = result.userTier === 'premium';
+    console.log('[LISA DEBUG] Monitor init:', { enabled: this.enabled, isPremium, userTier: result.userTier, askOnChatSwitch: result.askOnChatSwitch });
     
     if (this.enabled && isPremium) {
       this.startMonitoring();

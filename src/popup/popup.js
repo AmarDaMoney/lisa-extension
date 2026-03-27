@@ -650,7 +650,8 @@ class LISAPopup {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const platform = (this.compressedData.metadata.platform || 'unknown').replace(/[.\s()]/g, '-');
-    const filename = `lisa-${platform}-${timestamp}.json`;
+    const title = (this.compressedData.metadata?.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
+    const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
     const dataStr = JSON.stringify(this.compressedData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -1172,7 +1173,8 @@ class LISAPopup {
       
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lisa-${snapshot.platform}-${snapshot.id}.${extension}`;
+      const snapshotTitle = (snapshot.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
+      a.download = snapshotTitle ? `${snapshotTitle}-lisa-${snapshot.platform}-${snapshot.id}.${extension}` : `lisa-${snapshot.platform}-${snapshot.id}.${extension}`;
       a.click();
       
       URL.revokeObjectURL(url);

@@ -476,6 +476,7 @@ class LISAChatMonitor {
   }
 
   checkUrlChange() {
+    console.log("[LISA] URL changed, checking if should save...");
     console.log("[LISA DEBUG] checkUrlChange fired", { currentUrl: window.location.href, lastUrl: this.lastUrl, lastPath: this.lastPath, dontAsk: this.dontAskThisSession });
     const currentUrl = window.location.href;
     const currentPath = new URL(currentUrl).pathname;
@@ -501,6 +502,7 @@ class LISAChatMonitor {
     if (this.dontAskThisSession) return;
     
     // Show prompt after page loads
+    console.log("[LISA] About to call promptSave in 2 seconds");
     setTimeout(() => this.promptSave(), 2000);
   }
 

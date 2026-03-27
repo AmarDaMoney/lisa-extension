@@ -507,6 +507,7 @@ class LISAChatMonitor {
   }
 
   isChatUrl(url) {
+    console.log("[LISA] isChatUrl checking:", url);
     const chatPatterns = [
       /claude\.ai\/chat\//,
       /claude\.ai\/code\//,

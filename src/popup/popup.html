@@ -407,3 +407,36 @@
           <div class="settings-option">
             <span>Ask to save previous conversation</span>
             <label class="toggle-switch">
+              <input type="checkbox" id="askOnChatSwitch" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+        <div class="settings-divider"></div>
+        
+        <section class="settings-section" >
+          <h3>🗑️ Reset</h3>
+          <p class="settings-desc">Clear all local data and start fresh.</p>
+          <button id="resetDataBtn" class="btn btn-danger">
+            Reset Extension Data
+          </button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" class="overlay" style="display: none;">
+    <div class="spinner"></div>
+    <p id="loadingText">Processing...</p>
+  </div>
+
+  <!-- Stripe integration scripts -->
+  <script src="../stripe/stripe-config.js"></script>
+  <script src="../stripe/stripe-client.js"></script>
+  <script src="../stripe/stripe-subscription-modal.js"></script>
+  <script src="../stripe/stripe-payment-manager.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
+

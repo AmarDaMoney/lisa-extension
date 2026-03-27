@@ -104,7 +104,7 @@ class LISAPopup {
           if (resp.ok) {
             const data = await resp.json();
             this.userTier = (data.valid === true) ? 'premium' : 'free';
-            if (data.valid !== true) await chrome.storage.sync.set({ userTier: 'free' });
+            await chrome.storage.sync.set({ userTier: this.userTier });
           } else {
             this.userTier = storage.userTier || 'free';
           }

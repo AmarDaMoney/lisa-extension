@@ -449,6 +449,12 @@ class LISAChatMonitor {
     
     if (this.enabled && isPremium) {
       this.startMonitoring();
+      console.log("[LISA] Monitor is active");
+      // Small dot indicator
+      const dot = document.createElement("div");
+      dot.id = "lisa-monitor-dot";
+      dot.style.cssText = "position:fixed; bottom:5px; right:5px; width:8px; height:8px; background:#10b981; border-radius:50%; z-index:999999; opacity:0.7;";
+      document.body.appendChild(dot);
       console.log("[LISA] ✅ Auto-save monitoring ACTIVE");
       // Visual indicator for debugging
       const badge = document.createElement("div");

@@ -157,6 +157,16 @@ class LISAFloatingButton {
         z-index: 100001;
         animation: lisa-fade-in 0.2s ease;
       }
+        .lisa-upgrade-modal {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100001;
+          animation: lisa-fade-in 0.2s ease;
+        }
       @keyframes lisa-fade-in {
         from { opacity: 0; }
         to { opacity: 1; }

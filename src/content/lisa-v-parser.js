@@ -26,6 +26,7 @@ class LisaVParser {
     if (host.includes('chat.mistral.ai')) return 'Mistral AI';
     if (host.includes('chat.deepseek.com')) return 'DeepSeek';
     if (host.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
+    if (host === 'github.com' && window.location.pathname.startsWith('/copilot')) return 'GitHub Copilot';
     if (host.includes('perplexity.ai')) return 'Perplexity';
     return 'unknown';
   }
@@ -157,6 +158,8 @@ class LisaVParser {
       messages = await this.extractChatGPTMessages();
     } else if (platform === 'Gemini') {
       messages = await this.extractGeminiMessages();
+    } else if (platform === 'GitHub Copilot') {
+      messages = await this.extractGitHubCopilotMessages();
     } else {
       // Generic fallback
       messages = await this.extractGenericMessages();
@@ -256,6 +259,55 @@ class LisaVParser {
       }
     }
     
+    return messages;
+  }
+
+  // GitHub Copilot-specific extraction (github.com/copilot)
+  async extractGitHubCopilotMessages() {
+    const messages = [];
+
+    // Mirror the multi-strategy selector cascade used in github-copilot-parser.js
+    const candidateSelectors = [
+      '[data-testid="thread-message"], [data-testid*="copilot-message"], [data-testid*="chat-message"]',
+      '[data-component="ThreadMessage"], [data-component*="Message"], [data-component*="ChatBubble"]',
+      'article[data-message-id], article[data-role]',
+      '[data-message-role], [data-author-role]',
+      '[class*="CopilotChat"], [class*="copilot-chat"], [class*="ThreadMessage"], [class*="chatMessage"]',
+      '[class*="message"], [class*="Message"]'
+    ];
+
+    let containers = null;
+    for (const selector of candidateSelectors) {
+      const found = document.querySelectorAll(selector);
+      if (found.length > 0) { containers = found; break; }
+    }
+
+    if (!containers) return messages;
+
+    for (const container of containers) {
+      const explicit =
+        container.getAttribute('data-message-role') ||
+        container.getAttribute('data-author-role') ||
+        container.getAttribute('data-role') ||
+        container.getAttribute('data-actor-type');
+
+      let isUser = explicit === 'user';
+      if (!explicit) {
+        const classStr =
+          typeof container.className === 'string'
+            ? container.className
+            : container.className?.baseVal || '';
+        isUser = classStr.includes('user') || classStr.includes('human') ||
+                 container.querySelector('[data-role="user"], [data-message-role="user"]') !== null;
+      }
+
+      const role = isUser ? 'user' : 'assistant';
+      const blocks = await this.parseMessageContent(container, role);
+      if (blocks.length > 0) {
+        messages.push(blocks);
+      }
+    }
+
     return messages;
   }
 

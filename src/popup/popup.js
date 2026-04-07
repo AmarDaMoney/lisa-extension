@@ -196,6 +196,8 @@ class LISAPopup {
         platform = 'DeepSeek';
       } else if (url.includes('copilot.microsoft.com')) {
         platform = 'Microsoft Copilot';
+      } else if (url.includes('github.com/copilot')) {
+        platform = 'GitHub Copilot';
       } else if (url.includes('perplexity.ai')) {
         platform = 'Perplexity';
       } else {

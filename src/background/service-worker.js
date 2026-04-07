@@ -319,6 +319,7 @@ class SnapshotManager {
     if (url.includes('chat.mistral.ai')) return 'Mistral AI';
     if (url.includes('chat.deepseek.com')) return 'DeepSeek';
     if (url.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
+    if (url.includes('github.com/copilot')) return 'GitHub Copilot';
     if (url.includes('perplexity.ai')) return 'Perplexity';
     try {
       return new URL(url).hostname;

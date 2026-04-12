@@ -423,20 +423,29 @@ class LISAFloatingButton {
           Get unlimited LISA-V and Raw JSON saves, plus all premium features!
         </div>
         <div class="lisa-modal-buttons">
-          <button class="lisa-modal-btn" onclick="this.closest('.lisa-upgrade-modal').remove()">Maybe Later</button>
-          <button class="lisa-modal-btn primary" onclick="window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank'); this.closest('.lisa-upgrade-modal').remove()">Upgrade Now</button>
+          <button class="lisa-modal-btn lisa-maybe-later">Maybe Later</button>
+          <button class="lisa-modal-btn primary lisa-upgrade-now">Upgrade Now</button>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
+
+    // Add event listeners (CSP-compliant, no inline onclick)
+    const maybeLaterBtn = modal.querySelector('.lisa-maybe-later');
+    const upgradeNowBtn = modal.querySelector('.lisa-upgrade-now');
+    
+    maybeLaterBtn.addEventListener('click', () => {
+      modal.remove();
+    });
+    
+    upgradeNowBtn.addEventListener('click', () => {
+      window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank');
+      modal.remove();
+    });
   }
 }
 
 // ============================================
-// CHAT CHANGE DETECTION
-// ============================================
-
-
 // Initialize when DOM is ready
 let floatingButton;
 if (document.readyState === 'loading') {

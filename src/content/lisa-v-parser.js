@@ -177,10 +177,15 @@ class LisaVParser {
     const messageContainers = document.querySelectorAll("[data-test-render-count]");
     
     for (const container of messageContainers) {
-      // Better user detection - matches working claude-parser.js
-      const isUser = container.querySelector("[data-is-streaming]")?.textContent?.includes("You") ||
-                     container.closest("[class*=\"human\"]") !== null ||
-                     container.getAttribute("data-is-human") === "true";
+      // User messages have: justify-end or items-end (right-aligned) + bg-bg-300 background
+      // Assistant messages have: data-is-streaming attribute
+      const hasStreaming = container.querySelector("[data-is-streaming]") !== null;
+      const hasUserBg = container.querySelector(".bg-bg-300") !== null;
+      const hasRightAlign = container.querySelector("[class*='justify-end']") !== null ||
+                            container.querySelector("[class*='items-end']") !== null;
+      
+      // Assistant has streaming element, User has right-aligned bg-bg-300 bubble
+      const isUser = !hasStreaming && (hasUserBg || hasRightAlign);
       
       const role = isUser ? "user" : "assistant";
       const blocks = await this.parseMessageContent(container, role);

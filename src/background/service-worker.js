@@ -641,6 +641,31 @@ function createContextMenus() {
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('[LISA] Extension installed/updated:', details.reason);
   createContextMenus();
+  
+  // Show "What's new" for updates (not fresh installs)
+  if (details.reason === 'update') {
+    const currentVersion = chrome.runtime.getManifest().version;
+    const previousVersion = details.previousVersion;
+    
+    // Only show if major or minor version changed (not patch)
+    const [currMajor, currMinor] = currentVersion.split('.').map(Number);
+    const [prevMajor, prevMinor] = (previousVersion || '0.0.0').split('.').map(Number);
+    
+    if (currMajor > prevMajor || currMinor > prevMinor) {
+      // Store flag to show "What's new" when popup opens
+      chrome.storage.local.set({ 
+        showWhatsNew: true,
+        updatedToVersion: currentVersion,
+        changelog: [
+          "Fixed code block detection in conversation capture",
+          "Fixed user/assistant role detection for Claude",
+          "Removed content truncation limits",
+          "Payment system improvements"
+        ]
+      });
+      console.log('[LISA] Update detected:', previousVersion, '->', currentVersion);
+    }
+  }
 });
 
 // Also create menus on service worker startup (in case of restart)

@@ -22,6 +22,96 @@ class LISAPopup {
     this.setupEventListeners();
     this.loadSnapshots();
     this.setupAutoSaveToggle();
+    this.checkForUpdates();
+    this.checkWhatsNew();
+  }
+  
+  async checkWhatsNew() {
+    try {
+      const result = await chrome.storage.local.get(['showWhatsNew', 'updatedToVersion', 'changelog']);
+      if (result.showWhatsNew) {
+        this.showWhatsNewModal(result.updatedToVersion, result.changelog || []);
+        // Clear the flag so it only shows once
+        chrome.storage.local.remove(['showWhatsNew', 'updatedToVersion', 'changelog']);
+      }
+    } catch (error) {
+      console.log('[LISA] What\'s new check skipped:', error.message);
+    }
+  }
+  
+  showWhatsNewModal(version, changelog) {
+    const overlay = document.createElement('div');
+    overlay.id = 'whats-new-overlay';
+    overlay.innerHTML = `
+      <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 12px; padding: 24px; max-width: 320px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+          <div style="text-align: center; margin-bottom: 16px;">
+            <span style="font-size: 32px;">🎉</span>
+            <h2 style="margin: 8px 0 4px; font-size: 18px; color: #1a1a1a;">Updated to v${version}!</h2>
+            <p style="color: #666; font-size: 12px; margin: 0;">Thanks for using LISA</p>
+          </div>
+          <div style="background: #f5f5f5; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+            <p style="font-weight: 600; font-size: 13px; margin: 0 0 8px; color: #333;">What's new:</p>
+            <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #555;">
+              ${changelog.map(item => `<li style="margin-bottom: 4px;">${item}</li>`).join('')}
+            </ul>
+          </div>
+          <button id="close-whats-new" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+            Got it!
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    document.getElementById('close-whats-new').addEventListener('click', () => {
+      overlay.remove();
+    });
+  }
+  
+  async checkForUpdates() {
+    try {
+      const currentVersion = chrome.runtime.getManifest().version;
+      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/version');
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      const latestVersion = data.version;
+      
+      // Compare versions (simple string compare works for semver)
+      if (latestVersion > currentVersion) {
+        this.showUpdateBanner(latestVersion, data.changelog);
+      }
+    } catch (error) {
+      // Silently fail - don't block popup functionality
+      console.log('[LISA] Version check skipped:', error.message);
+    }
+  }
+  
+  showUpdateBanner(version, changelog) {
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.innerHTML = `
+      <div style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 12px; font-size: 13px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>🚀 <strong>v${version}</strong> available!</span>
+          <button id="dismiss-update" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">×</button>
+        </div>
+        <div style="margin-top: 6px; font-size: 11px; opacity: 0.9;">
+          Chrome will auto-update soon, or update manually in Extensions.
+        </div>
+      </div>
+    `;
+    
+    const container = document.querySelector('.container') || document.body.firstElementChild;
+    container.insertBefore(banner, container.firstChild);
+    
+    document.getElementById('dismiss-update').addEventListener('click', () => {
+      banner.remove();
+      // Remember dismissal for this version
+      chrome.storage.local.set({ dismissedUpdate: version });
+    });
   }
 
   async loadUsageStats() {

@@ -1,6 +1,6 @@
 /**
  * LISA Extension - Claude Code Parser
- * Version: 0.49.3
+ * Version: 0.49.4
  * 
  * Extracts conversations from Claude Code sessions (claude.ai/code/session_*)
  */

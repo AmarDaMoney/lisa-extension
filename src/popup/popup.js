@@ -1,5 +1,5 @@
 // LISA Core Extension - Popup Logic
-// v0.49.3 - Auto-embed integrity hash, auto-renewal/cancellation notice
+// v0.49.4 - Auto-embed integrity hash, auto-renewal/cancellation notice
 
 class LISAPopup {
   constructor() {

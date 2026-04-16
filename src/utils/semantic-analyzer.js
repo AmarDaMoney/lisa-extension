@@ -1,6 +1,6 @@
 /**
  * LISA Semantic Analyzer
- * Version: 0.49.3
+ * Version: 0.49.4
  * 
  * Transforms raw extracted messages into structured semantic format.
  * Fails gracefully - returns original data if analysis fails.
@@ -103,9 +103,9 @@ const SemanticAnalyzer = {
           semanticAnchors[id] = {
             topic,
             role: msg.role,
-            content: msg.content.substring(0, 200) + (msg.content.length > 200 ? '...' : ''),
+            content: msg.content,
             severity: severities.length > 0 ? severities[0].level : null,
-            files: files.slice(0, 5),
+            files: files,
             tags: severities.map(s => s.tag)
           };
           anchorIndex++;
@@ -116,7 +116,7 @@ const SemanticAnalyzer = {
       let actionIndex = 1;
       const allActions = this.extractActions(allText);
 
-      allActions.slice(0, 10).forEach(action => {
+      allActions.forEach(action => {
         const id = `AV${String(actionIndex).padStart(3, '0')}`;
         actionVectors[id] = {
           action: action.command,
@@ -132,9 +132,9 @@ const SemanticAnalyzer = {
         method: 'semantic_anchoring',
         anchor_count: Object.keys(semanticAnchors).length,
         action_count: Object.keys(actionVectors).length,
-        key_themes: topics.slice(0, 5),
-        files_touched: allFiles.slice(0, 10),
-        git_refs: allGitRefs.slice(0, 5),
+        key_themes: topics,
+        files_touched: allFiles,
+        git_refs: allGitRefs,
         severities_found: [...new Set(allSeverities.map(s => s.level))]
       };
 

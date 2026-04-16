@@ -35,8 +35,7 @@ class LisaVParser {
     return element.tagName === 'PRE' || 
            element.tagName === 'CODE' ||
            element.classList?.contains('code-block') ||
-           element.classList?.contains('hljs') ||
-           element.querySelector('pre, code');
+           element.classList?.contains('hljs');
   }
 
   // Extract language from code block

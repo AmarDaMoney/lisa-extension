@@ -9,6 +9,138 @@
 
 const SemanticAnalyzer = {
   
+  // ===========================================
+  // MULTILINGUAL SUPPORT
+  // ===========================================
+  
+  // Language detection patterns (first 500 chars sampled)
+  languagePatterns: {
+    arabic: /[؀-ۿݐ-ݿ]/,
+    chinese: /[一-鿿]/,
+    japanese: /[぀-ゟ゠-ヿ]/,
+    korean: /[가-힯]/,
+    cyrillic: /[Ѐ-ӿ]/,
+    hebrew: /[֐-׿]/
+  },
+  
+  // RTL languages need special handling
+  rtlLanguages: ['arabic', 'hebrew'],
+  
+  // Multilingual topic keywords
+  topicKeywords: {
+    security: {
+      en: ['security', 'vulnerab', 'exploit', 'attack', 'breach', 'auth', 'permission'],
+      fr: ['sécurité', 'vulnérab', 'exploit', 'attaque', 'faille', 'auth', 'permission'],
+      es: ['seguridad', 'vulnerab', 'exploit', 'ataque', 'brecha', 'auth', 'permiso'],
+      ar: ['أمن', 'أمان', 'ثغرة', 'هجوم', 'اختراق'],
+      de: ['sicherheit', 'schwachstelle', 'angriff', 'exploit'],
+      zh: ['安全', '漏洞', '攻击', '入侵']
+    },
+    bugfix: {
+      en: ['bug', 'fix', 'error', 'issue', 'problem', 'crash', 'fail'],
+      fr: ['bug', 'bogue', 'erreur', 'problème', 'plantage', 'échec', 'corriger'],
+      es: ['bug', 'error', 'problema', 'fallo', 'corregir', 'arreglar'],
+      ar: ['خطأ', 'مشكلة', 'عطل', 'إصلاح', 'خلل'],
+      de: ['fehler', 'bug', 'problem', 'absturz', 'beheben'],
+      zh: ['错误', '问题', '修复', '崩溃', 'bug']
+    },
+    testing: {
+      en: ['test', 'spec', 'unit', 'integration', 'coverage', 'assert'],
+      fr: ['test', 'spec', 'unitaire', 'intégration', 'couverture'],
+      es: ['test', 'prueba', 'unitario', 'integración', 'cobertura'],
+      ar: ['اختبار', 'فحص', 'تجربة'],
+      de: ['test', 'prüfung', 'einheit', 'integration'],
+      zh: ['测试', '单元', '集成', '覆盖']
+    },
+    refactor: {
+      en: ['refactor', 'clean', 'restructure', 'reorganize', 'simplify'],
+      fr: ['refactorer', 'nettoyer', 'restructurer', 'réorganiser', 'simplifier'],
+      es: ['refactor', 'limpiar', 'reestructurar', 'reorganizar', 'simplificar'],
+      ar: ['إعادة هيكلة', 'تنظيف', 'تبسيط'],
+      de: ['refaktor', 'aufräumen', 'umstrukturieren', 'vereinfachen'],
+      zh: ['重构', '清理', '简化', '整理']
+    },
+    feature: {
+      en: ['feature', 'add', 'implement', 'new', 'create', 'build'],
+      fr: ['fonctionnalité', 'ajouter', 'implémenter', 'nouveau', 'créer', 'construire'],
+      es: ['función', 'añadir', 'implementar', 'nuevo', 'crear', 'construir'],
+      ar: ['ميزة', 'إضافة', 'تنفيذ', 'جديد', 'إنشاء'],
+      de: ['funktion', 'hinzufügen', 'implementieren', 'neu', 'erstellen'],
+      zh: ['功能', '添加', '实现', '新建', '创建']
+    },
+    config: {
+      en: ['config', 'setup', 'install', 'environment', 'deploy', 'settings'],
+      fr: ['config', 'installation', 'environnement', 'déployer', 'paramètres'],
+      es: ['config', 'configurar', 'instalar', 'entorno', 'desplegar', 'ajustes'],
+      ar: ['إعداد', 'تثبيت', 'بيئة', 'نشر', 'إعدادات'],
+      de: ['konfiguration', 'einrichten', 'installieren', 'umgebung', 'einstellungen'],
+      zh: ['配置', '安装', '环境', '部署', '设置']
+    },
+    documentation: {
+      en: ['doc', 'readme', 'comment', 'guide', 'tutorial', 'manual'],
+      fr: ['doc', 'readme', 'commentaire', 'guide', 'tutoriel', 'manuel'],
+      es: ['doc', 'readme', 'comentario', 'guía', 'tutorial', 'manual'],
+      ar: ['توثيق', 'دليل', 'تعليق', 'شرح'],
+      de: ['doku', 'readme', 'kommentar', 'anleitung', 'handbuch'],
+      zh: ['文档', '说明', '注释', '指南', '教程']
+    }
+  },
+  
+  // Multilingual action keywords
+  actionKeywords: {
+    todo: {
+      en: ['TODO', 'FIXME', 'HACK', 'XXX', 'NOTE'],
+      fr: ['TODO', 'ÀFAIRE', 'FIXME', 'CORRECTION', 'NOTE'],
+      es: ['TODO', 'HACER', 'FIXME', 'ARREGLAR', 'NOTA'],
+      ar: ['للتنفيذ', 'إصلاح', 'ملاحظة'],
+      de: ['TODO', 'FIXME', 'ERLEDIGEN', 'NOTIZ'],
+      zh: ['待办', '修复', '注意']
+    }
+  },
+  
+  // Detect primary language from text sample
+  detectLanguage(text) {
+    if (!text || text.length < 10) return 'en';
+    
+    const sample = text.substring(0, 500);
+    
+    // Check for non-Latin scripts first
+    for (const [lang, pattern] of Object.entries(this.languagePatterns)) {
+      if (pattern.test(sample)) {
+        return lang;
+      }
+    }
+    
+    // For Latin scripts, use common word detection
+    const lower = sample.toLowerCase();
+    
+    // French indicators
+    if (/(le|la|les|un|une|des|est|sont|avoir|être|faire|avec|pour|dans|que|qui|ce|cette)/.test(lower)) {
+      const frenchScore = (lower.match(/(le|la|les|un|une|des|est|sont|avec|pour|dans|que|qui)/g) || []).length;
+      if (frenchScore >= 3) return 'fr';
+    }
+    
+    // Spanish indicators
+    if (/(el|la|los|las|un|una|es|son|estar|ser|hacer|con|para|en|que|esto|esta)/.test(lower)) {
+      const spanishScore = (lower.match(/(el|la|los|las|un|una|es|son|con|para|esto|esta)/g) || []).length;
+      if (spanishScore >= 3) return 'es';
+    }
+    
+    // German indicators
+    if (/(der|die|das|ein|eine|ist|sind|haben|sein|mit|für|und|oder|nicht|auch)/.test(lower)) {
+      const germanScore = (lower.match(/(der|die|das|ein|eine|ist|sind|haben|mit|für|nicht)/g) || []).length;
+      if (germanScore >= 3) return 'de';
+    }
+    
+    // Default to English
+    return 'en';
+  },
+  
+  // Check if language is RTL
+  isRTL(lang) {
+    return this.rtlLanguages.includes(lang);
+  },
+  
   severityPatterns: [
     { regex: /\b(C-\d+|CRITICAL)\b/gi, level: 'critical' },
     { regex: /\b(H-\d+|HIGH)\b/gi, level: 'high' },
@@ -64,15 +196,25 @@ const SemanticAnalyzer = {
     return [...new Set(matches.map(m => m.trim()))];
   },
 
-  detectTopic(content) {
+  detectTopic(content, lang = null) {
     const lower = content.toLowerCase();
-    if (lower.includes('security') || lower.includes('vulnerab') || lower.includes('exploit')) return 'security';
-    if (lower.includes('bug') || lower.includes('fix') || lower.includes('error')) return 'bugfix';
-    if (lower.includes('test') || lower.includes('spec')) return 'testing';
-    if (lower.includes('refactor') || lower.includes('clean')) return 'refactor';
-    if (lower.includes('feature') || lower.includes('add') || lower.includes('implement')) return 'feature';
-    if (lower.includes('config') || lower.includes('setup') || lower.includes('install')) return 'config';
-    if (lower.includes('doc') || lower.includes('readme') || lower.includes('comment')) return 'documentation';
+    const detectedLang = lang || this.detectLanguage(content);
+    
+    // Check each topic against all language variants
+    for (const [topic, langKeywords] of Object.entries(this.topicKeywords)) {
+      // Check detected language first, then fall back to English
+      const langsToCheck = detectedLang !== 'en' ? [detectedLang, 'en'] : ['en'];
+      
+      for (const checkLang of langsToCheck) {
+        const keywords = langKeywords[checkLang] || langKeywords['en'] || [];
+        for (const keyword of keywords) {
+          if (lower.includes(keyword.toLowerCase())) {
+            return topic;
+          }
+        }
+      }
+    }
+    
     return 'general';
   },
 
@@ -138,6 +280,10 @@ const SemanticAnalyzer = {
         severities_found: [...new Set(allSeverities.map(s => s.level))]
       };
 
+      // Detect primary language of conversation
+      const detectedLanguage = this.detectLanguage(allText);
+      const isRTL = this.isRTL(detectedLanguage);
+      
       return {
         ...rawExtraction,
         session_metadata: {
@@ -145,7 +291,9 @@ const SemanticAnalyzer = {
           sessionId: rawExtraction.conversationId,
           extractedAt: rawExtraction.extractedAt,
           messageCount: rawExtraction.messageCount,
-          enriched: true
+          enriched: true,
+          language: detectedLanguage,
+          rtl: isRTL
         },
         semantic_anchors: semanticAnchors,
         action_vectors: actionVectors,

@@ -22,8 +22,12 @@ class ClaudeParser {
     
     messageElements.forEach((element, index) => {
       // Determine if user or assistant message
-      const isUser = element.querySelector('[data-is-streaming="false"]')?.textContent.includes('You') || 
-                     element.closest('[class*="human"]') !== null;
+      // Matches lisa-v-parser.js detection: user = right-aligned bg-bg-300 bubble, assistant = has streaming element
+      const hasStreaming = element.querySelector('[data-is-streaming]') !== null;
+      const hasUserBg = element.querySelector('.bg-bg-300') !== null;
+      const hasRightAlign = element.querySelector("[class*='justify-end']") !== null ||
+                            element.querySelector("[class*='items-end']") !== null;
+      const isUser = !hasStreaming && (hasUserBg || hasRightAlign);
       
       // Extract text content, excluding UI elements
       const textContent = this.extractTextContent(element);

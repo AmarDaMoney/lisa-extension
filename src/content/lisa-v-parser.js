@@ -335,54 +335,126 @@ class LisaVParser {
     return relationships;
   }
 
-  // Generate handoff "next" blocks based on conversation analysis
+  // Generate handoff "next" blocks with resolution tracking
   generateNextBlocks() {
-    const nextBlocks = [];
-    const lastMessages = this.blocks.slice(-10);
-    const allText = this.blocks.filter(b => b.t === "a_text").map(b => b.v).join(" ");
+    const tasks = [];
+    const allBlocks = this.blocks;
+    const allText = allBlocks.filter(b => b.t === "a_text" || b.t === "u").map(b => b.v || "").join("\n");
     
-    // Detect unfinished tasks (TODO, FIXME, will implement, next step)
-    const todoPatterns = [
-      /TODO:?\s*(.{10,80})/gi,
-      /FIXME:?\s*(.{10,80})/gi,
-      /will implement\s+(.{10,50})/gi,
-      /next,?\s+(?:we |I )?(?:should|will|need to)\s+(.{10,80})/gi,
-      /remaining:?\s*(.{10,80})/gi
+    // Resolution signals — if these appear AFTER a task mention, mark it resolved
+    const resolutionPatterns = [
+      /\u2705/g,                          // ✅ emoji
+      /\bfixed\b/gi,
+      /\bdone\b/gi,
+      /\bdeployed\b/gi,
+      /\bcommitted\b/gi,
+      /\bresolved\b/gi,
+      /\bcompleted\b/gi,
+      /\bworking now\b/gi,
+      /\bmerged\b/gi,
+      /Syntax OK/gi
     ];
     
-    for (const pattern of todoPatterns) {
-      const matches = allText.matchAll(pattern);
-      for (const match of matches) {
-        nextBlocks.push({
-          t: "next",
-          action: match[1].trim().replace(/[.,;]$/, ""),
-          priority: "medium",
-          owner: "next_instance",
-          auto_detected: true
+    // Task detection patterns — capture full actionable sentences
+    const todoPatterns = [
+      { regex: /TODO:?\s*(.{10,120})/gi, type: "todo", priority: "high" },
+      { regex: /FIXME:?\s*(.{10,120})/gi, type: "fixme", priority: "high" },
+      { regex: /(?:will|need to|should|must)\s+(?:implement|add|fix|create|update|remove|refactor)\s+(.{10,120})/gi, type: "planned", priority: "medium" },
+      { regex: /next[,:]?\s+(?:we |I )?(?:should|will|need to|step)\s+(.{10,120})/gi, type: "next_step", priority: "medium" },
+      { regex: /(?:remaining|still need|not yet|incomplete|pending):?\s*(.{10,120})/gi, type: "pending", priority: "medium" },
+      { regex: /(?:bug|issue|broken|failing|error):?\s+(.{10,120})/gi, type: "bug", priority: "high" }
+    ];
+    
+    // Extract tasks with their position in conversation
+    for (const { regex, type, priority } of todoPatterns) {
+      const re = new RegExp(regex.source, regex.flags);
+      let match;
+      while ((match = re.exec(allText)) !== null) {
+        const action = match[1].trim().replace(/[.,;:]+$/, "").substring(0, 120);
+        if (action.length < 10) continue;
+        
+        tasks.push({
+          action,
+          type,
+          priority,
+          position: match.index
         });
       }
     }
     
-    // Detect questions left unanswered
-    const lastUserMsg = [...this.blocks].reverse().find(b => b.t === "u");
-    if (lastUserMsg?.v?.includes("?")) {
+    // Check each task for resolution — look for resolution signals AFTER the task mention
+    const resolvedTasks = [];
+    const openTasks = [];
+    
+    for (const task of tasks) {
+      const textAfterTask = allText.substring(task.position);
+      const isResolved = resolutionPatterns.some(pattern => {
+        const re = new RegExp(pattern.source, pattern.flags);
+        return re.test(textAfterTask.substring(0, 500));
+      });
+      
+      if (isResolved) {
+        resolvedTasks.push(task);
+      } else {
+        openTasks.push(task);
+      }
+    }
+    
+    // Detect unanswered questions from last user message
+    const lastUserMsg = [...allBlocks].reverse().find(b => b.t === "u");
+    if (lastUserMsg?.v?.includes("?") && lastUserMsg.v.length > 15) {
+      const questionText = lastUserMsg.v.trim().substring(0, 120);
+      // Check if assistant responded after this question
+      const lastUserIdx = allBlocks.lastIndexOf(lastUserMsg);
+      const hasResponse = allBlocks.slice(lastUserIdx + 1).some(b => b.t === "a_text");
+      if (!hasResponse) {
+        openTasks.push({
+          action: questionText,
+          type: "unanswered_question",
+          priority: "high",
+          position: allText.length
+        });
+      }
+    }
+    
+    // Build next blocks — open items first, then resolved
+    const nextBlocks = [];
+    const seen = new Set();
+    
+    for (const task of openTasks) {
+      const key = task.action.toLowerCase().substring(0, 50);
+      if (seen.has(key)) continue;
+      seen.add(key);
       nextBlocks.push({
         t: "next",
-        action: "Address user question: " + lastUserMsg.v.slice(0, 100),
-        priority: "high",
+        action: task.action,
+        type: task.type,
+        priority: task.priority,
+        status: "open",
         owner: "next_instance",
         auto_detected: true
       });
     }
     
-    // Deduplicate
-    const seen = new Set();
-    return nextBlocks.filter(b => {
-      const key = b.action.toLowerCase();
-      if (seen.has(key)) return false;
+    for (const task of resolvedTasks) {
+      const key = task.action.toLowerCase().substring(0, 50);
+      if (seen.has(key)) continue;
       seen.add(key);
-      return true;
-    }).slice(0, 5); // Max 5 next blocks
+      nextBlocks.push({
+        t: "next",
+        action: task.action,
+        type: task.type,
+        priority: task.priority,
+        status: "resolved",
+        owner: "resolved",
+        auto_detected: true
+      });
+    }
+    
+    // Return max 8 blocks: prioritize open items, then include resolved for context
+    const openItems = nextBlocks.filter(b => b.status === "open").slice(0, 5);
+    const resolvedItems = nextBlocks.filter(b => b.status === "resolved").slice(0, 3);
+    return [...openItems, ...resolvedItems];
   }
 
   // Build complete LISA-V with relationships and next blocks

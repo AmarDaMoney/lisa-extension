@@ -244,6 +244,10 @@ class UniversalParser {
           sendResponse({ success: false, error: error.message });
         }
       }
+      if (request.action === 'samplePageText') {
+        const text = document.body?.innerText?.substring(0, 1000) || '';
+        sendResponse({ text });
+      }
       return true;
     });
   }

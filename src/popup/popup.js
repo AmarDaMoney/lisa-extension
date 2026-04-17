@@ -294,6 +294,9 @@ class LISAPopup {
 
       this.updatePlatformStatus(`✅ ${platform} detected`, true);
       document.getElementById('extractBtn').disabled = false;
+      
+      // Quick language detection from page sample
+      this.detectLanguageFromPage(tab.id);
     } catch (error) {
       console.error('[LISA] Platform detection error:', error);
       this.updatePlatformStatus('Error detecting platform', false);
@@ -327,6 +330,44 @@ class LISAPopup {
       indicator.textContent = langFlags[lang] || '🌐 ' + lang.toUpperCase();
       indicator.style.display = 'inline-flex';
     }
+  }
+  
+  async detectLanguageFromPage(tabId) {
+    try {
+      const response = await this.sendMessageToTab(tabId, { action: 'samplePageText' });
+      if (response && response.text) {
+        const lang = this.detectLanguage(response.text);
+        this.showLanguageIndicator(lang);
+      }
+    } catch (error) {
+      // Silently fail - language detection is optional
+      console.log('[LISA] Language detection skipped:', error.message);
+    }
+  }
+  
+  detectLanguage(text) {
+    if (!text || text.length < 10) return 'en';
+    const sample = text.substring(0, 500);
+    
+    // Non-Latin scripts
+    if (/[؀-ۿݐ-ݿ]/.test(sample)) return 'ar';
+    if (/[一-鿿]/.test(sample)) return 'zh';
+    if (/[぀-ゟ゠-ヿ]/.test(sample)) return 'ja';
+    if (/[가-힯]/.test(sample)) return 'ko';
+    if (/[Ѐ-ӿ]/.test(sample)) return 'ru';
+    if (/[֐-׿]/.test(sample)) return 'he';
+    
+    // Latin scripts - check common words
+    const lower = sample.toLowerCase();
+    const frenchWords = (lower.match(/\b(le|la|les|un|une|des|est|sont|avec|pour|dans|que|qui)\b/g) || []).length;
+    const spanishWords = (lower.match(/\b(el|la|los|las|un|una|es|son|con|para|esto|esta)\b/g) || []).length;
+    const germanWords = (lower.match(/\b(der|die|das|ein|eine|ist|sind|haben|mit|für|nicht)\b/g) || []).length;
+    
+    if (frenchWords >= 3) return 'fr';
+    if (spanishWords >= 3) return 'es';
+    if (germanWords >= 3) return 'de';
+    
+    return 'en';
   }
 
   setupEventListeners() {

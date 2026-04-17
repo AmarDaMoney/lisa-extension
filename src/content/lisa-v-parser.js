@@ -332,7 +332,76 @@ class LisaVParser {
       }
     }
     
-    return relationships;
+    // Detect API calls (fetch, axios, POST/GET/PUT/DELETE endpoints)
+    const allText = this.blocks.map(b => b.v || "").join("\n");
+    const apiPatterns = [
+      /fetch\(['"]([^'"]+)['"]/g,
+      /(?:POST|GET|PUT|DELETE|PATCH)\s+(\/api\/[\w\-\/]+)/g,
+      /\.(?:post|get|put|delete|patch)\(['"]([^'"]+)['"]/g
+    ];
+    
+    for (const block of codeBlocks) {
+      if (!block.file) continue;
+      for (const pattern of apiPatterns) {
+        const re = new RegExp(pattern.source, pattern.flags);
+        let match;
+        while ((match = re.exec(block.v)) !== null) {
+          const endpoint = match[1];
+          if (endpoint && endpoint.length > 3) {
+            relationships.push({
+              t: "relationship",
+              subject: block.file,
+              predicate: "calls",
+              object: endpoint
+            });
+          }
+        }
+      }
+    }
+    
+    // Detect git commit → file relationships
+    const commitPattern = /(?:commit|committed|pushed)\s+(?:to\s+)?(?:[`'"]?)([a-f0-9]{7,40})(?:[`'"]?)/gi;
+    const commitMatches = allText.matchAll(commitPattern);
+    const mentionedFiles = [...new Set(codeBlocks.map(b => b.file).filter(f => f))];
+    
+    for (const match of commitMatches) {
+      const commitHash = match[1];
+      for (const file of mentionedFiles) {
+        relationships.push({
+          t: "relationship",
+          subject: commitHash,
+          predicate: "implements",
+          object: file
+        });
+      }
+    }
+    
+    // Detect branch → commit relationships
+    const branchPattern = /(?:branch|origin\/)([\w\-\/]+)/gi;
+    const branchMatches = allText.matchAll(branchPattern);
+    const commitHashes = [...allText.matchAll(/([a-f0-9]{7,40})/g)].map(m => m[1]);
+    
+    for (const match of branchMatches) {
+      const branch = match[1];
+      if (branch === 'main' || branch === 'master' || branch.length < 3) continue;
+      for (const hash of [...new Set(commitHashes)].slice(0, 5)) {
+        relationships.push({
+          t: "relationship",
+          subject: branch,
+          predicate: "contains",
+          object: hash
+        });
+      }
+    }
+    
+    // Deduplicate relationships
+    const seen = new Set();
+    return relationships.filter(r => {
+      const key = r.subject + r.predicate + r.object;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   // Generate handoff "next" blocks with resolution tracking

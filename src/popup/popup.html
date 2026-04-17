@@ -93,41 +93,30 @@
         
         <div class="instructions-box" id="howToContent" style="display: none;">
           
-          <!-- Step 1: Capture -->
-          <div class="quick-tips-accordion">
-            <button class="quick-tips-toggle" id="captureMethodsToggle">
-              <span>📸 <strong>Step 1: Capture</strong></span>
-              <span class="toggle-icon">▼</span>
-            </button>
-            <div class="quick-tips-content" id="captureMethodsContent">
-              <ul class="tips-list">
-                <li><strong>Export button above:</strong> Click "Export Conversation" to capture the current chat</li>
-                <li><strong>Right-click menu:</strong> Select text → right-click → "Export Selection to LISA Core"</li>
-                <li><strong>Auto-save:</strong> Enable "Sync to Library" to auto-capture when you close AI tabs</li>
-              </ul>
-            </div>
+          <p style="margin: 0 0 12px; font-size: 12px; color: #aaa;">Upload your LISA file to any AI, then try:</p>
+          
+          <div class="prompt-box" style="margin-bottom: 8px;">
+            <code id="suggestedPrompt">"Read this and continue our conversation"</code>
+            <button id="copyPromptBtn" class="btn-copy" title="Copy">📋</button>
           </div>
           
-          <!-- Step 2: Use -->
-          <h4>🚀 Step 2: Continue Anywhere</h4>
-          <ol class="usage-steps">
-            <li>
-              <strong>Open any AI chat</strong> (Claude, ChatGPT, Gemini, DeepSeek, etc.)
-            </li>
-            <li>
-              <strong>Upload your LISA file</strong> (📎 icon)
-            </li>
-            <li>
-              <strong>Use this prompt:</strong>
-              <div class="prompt-box">
-                <code id="suggestedPrompt">"Read this LISA JSON and continue our conversation"</code>
-                <button id="copyPromptBtn" class="btn-copy" title="Copy prompt">📋</button>
-              </div>
-            </li>
-          </ol>
+          <div class="prompt-box" style="margin-bottom: 8px;">
+            <code>"What did we decide about [topic]?"</code>
+            <button class="btn-copy copy-alt" title="Copy">📋</button>
+          </div>
+          
+          <div class="prompt-box" style="margin-bottom: 8px;">
+            <code>"Summarize the key points"</code>
+            <button class="btn-copy copy-alt" title="Copy">📋</button>
+          </div>
+          
+          <div class="prompt-box" style="margin-bottom: 12px;">
+            <code>"Reconstruct and expand this conversation"</code>
+            <button class="btn-copy copy-alt" title="Copy">📋</button>
+          </div>
           
           <div class="value-highlight">
-            <p>✨ <strong>Result:</strong> Full context transfer with ~80% fewer tokens. Language auto-detected. Merkle root verifies integrity.</p>
+            <p>✨ Full context in ~80% fewer tokens. Language auto-detected. Merkle root verifies integrity.</p>
           </div>
           
         </div>

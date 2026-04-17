@@ -349,6 +349,16 @@ class LISAPopup {
     document.getElementById('copyPromptBtn').addEventListener('click', () => {
       this.copyPrompt();
     });
+    
+    // Copy all prompt buttons (including alternatives)
+    document.querySelectorAll('.copy-alt').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const code = e.target.closest('.prompt-box').querySelector('code');
+        if (code) {
+          this.copyText(code.textContent, e.target);
+        }
+      });
+    });
 
     // Help modal
     document.getElementById('helpLink').addEventListener('click', (e) => {
@@ -458,17 +468,23 @@ class LISAPopup {
   }
 
   copyPrompt() {
-    const prompt = "Read this LISA JSON and continue our conversation";
-    navigator.clipboard.writeText(prompt).then(() => {
-      const btn = document.getElementById('copyPromptBtn');
-      const originalText = btn.textContent;
-      btn.textContent = '✅';
-      setTimeout(() => {
-        btn.textContent = originalText;
-      }, 1500);
+    const code = document.getElementById('suggestedPrompt');
+    const prompt = code ? code.textContent : "Read this and continue our conversation";
+    this.copyText(prompt, document.getElementById('copyPromptBtn'));
+  }
+  
+  copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+      if (btn) {
+        const originalText = btn.textContent;
+        btn.textContent = '✅';
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 1500);
+      }
     }).catch(err => {
       console.error('[LISA] Copy failed:', err);
-      this.showError('Failed to copy prompt');
+      this.showError('Failed to copy');
     });
   }
 

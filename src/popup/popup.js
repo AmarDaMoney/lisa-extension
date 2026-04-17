@@ -305,6 +305,29 @@ class LISAPopup {
     status.textContent = message;
     status.className = isActive ? 'status active' : 'status';
   }
+  
+  showLanguageIndicator(lang) {
+    const langFlags = {
+      'en': '🇬🇧 EN',
+      'fr': '🇫🇷 FR', 
+      'es': '🇪🇸 ES',
+      'ar': '🇸🇦 AR',
+      'de': '🇩🇪 DE',
+      'zh': '🇨🇳 ZH',
+      'arabic': '🇸🇦 AR',
+      'chinese': '🇨🇳 ZH',
+      'japanese': '🇯🇵 JP',
+      'korean': '🇰🇷 KR',
+      'cyrillic': '🇷🇺 RU',
+      'hebrew': '🇮🇱 HE'
+    };
+    
+    const indicator = document.getElementById('languageIndicator');
+    if (indicator && lang) {
+      indicator.textContent = langFlags[lang] || '🌐 ' + lang.toUpperCase();
+      indicator.style.display = 'inline-flex';
+    }
+  }
 
   setupEventListeners() {
     // Capture Methods Accordion Toggle
@@ -682,6 +705,9 @@ class LISAPopup {
 
         // Show hashing section (visible for all, but only works for premium)
         document.getElementById('hashingSection').style.display = 'block';
+        
+        // Show language indicator
+        this.showLanguageIndicator(this.compressedData.session_metadata?.language);
 
         this.hideLoading();
       } else {

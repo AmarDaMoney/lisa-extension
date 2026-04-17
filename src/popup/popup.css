@@ -1548,3 +1548,17 @@ input:checked + .toggle-slider:before {
     color: var(--text-primary);
   }
 }
+
+/* Language indicator badge */
+.lang-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin-left: 8px;
+  background: rgba(74, 222, 128, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 12px;
+  font-size: 11px;
+  color: #4ade80;
+}

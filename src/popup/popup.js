@@ -311,23 +311,27 @@ class LISAPopup {
   
   showLanguageIndicator(lang) {
     const langFlags = {
-      'en': '🇬🇧 EN',
-      'fr': '🇫🇷 FR', 
-      'es': '🇪🇸 ES',
-      'ar': '🇸🇦 AR',
-      'de': '🇩🇪 DE',
-      'zh': '🇨🇳 ZH',
-      'arabic': '🇸🇦 AR',
-      'chinese': '🇨🇳 ZH',
-      'japanese': '🇯🇵 JP',
-      'korean': '🇰🇷 KR',
-      'cyrillic': '🇷🇺 RU',
-      'hebrew': '🇮🇱 HE'
+      'en': 'EN',
+      'fr': 'FR', 
+      'es': 'ES',
+      'ar': 'AR',
+      'de': 'DE',
+      'zh': 'ZH',
+      'arabic': 'AR',
+      'chinese': 'ZH',
+      'japanese': 'JP',
+      'korean': 'KR',
+      'cyrillic': 'RU',
+      'hebrew': 'HE',
+      'ja': 'JP',
+      'ko': 'KR',
+      'ru': 'RU',
+      'he': 'HE'
     };
     
     const indicator = document.getElementById('languageIndicator');
     if (indicator && lang) {
-      indicator.textContent = langFlags[lang] || '🌐 ' + lang.toUpperCase();
+      indicator.textContent = langFlags[lang] || lang.toUpperCase();
       indicator.style.display = 'inline-flex';
     }
   }
@@ -700,6 +704,10 @@ class LISAPopup {
         document.getElementById('detectedPlatform').textContent = response.data.platform || 'Unknown';
         document.getElementById('extractedInfo').style.display = 'block';
         document.getElementById('compressBtn').style.display = 'block';
+
+        // Detect language from extracted content
+        const sampleText = (response.data.messages || []).map(m => m.content || '').join(' ').substring(0, 500);
+        this.showLanguageIndicator(this.detectLanguage(sampleText));
 
         this.hideLoading();
         

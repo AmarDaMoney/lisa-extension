@@ -359,10 +359,9 @@ class LisaVParser {
     const todoPatterns = [
       { regex: /TODO:?\s*(.{10,120})/gi, type: "todo", priority: "high" },
       { regex: /FIXME:?\s*(.{10,120})/gi, type: "fixme", priority: "high" },
-      { regex: /(?:will|need to|should|must)\s+(?:implement|add|fix|create|update|remove|refactor)\s+(.{10,120})/gi, type: "planned", priority: "medium" },
-      { regex: /next[,:]?\s+(?:we |I )?(?:should|will|need to|step)\s+(.{10,120})/gi, type: "next_step", priority: "medium" },
-      { regex: /(?:remaining|still need|not yet|incomplete|pending):?\s*(.{10,120})/gi, type: "pending", priority: "medium" },
-      { regex: /(?:bug|issue|broken|failing|error):?\s+(.{10,120})/gi, type: "bug", priority: "high" }
+      { regex: /(?:we |I )?(?:need to|must)\s+(?:implement|add|fix|create|update|remove|refactor|deploy|test|verify)\s+(.{10,120})/gi, type: "planned", priority: "medium" },
+      { regex: /(?:not yet|still needs?)\s+(?:fixed|implemented|done|deployed|tested|resolved):?\s*(.{10,120})?/gi, type: "pending", priority: "medium" },
+      { regex: /(?:^|\n)\s*(?:Bug|Issue|BUG|ISSUE):?\s+(.{10,120})/gm, type: "bug", priority: "high" }
     ];
     
     // Extract tasks with their position in conversation

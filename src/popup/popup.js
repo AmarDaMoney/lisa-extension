@@ -307,13 +307,13 @@ class LISAPopup {
   }
 
   setupEventListeners() {
-    // Quick Tips Accordion Toggle
-    const quickTipsToggle = document.getElementById('quickTipsToggle');
-    const quickTipsContent = document.getElementById('quickTipsContent');
-    if (quickTipsToggle && quickTipsContent) {
-      quickTipsToggle.addEventListener('click', () => {
-        quickTipsToggle.classList.toggle('active');
-        quickTipsContent.classList.toggle('expanded');
+    // Capture Methods Accordion Toggle
+    const captureToggle = document.getElementById('captureMethodsToggle');
+    const captureContent = document.getElementById('captureMethodsContent');
+    if (captureToggle && captureContent) {
+      captureToggle.addEventListener('click', () => {
+        captureToggle.classList.toggle('active');
+        captureContent.classList.toggle('expanded');
       });
     }
 

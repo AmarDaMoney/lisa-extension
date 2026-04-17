@@ -518,6 +518,50 @@ class LisaVParser {
   toArray() {
     return this.blocks;
   }
+  // Flatten blocks into messages format for backend compatibility
+  toMessages() {
+    const messages = [];
+    let currentRole = null;
+    let currentContent = [];
+    
+    for (const block of this.blocks) {
+      if (block.t === 'meta' || block.t === 'manifest' || block.t === 'sys' || 
+          block.t === 'next' || block.t === 'relationship') continue;
+      
+      const role = block.t === 'u' ? 'user' : 'assistant';
+      
+      if (role !== currentRole && currentRole !== null) {
+        messages.push({
+          role: currentRole,
+          content: currentContent.join('\n').trim(),
+          index: messages.length
+        });
+        currentContent = [];
+      }
+      
+      currentRole = role;
+      currentContent.push(block.v || '');
+    }
+    
+    // Push last message
+    if (currentRole && currentContent.length > 0) {
+      messages.push({
+        role: currentRole,
+        content: currentContent.join('\n').trim(),
+        index: messages.length
+      });
+    }
+    
+    return {
+      platform: this.detectPlatform(),
+      conversationId: this.conversationId,
+      url: window.location.href,
+      title: document.title,
+      extractedAt: new Date().toISOString(),
+      messageCount: messages.length,
+      messages: messages
+    };
+  }
 
   // Get stats
   getStats() {
@@ -537,3 +581,22 @@ class LisaVParser {
 
 // Make available globally
 window.LisaVParser = LisaVParser;
+
+// Listen for extraction requests via LISA-V
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'extractViaLisaV') {
+    (async () => {
+      try {
+        const parser = new LisaVParser();
+        await parser.extractConversation();
+        await parser.finalize();
+        const messagesData = parser.toMessages();
+        sendResponse({ success: true, data: messagesData });
+      } catch (error) {
+        console.error('[LISA] LISA-V extraction error:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true; // Keep channel open for async
+  }
+});

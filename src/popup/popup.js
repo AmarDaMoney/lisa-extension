@@ -690,7 +690,7 @@ class LISAPopup {
         throw new Error('Cannot access Chrome internal pages');
       }
 
-      const response = await this.sendMessageToTab(tab.id, { action: 'extractConversation' });
+      const response = await this.sendMessageToTab(tab.id, { action: 'extractViaLisaV' });
 
       if (response.success && response.data) {
         this.currentConversation = response.data;

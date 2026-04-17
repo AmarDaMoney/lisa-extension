@@ -378,9 +378,18 @@ class LISAFloatingButton {
           this.showUpgradePrompt();
           return;
         }
-      this.showToast('Saving...');
+      this.showToast('Extracting...');
       
-      const response = await chrome.runtime.sendMessage({ action: 'extractAndSave' });
+      // Use LISA-V parser for extraction, then flatten to messages for backend compat
+      const parser = new LisaVParser();
+      await parser.extractConversation();
+      await parser.finalize();
+      const messagesData = parser.toMessages();
+      
+      const response = await chrome.runtime.sendMessage({
+        action: 'extractAndSave',
+        data: messagesData
+      });
       
       if (response && response.success) {
         this.showToast('✅ Saved to LISA library!');

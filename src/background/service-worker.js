@@ -141,13 +141,33 @@ class LISACompressor {
   }
 
   summarize(text) {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
     
     if (sentences.length <= 2) {
-      return text;
+      return text.substring(0, 300);
     }
-
-    return `${sentences[0]}... ${sentences[sentences.length - 1]}`;
+    
+    // Score sentences by keyword density (concepts, technical terms, actions)
+    const scored = sentences.map((s, i) => {
+      let score = 0;
+      // Position bonus: first and last sentences often have context
+      if (i === 0) score += 2;
+      if (i === sentences.length - 1) score += 1;
+      // Content signals
+      if (/\b(?:because|therefore|however|conclusion|result|key|important|critical|must|should)\b/i.test(s)) score += 3;
+      if (/\b(?:fix|bug|error|issue|implement|deploy|create|update)\b/i.test(s)) score += 2;
+      if (/[A-Z][a-z]+[A-Z]/.test(s)) score += 1; // camelCase = technical
+      if (/\b[A-Z]{2,}\b/.test(s)) score += 1; // ACRONYMS = technical
+      // Penalize short filler sentences
+      if (s.trim().length < 20) score -= 2;
+      return { text: s.trim(), score, index: i };
+    });
+    
+    // Take top 3 sentences by score, maintain original order
+    const top = scored.sort((a, b) => b.score - a.score).slice(0, 3);
+    top.sort((a, b) => a.index - b.index);
+    
+    return top.map(s => s.text).join('. ').substring(0, 500);
   }
 
   reconstruct(compressed) {

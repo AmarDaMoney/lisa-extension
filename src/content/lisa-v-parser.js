@@ -372,6 +372,10 @@ class LisaVParser {
       while ((match = re.exec(allText)) !== null) {
         const action = match[1].trim().replace(/[.,;:]+$/, "").substring(0, 120);
         if (action.length < 10) continue;
+        // Filter out code/regex fragments that are not real tasks
+        if (/[\\\/{}()\[\]|^$*+?].*[\\\/{}()\[\]|^$*+?]/.test(action)) continue;
+        if (/^[^a-zA-Z]*$/.test(action)) continue;
+        if ((action.match(/[^a-zA-Z0-9\s.,!?;:\-]/g) || []).length > action.length * 0.3) continue;
         
         tasks.push({
           action,

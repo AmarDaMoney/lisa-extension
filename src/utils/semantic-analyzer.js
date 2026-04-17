@@ -15,12 +15,12 @@ const SemanticAnalyzer = {
   
   // Language detection patterns (first 500 chars sampled)
   languagePatterns: {
-    arabic: /[؀-ۿݐ-ݿ]/,
-    chinese: /[一-鿿]/,
-    japanese: /[぀-ゟ゠-ヿ]/,
-    korean: /[가-힯]/,
-    cyrillic: /[Ѐ-ӿ]/,
-    hebrew: /[֐-׿]/
+    arabic: /[\u0600-\u06FF\u0750-\u077F]/,
+    chinese: /[\u4E00-\u9FFF]/,
+    japanese: /[\u3040-\u309F\u30A0-\u30FF]/,
+    korean: /[\uAC00-\uD7AF]/,
+    cyrillic: /[\u0400-\u04FF]/,
+    hebrew: /[\u0590-\u05FF]/
   },
   
   // RTL languages need special handling
@@ -115,20 +115,20 @@ const SemanticAnalyzer = {
     const lower = sample.toLowerCase();
     
     // French indicators
-    if (/(le|la|les|un|une|des|est|sont|avoir|être|faire|avec|pour|dans|que|qui|ce|cette)/.test(lower)) {
-      const frenchScore = (lower.match(/(le|la|les|un|une|des|est|sont|avec|pour|dans|que|qui)/g) || []).length;
+    if (/\b(le|la|les|un|une|des|est|sont|avoir|faire|avec|pour|dans|que|qui|ce|cette)\b/.test(lower)) {
+      const frenchScore = (lower.match(/\b(le|la|les|un|une|des|est|sont|avec|pour|dans|que|qui)\b/g) || []).length;
       if (frenchScore >= 3) return 'fr';
     }
     
     // Spanish indicators
-    if (/(el|la|los|las|un|una|es|son|estar|ser|hacer|con|para|en|que|esto|esta)/.test(lower)) {
-      const spanishScore = (lower.match(/(el|la|los|las|un|una|es|son|con|para|esto|esta)/g) || []).length;
+    if (/\b(el|la|los|las|un|una|es|son|estar|ser|hacer|con|para|en|que|esto|esta)\b/.test(lower)) {
+      const spanishScore = (lower.match(/\b(el|la|los|las|un|una|es|son|con|para|esto|esta)\b/g) || []).length;
       if (spanishScore >= 3) return 'es';
     }
     
     // German indicators
-    if (/(der|die|das|ein|eine|ist|sind|haben|sein|mit|für|und|oder|nicht|auch)/.test(lower)) {
-      const germanScore = (lower.match(/(der|die|das|ein|eine|ist|sind|haben|mit|für|nicht)/g) || []).length;
+    if (/\b(der|die|das|ein|eine|ist|sind|haben|sein|mit|und|oder|nicht|auch)\b/.test(lower)) {
+      const germanScore = (lower.match(/\b(der|die|das|ein|eine|ist|sind|haben|mit|nicht)\b/g) || []).length;
       if (germanScore >= 3) return 'de';
     }
     

@@ -351,25 +351,27 @@ class LISAPopup {
   
   detectLanguage(text) {
     if (!text || text.length < 10) return 'en';
-    const sample = text.substring(0, 500);
+    const sample = text.substring(0, 500).toLowerCase();
     
-    // Non-Latin scripts
-    if (/[؀-ۿݐ-ݿ]/.test(sample)) return 'ar';
-    if (/[一-鿿]/.test(sample)) return 'zh';
-    if (/[぀-ゟ゠-ヿ]/.test(sample)) return 'ja';
-    if (/[가-힯]/.test(sample)) return 'ko';
-    if (/[Ѐ-ӿ]/.test(sample)) return 'ru';
-    if (/[֐-׿]/.test(sample)) return 'he';
+    // Non-Latin scripts — unambiguous
+    if (/[\u0600-\u06FF]/.test(sample)) return 'ar';
+    if (/[\u4E00-\u9FFF]/.test(sample)) return 'zh';
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(sample)) return 'ja';
+    if (/[\uAC00-\uD7AF]/.test(sample)) return 'ko';
+    if (/[\u0400-\u04FF]/.test(sample)) return 'ru';
+    if (/[\u0590-\u05FF]/.test(sample)) return 'he';
     
-    // Latin scripts - check common words
-    const lower = sample.toLowerCase();
-    const frenchWords = (lower.match(/\b(le|la|les|un|une|des|est|sont|avec|pour|dans|que|qui)\b/g) || []).length;
-    const spanishWords = (lower.match(/\b(el|la|los|las|un|una|es|son|con|para|esto|esta)\b/g) || []).length;
-    const germanWords = (lower.match(/\b(der|die|das|ein|eine|ist|sind|haben|mit|für|nicht)\b/g) || []).length;
+    // Latin languages — score ALL, pick highest
+    // Use unique words that don't overlap between languages
+    const scores = {
+      fr: (sample.match(/\b(les|des|est|sont|avec|dans|pour|cette|nous|vous|mais|aussi|une|faire|comme|très)\b/g) || []).length,
+      es: (sample.match(/\b(los|las|una|son|pero|como|más|tiene|puede|hay|esta|esto|también|porque|desde|cuando)\b/g) || []).length,
+      de: (sample.match(/\b(der|die|das|ein|eine|ist|sind|haben|nicht|auch|wenn|oder|aber|wird|kann|nach|über|sehr)\b/g) || []).length
+    };
     
-    if (frenchWords >= 3) return 'fr';
-    if (spanishWords >= 3) return 'es';
-    if (germanWords >= 3) return 'de';
+    // Find the highest scoring language
+    const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+    if (best[1] >= 3) return best[0];
     
     return 'en';
   }

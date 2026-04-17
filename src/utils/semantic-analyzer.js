@@ -114,23 +114,15 @@ const SemanticAnalyzer = {
     // For Latin scripts, use common word detection
     const lower = sample.toLowerCase();
     
-    // French indicators
-    if (/\b(le|la|les|un|une|des|est|sont|avoir|faire|avec|pour|dans|que|qui|ce|cette)\b/.test(lower)) {
-      const frenchScore = (lower.match(/\b(le|la|les|un|une|des|est|sont|avec|pour|dans|que|qui)\b/g) || []).length;
-      if (frenchScore >= 3) return 'fr';
-    }
+    // Latin languages — score ALL, pick highest (avoid overlap between fr/es/de)
+    const scores = {
+      fr: (sample.match(/\b(les|des|est|sont|avec|dans|pour|cette|nous|vous|mais|aussi|une|faire|comme|très)\b/g) || []).length,
+      es: (sample.match(/\b(los|las|una|son|pero|como|más|tiene|puede|hay|esta|esto|también|porque|desde|cuando)\b/g) || []).length,
+      de: (sample.match(/\b(der|die|das|ein|eine|ist|sind|haben|nicht|auch|wenn|oder|aber|wird|kann|nach|über|sehr)\b/g) || []).length
+    };
     
-    // Spanish indicators
-    if (/\b(el|la|los|las|un|una|es|son|estar|ser|hacer|con|para|en|que|esto|esta)\b/.test(lower)) {
-      const spanishScore = (lower.match(/\b(el|la|los|las|un|una|es|son|con|para|esto|esta)\b/g) || []).length;
-      if (spanishScore >= 3) return 'es';
-    }
-    
-    // German indicators
-    if (/\b(der|die|das|ein|eine|ist|sind|haben|sein|mit|und|oder|nicht|auch)\b/.test(lower)) {
-      const germanScore = (lower.match(/\b(der|die|das|ein|eine|ist|sind|haben|mit|nicht)\b/g) || []).length;
-      if (germanScore >= 3) return 'de';
-    }
+    const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+    if (best[1] >= 3) return best[0];
     
     // Default to English
     return 'en';

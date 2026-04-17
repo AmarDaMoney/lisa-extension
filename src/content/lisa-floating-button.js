@@ -388,6 +388,7 @@ class LISAFloatingButton {
       
       const response = await chrome.runtime.sendMessage({
         action: 'extractAndSave',
+        format: 'raw',
         data: messagesData
       });
       

@@ -509,6 +509,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             conversationCache.set(tab.id, JSON.parse(JSON.stringify(data)));
           }
 
+          // Tag format if provided
+          if (request.format) data.format = request.format;
           // Save snapshot with appropriate source
           const source = request.data ? 'extension-compressed' : 'floating-button';
           const snapshot = await snapshotManager.saveSnapshot(data, source);

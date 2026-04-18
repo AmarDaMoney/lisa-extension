@@ -426,11 +426,11 @@ class LisaVParser {
     
     // Task detection patterns — capture full actionable sentences
     const todoPatterns = [
-      { regex: /TODO:?\s*(.{10,120})/gi, type: "todo", priority: "high" },
-      { regex: /FIXME:?\s*(.{10,120})/gi, type: "fixme", priority: "high" },
-      { regex: /(?:we |I )?(?:need to|must)\s+(?:implement|add|fix|create|update|remove|refactor|deploy|test|verify)\s+(.{10,120})/gi, type: "planned", priority: "medium" },
-      { regex: /(?:not yet|still needs?)\s+(?:fixed|implemented|done|deployed|tested|resolved):?\s*(.{10,120})?/gi, type: "pending", priority: "medium" },
-      { regex: /(?:^|\n)\s*(?:Bug|Issue|BUG|ISSUE):?\s+(.{10,120})/gm, type: "bug", priority: "high" }
+      { regex: /TODO:?\s*(.{10,300})/gi, type: "todo", priority: "high" },
+      { regex: /FIXME:?\s*(.{10,300})/gi, type: "fixme", priority: "high" },
+      { regex: /(?:we |I )?(?:need to|must)\s+(?:implement|add|fix|create|update|remove|refactor|deploy|test|verify)\s+(.{10,300})/gi, type: "planned", priority: "medium" },
+      { regex: /(?:not yet|still needs?)\s+(?:fixed|implemented|done|deployed|tested|resolved):?\s*(.{10,300})?/gi, type: "pending", priority: "medium" },
+      { regex: /(?:^|\n)\s*(?:Bug|Issue|BUG|ISSUE):?\s+(.{10,300})/gm, type: "bug", priority: "high" }
     ];
     
     // Extract tasks with their position in conversation
@@ -438,7 +438,8 @@ class LisaVParser {
       const re = new RegExp(regex.source, regex.flags);
       let match;
       while ((match = re.exec(allText)) !== null) {
-        const action = match[1].trim().replace(/[.,;:]+$/, "").substring(0, 120);
+        const rawAction = match[1].trim().replace(/[.,;:]+$/, "");
+          const action = rawAction.length > 200 ? rawAction.substring(0, rawAction.lastIndexOf(" ", 200)).trim() || rawAction.substring(0, 200) : rawAction;
         if (action.length < 10) continue;
         // Filter out code/regex fragments that are not real tasks
         if (/[\\\/{}()\[\]|^$*+?].*[\\\/{}()\[\]|^$*+?]/.test(action)) continue;

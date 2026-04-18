@@ -173,6 +173,19 @@ class LisaVParser {
   }
 
   async extractClaudeMessages() {
+    // Expand all collapsed "Show more" / "Afficher plus" messages before extraction
+    const expandButtons = document.querySelectorAll('button');
+    for (const btn of expandButtons) {
+      const text = btn.textContent.trim().toLowerCase();
+      if (text === 'show more' || text === 'afficher plus' || text === 'see more' || text === 'ver más' || text === 'mehr anzeigen') {
+        btn.click();
+      }
+    }
+    // Brief wait for DOM to expand
+    if (expandButtons.length > 0) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+
     const messages = [];
     const messageContainers = document.querySelectorAll("[data-test-render-count]");
     

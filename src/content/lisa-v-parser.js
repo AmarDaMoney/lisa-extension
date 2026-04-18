@@ -529,32 +529,86 @@ class LisaVParser {
     return [...openItems, ...resolvedItems];
   }
 
+
+  // Generate lightweight manifest for top of file (truncation detection)
+  generateLiteManifest(totalBlockCount) {
+    return {
+      t: "manifest",
+      lite: true,
+      blockCount: totalBlockCount,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // Generate summary block — executive brief for receiving AI instances
+  generateSummaryBlock(nextBlocks) {
+    const completed = [];
+    const open = [];
+    for (const block of nextBlocks) {
+      if (block.resolved) {
+        completed.push(block.action);
+      } else {
+        open.push(block.action);
+      }
+    }
+    return {
+      t: "summary",
+      completed,
+      open,
+      warnings: []
+    };
+  }
   // Build complete LISA-V with relationships and next blocks
   async finalize() {
+    // --- Phase 1: Generate all derived blocks ---
     const relationships = this.extractRelationships();
     const nextBlocks = this.generateNextBlocks();
-    
-    // Add relationships before the end
-    this.blocks.push(...relationships);
-    
-    // Add next blocks at the end
+
+    // --- Phase 2: Rebuild blocks in truncation-proof order ---
+    const conversationBlocks = [...this.blocks];
+    this.blocks = [];
+
+    // Line 1: meta (always first element)
+    const metaIndex = conversationBlocks.findIndex(b => b.t === "meta");
+    const metaBlock = metaIndex >= 0
+      ? conversationBlocks.splice(metaIndex, 1)[0]
+      : { t: "meta", id: "unknown", platform: "unknown", ver: "1.0", timestamp: new Date().toISOString() };
+    this.blocks.push(metaBlock);
+
+    // Line 2: lite manifest — receiving AI knows file scope immediately
+    const liteManifestIndex = this.blocks.length;
+    this.blocks.push(this.generateLiteManifest(0)); // placeholder, updated below
+
+    // Line 3: summary — executive brief (completed vs open tasks)
+    this.blocks.push(this.generateSummaryBlock(nextBlocks));
+
+    // Lines 4-N: next blocks — open tasks before any conversation content
     this.blocks.push(...nextBlocks);
-    
-    // Add integrity manifest
+
+    // Lines N+1+: conversation content (user messages, assistant text, code)
+    this.blocks.push(...conversationBlocks);
+
+    // Relationships after conversation
+    this.blocks.push(...relationships);
+
+    // Full manifest at bottom for integrity verification
     const merkleRoot = await this.getMerkleRoot();
     this.blocks.push({
       t: "manifest",
       merkleRoot: merkleRoot,
-      blockCount: this.blocks.length,
+      blockCount: this.blocks.length + 1,
       timestamp: new Date().toISOString()
     });
 
-    // Add closing sys block
+    // Update lite manifest with actual block count
+    this.blocks[liteManifestIndex].blockCount = this.blocks.length + 1;
+
+    // Closing sys block
     this.blocks.push({
       t: "sys",
-      v: "Session captured. " + this.getStats().totalBlocks + " blocks. Ready for handoff."
+      v: "Session captured. " + this.blocks.length + " blocks. Ready for handoff."
     });
-    
+
     return this;
   }
 

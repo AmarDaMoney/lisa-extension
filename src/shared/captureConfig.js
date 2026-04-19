@@ -33,7 +33,7 @@ async function getCaptureConfig() {
 async function setCaptureConfig(config) {
   try {
     await chrome.storage.sync.set({ [STORAGE_KEY]: config });
-    console.log('[LISA] Capture config updated:', config);
+    console.debug('[LISA] Capture config updated:', config);
   } catch (error) {
     console.error('[LISA] Error setting capture config:', error);
   }
@@ -45,7 +45,7 @@ async function setCaptureConfig(config) {
 async function resetCaptureConfig() {
   try {
     await chrome.storage.sync.set({ [STORAGE_KEY]: DEFAULT_CAPTURE_CONFIG });
-    console.log('[LISA] Capture config reset to defaults');
+    console.debug('[LISA] Capture config reset to defaults');
   } catch (error) {
     console.error('[LISA] Error resetting capture config:', error);
   }

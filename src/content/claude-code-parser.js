@@ -103,5 +103,5 @@ class ClaudeCodeParser {
   const parser = new ClaudeCodeParser();
   parser.initializeListener();
   chrome.runtime.sendMessage({ action: 'parserReady', platform: 'Claude Code' }).catch(() => {});
-  console.log('[LISA] ClaudeCodeParser initialized');
+  console.debug('[LISA] ClaudeCodeParser initialized');
 })();

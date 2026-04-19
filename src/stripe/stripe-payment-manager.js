@@ -29,7 +29,7 @@ class StripePaymentManager {
       // Check for payment success/cancel parameters
       this.checkUrlParameters();
       
-      console.log('[LISA] Stripe Payment Manager initialized (Checkout Session mode)');
+      console.debug('[LISA] Stripe Payment Manager initialized (Checkout Session mode)');
       return true;
     } catch (error) {
       console.error('[LISA] Failed to initialize Stripe:', error);
@@ -59,7 +59,7 @@ class StripePaymentManager {
       style.textContent = STRIPE_SUBSCRIPTION_MODAL_CSS;
       document.head.appendChild(style);
 
-      console.log('[LISA] Stripe UI injected');
+      console.debug('[LISA] Stripe UI injected');
     } catch (error) {
       console.error('[LISA] Failed to inject Stripe UI:', error);
     }
@@ -194,7 +194,7 @@ class StripePaymentManager {
     // Update button text
     this.updateSubmitButtonText();
 
-    console.log('[LISA] Billing plan changed to:', this.currentPlan);
+    console.debug('[LISA] Billing plan changed to:', this.currentPlan);
   }
 
   /**
@@ -229,7 +229,7 @@ class StripePaymentManager {
       if (result.redirected) {
         // Close the modal since user is redirected to Stripe
         this.closeSubscriptionModal();
-        console.log('[LISA] User redirected to Stripe Checkout');
+        console.debug('[LISA] User redirected to Stripe Checkout');
       }
 
     } catch (error) {
@@ -263,7 +263,7 @@ class StripePaymentManager {
     const urlParams = new URLSearchParams(window.location.search);
     
     if (urlParams.has('payment_cancelled')) {
-      console.log('[LISA] Payment was cancelled');
+      console.debug('[LISA] Payment was cancelled');
       // Clear URL parameter
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -281,12 +281,12 @@ class StripePaymentManager {
    */
   async handleCheckoutSuccess(sessionId) {
     try {
-      console.log('[LISA] Verifying checkout session:', sessionId);
+      console.debug('[LISA] Verifying checkout session:', sessionId);
       
       const result = await this.stripe.verifyCheckoutSession(sessionId);
       
       if (result.success) {
-        console.log('[LISA] Payment verified successfully!');
+        console.debug('[LISA] Payment verified successfully!');
         this.showSuccessModal();
       } else {
         console.warn('[LISA] Payment verification pending');
@@ -426,7 +426,7 @@ class StripePaymentManager {
       }
 
       alert('Subscription cancelled successfully');
-      console.log('[LISA] Subscription cancelled:', result);
+      console.debug('[LISA] Subscription cancelled:', result);
       
       // Reload to update UI
       window.location.reload();

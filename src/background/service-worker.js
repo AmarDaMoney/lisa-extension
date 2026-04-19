@@ -301,7 +301,7 @@ class SnapshotManager {
 
       await chrome.storage.local.set({ [this.STORAGE_KEY]: snapshots });
 
-      console.log(`[LISA] Snapshot saved: ${snapshot.platform} - ${snapshot.title} (v${snapshot.version})`);
+      console.debug(`[LISA] Snapshot saved: ${snapshot.platform} - ${snapshot.title} (v${snapshot.version})`);
       return snapshot;
     } catch (error) {
       console.error('[LISA] Failed to save snapshot:', error);
@@ -381,7 +381,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         platform: request.platform,
         timestamp: Date.now()
       });
-      console.log(`[LISA] Parser ready on tab ${sender.tab.id}: ${request.platform}`);
+      console.debug(`[LISA] Parser ready on tab ${sender.tab.id}: ${request.platform}`);
     }
     sendResponse({ success: true });
     return false;
@@ -616,7 +616,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const resp = await chrome.tabs.sendMessage(tab.id, { action: 'extractConversation' });
         if (resp?.success && resp.data && resp.data.messages?.length > 0) {
           conversationCache.set(tab.id, resp.data);
-          console.log(`[LISA] Pre-cached conversation for tab ${tab.id}`);
+          console.debug(`[LISA] Pre-cached conversation for tab ${tab.id}`);
         }
       } catch (err) {
         console.warn('[LISA] Pre-cache failed (tab may be closing):', err.message);
@@ -628,7 +628,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   // Handle analytics tracking
   if (request.action === 'trackEvent') {
-    console.log('[LISA] Event:', request.event, request.data);
+    console.debug('[LISA] Event:', request.event, request.data);
     // Future: send to analytics backend
     sendResponse({ success: true });
     return false;
@@ -655,13 +655,13 @@ function createContextMenus() {
       }
     });
     
-    console.log('[LISA] Context menus created');
+    console.debug('[LISA] Context menus created');
   });
 }
 
 // Create menus on install/update
 chrome.runtime.onInstalled.addListener((details) => {
-  console.log('[LISA] Extension installed/updated:', details.reason);
+  console.debug('[LISA] Extension installed/updated:', details.reason);
   createContextMenus();
   
   // Show "What's new" for updates (not fresh installs)
@@ -685,14 +685,14 @@ chrome.runtime.onInstalled.addListener((details) => {
           "Payment system improvements"
         ]
       });
-      console.log('[LISA] Update detected:', previousVersion, '->', currentVersion);
+      console.debug('[LISA] Update detected:', previousVersion, '->', currentVersion);
     }
   }
 });
 
 // Also create menus on service worker startup (in case of restart)
 chrome.runtime.onStartup.addListener(() => {
-  console.log('[LISA] Service worker started');
+  console.debug('[LISA] Service worker started');
   createContextMenus();
 });
 
@@ -929,14 +929,14 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   // Check if auto-save is enabled
   const autoSaveEnabled = await snapshotManager.isAutoSaveEnabled();
   if (!autoSaveEnabled) {
-    console.log('[LISA] Auto-save disabled, skipping snapshot');
+    console.debug('[LISA] Auto-save disabled, skipping snapshot');
     return;
   }
   
   try {
     // Try to get conversation from the tab before it fully closes
     // Note: This may not always work if tab is already gone
-    console.log(`[LISA] Tab closed: ${tabInfo.platform} - attempting auto-save`);
+    console.debug(`[LISA] Tab closed: ${tabInfo.platform} - attempting auto-save`);
     
     // Check cache for last extracted conversation
     const cachedData = conversationCache.get(tabId);
@@ -972,4 +972,4 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   }
 });
 
-console.log('[LISA] Core compression engine initialized v0.49.4');
+console.debug('[LISA] Core compression engine initialized v0.49.4');

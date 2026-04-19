@@ -21,7 +21,7 @@ class StripeClient {
    */
   async init() {
     try {
-      console.log('[LISA Stripe] Client initialized (Checkout Session mode)');
+      console.debug('[LISA Stripe] Client initialized (Checkout Session mode)');
       return true;
     } catch (error) {
       console.error('[LISA Stripe] Failed to initialize:', error);
@@ -41,7 +41,7 @@ class StripeClient {
       const successUrl = 'https://lisa-web-backend-production.up.railway.app/payment-success?session_id={CHECKOUT_SESSION_ID}';
       const cancelUrl = 'https://lisa-web-backend-production.up.railway.app/pricing?canceled=true';
       
-      console.log('[LISA Stripe] Creating checkout session...', { priceId, billingCycle });
+      console.debug('[LISA Stripe] Creating checkout session...', { priceId, billingCycle });
       
       // Use the website checkout endpoint (not /stripe/ prefix)
       const response = await fetch(`${this.apiBaseUrl}/create-checkout-session`, {
@@ -63,7 +63,7 @@ class StripeClient {
       }
 
       const data = await response.json();
-      console.log('[LISA Stripe] Checkout session created:', data);
+      console.debug('[LISA Stripe] Checkout session created:', data);
       
       if (data.url) {
         // Redirect to Stripe Checkout
@@ -120,7 +120,7 @@ class StripeClient {
       }
 
       const data = await response.json();
-      console.log('[LISA Stripe] Session verified:', data);
+      console.debug('[LISA Stripe] Session verified:', data);
       
       if (data.status === 'complete' || data.payment_status === 'paid') {
         // Activate premium
@@ -186,7 +186,7 @@ class StripeClient {
       }
 
       const data = await response.json();
-      console.log('[LISA Stripe] Subscription status:', data);
+      console.debug('[LISA Stripe] Subscription status:', data);
       return data;
     } catch (error) {
       console.error('[LISA Stripe] Failed to get subscription:', error);
@@ -214,7 +214,7 @@ class StripeClient {
       }
 
       const data = await response.json();
-      console.log('[LISA Stripe] Subscription cancelled:', data);
+      console.debug('[LISA Stripe] Subscription cancelled:', data);
       
       // Clear subscription from storage
       await chrome.storage.sync.set({
@@ -290,7 +290,7 @@ class StripeClient {
       const activated = await this.verifyAndActivatePremium();
       
       if (activated) {
-        console.log('[LISA Stripe] Premium activated successfully');
+        console.debug('[LISA Stripe] Premium activated successfully');
         return { success: true, message: 'Premium activated!' };
       } else {
         console.warn('[LISA Stripe] Premium activation pending');
@@ -319,7 +319,7 @@ class StripeClient {
    */
   async createPortalSession(licenseKey, subscriptionId) {
     try {
-      console.log('[LISA Stripe] Creating customer portal session...');
+      console.debug('[LISA Stripe] Creating customer portal session...');
       
       const response = await fetch(`${this.apiBaseUrl}/create-portal-session`, {
         method: 'POST',
@@ -340,7 +340,7 @@ class StripeClient {
       }
 
       const data = await response.json();
-      console.log('[LISA Stripe] Portal session created');
+      console.debug('[LISA Stripe] Portal session created');
       
       return data;
     } catch (error) {

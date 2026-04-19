@@ -23,7 +23,7 @@ class LISAFloatingButton {
       this.createButton();  
       
     } catch (error) {
-      console.log('[LISA] Could not check premium status');
+      console.debug('[LISA] Could not check premium status');
     }
   }
   
@@ -58,7 +58,7 @@ class LISAFloatingButton {
       
       return { allowed: true, remaining: 5 - count };
     } catch (error) {
-      console.log('[LISA] Limit check error:', error);
+      console.debug('[LISA] Limit check error:', error);
       return { allowed: true };
     }
   }
@@ -73,7 +73,7 @@ class LISAFloatingButton {
       await chrome.storage.sync.set({ [storageKey]: count });
       return 5 - count;
     } catch (error) {
-      console.log('[LISA] Limit increment error:', error);
+      console.debug('[LISA] Limit increment error:', error);
     }
   }
   createButton() {
@@ -237,7 +237,7 @@ class LISAFloatingButton {
 
     button.querySelector(".lisa-fab").addEventListener("click", () => this.showActionMenu());
     this.button = button;
-    console.log('[LISA] Floating button ready');
+    console.debug('[LISA] Floating button ready');
   }
 
 

@@ -35,7 +35,7 @@ class LISAPopup {
         chrome.storage.local.remove(['showWhatsNew', 'updatedToVersion', 'changelog']);
       }
     } catch (error) {
-      console.log('[LISA] What\'s new check skipped:', error.message);
+      console.debug('[LISA] What\'s new check skipped:', error.message);
     }
   }
   
@@ -85,7 +85,7 @@ class LISAPopup {
       }
     } catch (error) {
       // Silently fail - don't block popup functionality
-      console.log('[LISA] Version check skipped:', error.message);
+      console.debug('[LISA] Version check skipped:', error.message);
     }
   }
   
@@ -345,7 +345,7 @@ class LISAPopup {
       }
     } catch (error) {
       // Silently fail - language detection is optional
-      console.log('[LISA] Language detection skipped:', error.message);
+      console.debug('[LISA] Language detection skipped:', error.message);
     }
   }
   
@@ -674,7 +674,7 @@ class LISAPopup {
         files: [scriptFile]
       });
       
-      console.log('[LISA] Content script injected:', scriptFile);
+      console.debug('[LISA] Content script injected:', scriptFile);
     } catch (error) {
       console.error('[LISA] Failed to inject content script:', error);
     }
@@ -1459,7 +1459,7 @@ class LISAPopup {
   }
 
   trackEvent(eventName, data = {}) {
-    console.log('[LISA] Event:', eventName, data);
+    console.debug('[LISA] Event:', eventName, data);
     chrome.runtime.sendMessage({
       action: 'trackEvent',
       event: eventName,

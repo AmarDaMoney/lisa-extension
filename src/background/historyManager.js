@@ -37,7 +37,7 @@ async function saveToHistory(url, title, format, elementCount) {
     }
     
     await chrome.storage.local.set({ [STORAGE_KEY]: history });
-    console.log('[LISA] Saved to history:', newItem.id);
+    console.debug('[LISA] Saved to history:', newItem.id);
     
     // Update badge
     updateBadgeCount();
@@ -72,7 +72,7 @@ async function deleteFromHistory(id) {
     const history = await getHistory();
     const filtered = history.filter(item => item.id !== id);
     await chrome.storage.local.set({ [STORAGE_KEY]: filtered });
-    console.log('[LISA] Deleted from history:', id);
+    console.debug('[LISA] Deleted from history:', id);
     updateBadgeCount();
   } catch (error) {
     console.error('[LISA] Error deleting from history:', error);
@@ -86,7 +86,7 @@ async function deleteFromHistory(id) {
 async function clearHistory() {
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: [] });
-    console.log('[LISA] History cleared');
+    console.debug('[LISA] History cleared');
     chrome.action.setBadgeText({ text: '' });
   } catch (error) {
     console.error('[LISA] Error clearing history:', error);

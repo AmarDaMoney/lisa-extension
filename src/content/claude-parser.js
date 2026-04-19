@@ -1,6 +1,10 @@
 // Claude.ai Conversation Parser
 // Extracts conversation data from Claude web interface
 
+if (typeof ClaudeParser !== 'undefined') {
+  // Already loaded — skip re-declaration
+} else {
+
 class ClaudeParser {
   constructor() {
     this.platform = 'Claude';
@@ -104,3 +108,5 @@ chrome.runtime.sendMessage({
   action: 'parserReady', 
   platform: 'Claude' 
 });
+
+} // end guard

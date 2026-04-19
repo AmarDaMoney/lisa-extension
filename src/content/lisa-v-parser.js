@@ -418,11 +418,12 @@ class LisaVParser {
   }
 
   // Generate handoff "next" blocks with resolution tracking
+  // Generate handoff "next" blocks with resolution tracking
   generateNextBlocks() {
     const tasks = [];
     const allBlocks = this.blocks;
     const allText = allBlocks.filter(b => b.t === "a_text" || b.t === "u").map(b => b.v || "").join("\n");
-    
+
     // Resolution signals — if these appear AFTER a task mention, mark it resolved
     const resolutionPatterns = [
       /\u2705/g,                          // ✅ emoji
@@ -434,9 +435,12 @@ class LisaVParser {
       /\bcompleted\b/gi,
       /\bworking now\b/gi,
       /\bmerged\b/gi,
-      /Syntax OK/gi
+      /\bshipped\b/gi,
+      /\bpushed\b/gi,
+      /Syntax OK/gi,
+      /SYNTAX OK/gi
     ];
-    
+
     // Task detection patterns — capture full actionable sentences
     const todoPatterns = [
       { regex: /TODO:?\s*(.{10,300})/gi, type: "todo", priority: "high" },
@@ -445,20 +449,42 @@ class LisaVParser {
       { regex: /(?:not yet|still needs?)\s+(?:fixed|implemented|done|deployed|tested|resolved):?\s*(.{10,300})?/gi, type: "pending", priority: "medium" },
       { regex: /(?:^|\n)\s*(?:Bug|Issue|BUG|ISSUE):?\s+(.{10,300})/gm, type: "bug", priority: "high" }
     ];
-    
+
     // Extract tasks with their position in conversation
     for (const { regex, type, priority } of todoPatterns) {
       const re = new RegExp(regex.source, regex.flags);
       let match;
       while ((match = re.exec(allText)) !== null) {
         const rawAction = match[1].trim().replace(/[.,;:]+$/, "");
-          const action = rawAction.length > 200 ? rawAction.substring(0, rawAction.lastIndexOf(" ", 200)).trim() || rawAction.substring(0, 200) : rawAction;
+        const action = rawAction.length > 200
+          ? rawAction.substring(0, rawAction.lastIndexOf(" ", 200)).trim() || rawAction.substring(0, 200)
+          : rawAction;
         if (action.length < 10) continue;
-        // Filter out code/regex fragments that are not real tasks
+
+        // --- Universal filters: catch false positives from all user types ---
+
+        // Filter 1: Code/regex fragments (original)
         if (/[\\\/{}()\[\]|^$*+?].*[\\\/{}()\[\]|^$*+?]/.test(action)) continue;
         if (/^[^a-zA-Z]*$/.test(action)) continue;
         if ((action.match(/[^a-zA-Z0-9\s.,!?;:\-]/g) || []).length > action.length * 0.3) continue;
-        
+
+        // Filter 2: Terminal/grep output — line starts with file path or $ prompt
+        const lineStart = allText.lastIndexOf("\n", match.index);
+        const lineContext = allText.substring(lineStart + 1, match.index + action.length);
+        if (/^\/[\w\-\.\/]+:\d+:/.test(lineContext)) continue;        // grep output: /path/file.js:42:
+        if (/^\s*\$\s/.test(lineContext)) continue;                    // terminal prompt: $ command
+        if (/^@\w+.*\$/.test(lineContext)) continue;                   // codespaces prompt: @user $ 
+
+        // Filter 3: Array/object literals — task text is inside quotes in an array
+        if (/^['"\[]/.test(action)) continue;                          // starts with quote or bracket
+        if (/['"],\s*$/.test(action)) continue;                        // ends with quote-comma (array item)
+        if (/^\s*['"].*['"],?\s*$/.test(action.split("\n")[0])) continue; // single quoted string
+
+        // Filter 4: Code patterns — variable assignments, function calls, imports
+        if (/^[a-z_$][\w$]*\s*[:=({]/.test(action)) continue;         // variable = / obj: / func(
+        if (/^(const|let|var|function|class|import|export|return)\s/.test(action)) continue;
+        if (/^(grep|sed|awk|cat|echo|cd|git|npm|pip|node|python)\s/.test(action)) continue;
+
         tasks.push({
           action,
           type,
@@ -467,29 +493,30 @@ class LisaVParser {
         });
       }
     }
-    
-    // Check each task for resolution — look for resolution signals AFTER the task mention
+
+    // Check each task for resolution — wider window (2000 chars) to catch
+    // resolutions that happen further downstream in the conversation
     const resolvedTasks = [];
     const openTasks = [];
-    
+
     for (const task of tasks) {
       const textAfterTask = allText.substring(task.position);
       const isResolved = resolutionPatterns.some(pattern => {
         const re = new RegExp(pattern.source, pattern.flags);
-        return re.test(textAfterTask.substring(0, 500));
+        return re.test(textAfterTask.substring(0, 2000));
       });
-      
+
       if (isResolved) {
         resolvedTasks.push(task);
       } else {
         openTasks.push(task);
       }
     }
-    
+
     // Detect unanswered questions from last user message
     const lastUserMsg = [...allBlocks].reverse().find(b => b.t === "u");
     if (lastUserMsg?.v?.includes("?") && lastUserMsg.v.length > 15) {
-      const questionText = lastUserMsg.v.trim().substring(0, 120);
+      const questionText = lastUserMsg.v.trim().substring(0, 200);
       // Check if assistant responded after this question
       const lastUserIdx = allBlocks.lastIndexOf(lastUserMsg);
       const hasResponse = allBlocks.slice(lastUserIdx + 1).some(b => b.t === "a_text");
@@ -502,6 +529,7 @@ class LisaVParser {
         });
       }
     }
+
     
     // Build next blocks — open items first, then resolved
     const nextBlocks = [];

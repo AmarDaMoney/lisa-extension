@@ -443,8 +443,8 @@ class LisaVParser {
 
     // Task detection patterns — capture full actionable sentences
     const todoPatterns = [
-      { regex: /TODO:?\s*(.{10,300})/gi, type: "todo", priority: "high" },
-      { regex: /FIXME:?\s*(.{10,300})/gi, type: "fixme", priority: "high" },
+      { regex: /(?:^|\n)\s*TODO:?\s+([A-Za-z].{9,299})/gi, type: "todo", priority: "high" },
+      { regex: /(?:^|\n)\s*FIXME:?\s+([A-Za-z].{9,299})/gi, type: "fixme", priority: "high" },
       { regex: /(?:we |I )?(?:need to|must)\s+(?:implement|add|fix|create|update|remove|refactor|deploy|test|verify)\s+(.{10,300})/gi, type: "planned", priority: "medium" },
       { regex: /(?:not yet|still needs?)\s+(?:fixed|implemented|done|deployed|tested|resolved):?\s*(.{10,300})?/gi, type: "pending", priority: "medium" },
       { regex: /(?:^|\n)\s*(?:Bug|Issue|BUG|ISSUE):?\s+(.{10,300})/gm, type: "bug", priority: "high" }

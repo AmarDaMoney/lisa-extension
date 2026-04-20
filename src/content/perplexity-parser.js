@@ -16,31 +16,39 @@ class PerplexityParser {
   extractMessages() {
     const messages = [];
     
-    // Perplexity message structure
-    const messageElements = document.querySelectorAll('[class*="SearchResult"], [class*="message"], [class*="query"]');
-    
-    messageElements.forEach((element, index) => {
-      // Safely get className as string (handles SVGAnimatedString)
-      const classStr = typeof element.className === 'string' 
-        ? element.className 
-        : (element.className?.baseVal || '');
-      
-      // Determine role
-      const isUser = classStr.includes('query') || 
-                     classStr.includes('user') ||
-                     element.querySelector('[class*="user"]') !== null;
-      
-      const textContent = this.extractTextContent(element);
-      
-      if (textContent && textContent.trim().length > 0) {
-        messages.push({
-          role: isUser ? 'user' : 'assistant',
-          content: textContent.trim(),
-          index: index,
-          timestamp: new Date().toISOString()
-        });
+    // Perplexity uses group/query for user messages and .prose for assistant responses
+    // Collect user queries (DIV elements with group/query class, skip H1 duplicates)
+    const queries = document.querySelectorAll('div[class*="group/query"]');
+    // Collect assistant responses
+    const proseElements = document.querySelectorAll('div.prose');
+
+    // Interleave: each query is followed by a prose response
+    const maxPairs = Math.max(queries.length, proseElements.length);
+    for (let i = 0; i < maxPairs; i++) {
+      if (i < queries.length) {
+        const textContent = this.extractTextContent(queries[i]);
+        if (textContent && textContent.trim().length > 0) {
+          messages.push({
+            role: 'user',
+            content: textContent.trim(),
+            index: messages.length,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
-    });
+      if (i < proseElements.length) {
+        const textContent = this.extractTextContent(proseElements[i]);
+        if (textContent && textContent.trim().length > 0) {
+          messages.push({
+            role: 'assistant',
+            content: textContent.trim(),
+            index: messages.length,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    }
+
 
     return messages;
   }

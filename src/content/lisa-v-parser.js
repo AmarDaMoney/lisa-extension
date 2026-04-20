@@ -158,6 +158,8 @@ class LisaVParser {
       messages = await this.extractGeminiMessages();
     } else if (platform === 'DeepSeek') {
       messages = await this.extractDeepSeekMessages();
+    } else if (platform === 'Perplexity') {
+      messages = await this.extractPerplexityMessages();
     } else {
       // Generic fallback
       messages = await this.extractGenericMessages();
@@ -279,6 +281,27 @@ class LisaVParser {
   }
 
   // Generic fallback extraction
+  async extractPerplexityMessages() {
+    const messages = [];
+    // User queries
+    const queries = document.querySelectorAll('div[class*="group/query"]');
+    // Assistant responses
+    const proseElements = document.querySelectorAll('div.prose');
+
+    const maxPairs = Math.max(queries.length, proseElements.length);
+    for (let i = 0; i < maxPairs; i++) {
+      if (i < queries.length) {
+        const blocks = await this.parseMessageContent(queries[i], 'user');
+        if (blocks.length > 0) messages.push(blocks);
+      }
+      if (i < proseElements.length) {
+        const blocks = await this.parseMessageContent(proseElements[i], 'assistant');
+        if (blocks.length > 0) messages.push(blocks);
+      }
+    }
+    return messages;
+  }
+
   async extractDeepSeekMessages() {
     const messages = [];
     const messageContainers = document.querySelectorAll('.ds-message');

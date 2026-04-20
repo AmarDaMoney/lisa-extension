@@ -162,6 +162,8 @@ class LisaVParser {
       messages = await this.extractCopilotMessages();
     } else if (platform === 'Perplexity') {
       messages = await this.extractPerplexityMessages();
+    } else if (platform === 'Grok') {
+      messages = await this.extractGrokMessages();
     } else {
       // Generic fallback
       messages = await this.extractGenericMessages();
@@ -336,6 +338,32 @@ class LisaVParser {
         messages.push(blocks);
       }
     }
+    return messages;
+  }
+
+  async extractGrokMessages() {
+    const messages = [];
+    const messageWrappers = document.querySelectorAll('.relative.group.flex.flex-col.justify-center.w-full');
+    
+    for (const wrapper of messageWrappers) {
+      const hasItemsEnd = wrapper.className.includes('items-end');
+      const hasItemsStart = wrapper.className.includes('items-start');
+      
+      let role = null;
+      if (hasItemsEnd) role = 'user';
+      else if (hasItemsStart) role = 'assistant';
+      
+      if (!role) continue;
+      
+      const messageBubble = wrapper.querySelector('[class*="message-bubble"]');
+      if (!messageBubble) continue;
+      
+      const blocks = await this.parseMessageContent(messageBubble, role);
+      if (blocks.length > 0) {
+        messages.push(blocks);
+      }
+    }
+    
     return messages;
   }
 

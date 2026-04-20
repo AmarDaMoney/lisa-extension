@@ -13,30 +13,57 @@ class GrokParser {
     return match ? match[1] : 'grok-session-' + Date.now();
   }
 
-  extractMessages() {
+  async extractMessages() {
     const messages = [];
     
-    // Grok uses similar structure to Twitter/X
-    // Target message containers
-    const messageElements = document.querySelectorAll('[data-testid*="message"], [class*="message"], article');
+    // Grok uses message wrappers with items-end (user) / items-start (assistant)
+    const messageWrappers = document.querySelectorAll('.relative.group.flex.flex-col.justify-center.w-full');
     
-    messageElements.forEach((element, index) => {
-      // Determine if user or Grok message
-      const isUser = element.querySelector('[data-testid="User-Name"]') !== null ||
-                     element.textContent.includes('You:') ||
-                     element.closest('[class*="user"]') !== null;
+    for (const wrapper of messageWrappers) {
+      const hasItemsEnd = wrapper.className.includes('items-end');
+      const hasItemsStart = wrapper.className.includes('items-start');
       
-      const textContent = this.extractTextContent(element);
+      let role = null;
+      if (hasItemsEnd) role = 'user';
+      else if (hasItemsStart) role = 'assistant';
+      
+      if (!role) continue;
+      
+      const messageBubble = wrapper.querySelector('[class*="message-bubble"]');
+      if (!messageBubble) continue;
+      
+      const textContent = this.extractTextContent(messageBubble);
       
       if (textContent && textContent.trim().length > 0) {
         messages.push({
-          role: isUser ? 'user' : 'assistant',
+          role: role,
           content: textContent.trim(),
-          index: index,
+          index: messages.length,
           timestamp: new Date().toISOString()
         });
       }
-    });
+    }
+    
+    // Fallback for older Grok versions
+    if (messages.length === 0) {
+      const fallbackElements = document.querySelectorAll('[data-testid*="message"], [class*="message"], article');
+      fallbackElements.forEach((element, index) => {
+        const isUser = element.querySelector('[data-testid="User-Name"]') !== null ||
+                       element.textContent.includes('You:') ||
+                       element.closest('[class*="user"]') !== null;
+        
+        const textContent = this.extractTextContent(element);
+        
+        if (textContent && textContent.trim().length > 0) {
+          messages.push({
+            role: isUser ? 'user' : 'assistant',
+            content: textContent.trim(),
+            index: index,
+            timestamp: new Date().toISOString()
+          });
+        }
+      });
+    }
 
     return messages;
   }
@@ -50,8 +77,8 @@ class GrokParser {
     return clone.textContent || clone.innerText || '';
   }
 
-  extractConversation() {
-    const messages = this.extractMessages();
+  async extractConversation() {
+    const messages = await this.extractMessages();
     
     if (messages.length === 0) {
       return null;
@@ -75,13 +102,13 @@ class GrokParser {
         return true;
       }
       if (request.action === 'extractConversation') {
-        try {
-          const conversation = this.extractConversation();
+        this.extractConversation().then(conversation => {
           sendResponse({ success: true, data: conversation });
-        } catch (error) {
+        }).catch(error => {
           console.error('[LISA] Grok extraction error:', error);
           sendResponse({ success: false, error: error.message });
-        }
+        });
+        return true;
       }
       return true;
     });

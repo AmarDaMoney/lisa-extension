@@ -39,7 +39,7 @@ class GeminiParser {
       }
 
       // Extract assistant response
-      const response = turn.querySelector('[class*="response-container"]');
+      const response = turn.querySelector('.presented-response-container') || turn.querySelector('[class*="response-container"]');
       if (response) {
         const respText = this.extractTextContent(response);
         if (respText && respText.trim().length > 0) {

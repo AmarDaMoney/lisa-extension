@@ -268,19 +268,43 @@ class LisaVParser {
     const messages = [];
     const turns = document.querySelectorAll('.conversation-container');
 
+    // Gemini UI prefixes to strip (multilingual)
+    const geminiPrefixes = [
+      /^Vous avez dit\s*/i,
+      /^You said\s*/i,
+      /^Afficher le raisonnement\s*/i,
+      /^Show thinking\s*/i,
+      /^Gemini a dit\s*/i,
+      /^Gemini said\s*/i
+    ];
+
+    const stripPrefixes = (blocks) => {
+      for (const block of blocks) {
+        if (block.v) {
+          for (const re of geminiPrefixes) {
+            block.v = block.v.replace(re, '');
+          }
+          block.v = block.v.trim();
+        }
+      }
+      return blocks.filter(b => b.v && b.v.length > 0);
+    };
+
     for (const turn of turns) {
       // User message
       const userQuery = turn.querySelector('[class*="user-query"]');
       if (userQuery) {
         const blocks = await this.parseMessageContent(userQuery, 'user');
-        if (blocks.length > 0) messages.push(blocks);
+        const cleaned = stripPrefixes(blocks);
+        if (cleaned.length > 0) messages.push(cleaned);
       }
 
-      // Assistant response
-      const response = turn.querySelector('[class*="response-container"]');
+      // Assistant response — target presented-response-container to skip empty header/footer
+      const response = turn.querySelector('.presented-response-container') || turn.querySelector('[class*="response-container"]');
       if (response) {
         const blocks = await this.parseMessageContent(response, 'assistant');
-        if (blocks.length > 0) messages.push(blocks);
+        const cleaned = stripPrefixes(blocks);
+        if (cleaned.length > 0) messages.push(cleaned);
       }
     }
 

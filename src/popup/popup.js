@@ -757,7 +757,7 @@ class LISAPopup {
             relationshipCount += (t.relationships || []).length;
           }
           
-          document.getElementById('messageCount').textContent = tokens.length;
+          document.getElementById('analyzedCount').textContent = tokens.length;
           document.getElementById('entityCount').textContent = entityCount;
           document.getElementById('conceptCount').textContent = conceptCount;
           document.getElementById('relationshipCount').textContent = relationshipCount;

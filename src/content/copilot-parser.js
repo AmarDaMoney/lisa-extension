@@ -16,31 +16,45 @@ class CopilotParser {
   extractMessages() {
     const messages = [];
     
-    // Copilot uses cib- prefixed classes
-    const messageElements = document.querySelectorAll('[class*="cib-message"], [class*="message"], cib-message-group');
+    // Copilot uses user-message and ai-message class patterns
+    const userMessages = document.querySelectorAll('[class*="user-message"]');
+    const aiMessages = document.querySelectorAll('[class*="ai-message"]');
+
+    // Collect all messages with their position in DOM for correct ordering
+    const allMessages = [];
     
-    messageElements.forEach((element, index) => {
-      // Safely get className as string (handles SVGAnimatedString)
-      const classStr = typeof element.className === 'string' 
-        ? element.className 
-        : (element.className?.baseVal || '');
-      
-      // Determine if user or Copilot
-      const isUser = element.getAttribute('source') === 'user' ||
-                     classStr.includes('user') ||
-                     element.querySelector('[class*="user"]') !== null;
-      
-      const textContent = this.extractTextContent(element);
-      
+    userMessages.forEach(el => {
+      // Skip non-content containers (e.g. wrapper divs that also match)
+      const textContent = this.extractTextContent(el);
       if (textContent && textContent.trim().length > 0) {
-        messages.push({
-          role: isUser ? 'user' : 'assistant',
-          content: textContent.trim(),
-          index: index,
-          timestamp: new Date().toISOString()
-        });
+        allMessages.push({ el, role: 'user', pos: el.getBoundingClientRect().top });
       }
     });
+
+    aiMessages.forEach(el => {
+      const textContent = this.extractTextContent(el);
+      if (textContent && textContent.trim().length > 0) {
+        allMessages.push({ el, role: 'assistant', pos: el.getBoundingClientRect().top });
+      }
+    });
+
+    // Sort by vertical position to maintain conversation order
+    allMessages.sort((a, b) => a.pos - b.pos);
+
+    // Deduplicate — nested elements may match multiple times
+    const seen = new Set();
+    for (const msg of allMessages) {
+      const text = this.extractTextContent(msg.el).trim();
+      const key = text.substring(0, 100);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      messages.push({
+        role: msg.role,
+        content: text,
+        index: messages.length,
+        timestamp: new Date().toISOString()
+      });
+    }
 
     return messages;
   }

@@ -158,6 +158,8 @@ class LisaVParser {
       messages = await this.extractGeminiMessages();
     } else if (platform === 'DeepSeek') {
       messages = await this.extractDeepSeekMessages();
+    } else if (platform === 'Microsoft Copilot') {
+      messages = await this.extractCopilotMessages();
     } else if (platform === 'Perplexity') {
       messages = await this.extractPerplexityMessages();
     } else {
@@ -281,6 +283,33 @@ class LisaVParser {
   }
 
   // Generic fallback extraction
+  async extractCopilotMessages() {
+    const messages = [];
+    const userMessages = document.querySelectorAll('[class*="user-message"]');
+    const aiMessages = document.querySelectorAll('[class*="ai-message"]');
+
+    const allMessages = [];
+    for (const el of userMessages) {
+      allMessages.push({ el, role: 'user', pos: el.getBoundingClientRect().top });
+    }
+    for (const el of aiMessages) {
+      allMessages.push({ el, role: 'assistant', pos: el.getBoundingClientRect().top });
+    }
+    allMessages.sort((a, b) => a.pos - b.pos);
+
+    const seen = new Set();
+    for (const msg of allMessages) {
+      const blocks = await this.parseMessageContent(msg.el, msg.role);
+      if (blocks.length > 0) {
+        const key = blocks.map(b => b.v || '').join('').substring(0, 100);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        messages.push(blocks);
+      }
+    }
+    return messages;
+  }
+
   async extractPerplexityMessages() {
     const messages = [];
     // User queries

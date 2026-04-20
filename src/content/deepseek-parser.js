@@ -16,20 +16,19 @@ class DeepSeekParser {
   extractMessages() {
     const messages = [];
     
-    // DeepSeek message structure
-    const messageElements = document.querySelectorAll('[class*="Message"], [class*="message"], [data-message-role]');
+    // DeepSeek uses .ds-message containers
+    let messageElements = document.querySelectorAll('.ds-message');
+    
+    // Fallback: broader class-based selectors
+    if (messageElements.length === 0) {
+      messageElements = document.querySelectorAll('[class*="Message"], [class*="message"], [data-message-role]');
+    }
     
     messageElements.forEach((element, index) => {
-      // Safely get className as string (handles SVGAnimatedString)
-      const classStr = typeof element.className === 'string' 
-        ? element.className 
-        : (element.className?.baseVal || '');
-      
-      // Check for role attribute or class names
-      const role = element.getAttribute('data-message-role');
-      const isUser = role === 'user' || 
-                     classStr.includes('user') ||
-                     element.querySelector('[class*="user"]') !== null;
+      // DeepSeek: assistant messages contain .ds-markdown, user messages don't
+      const hasMarkdown = element.querySelector('.ds-markdown') !== null;
+      const hasAvatar = element.querySelector('.ds-icon, [class*="avatar"]') !== null;
+      const isUser = !hasMarkdown && !hasAvatar;
       
       const textContent = this.extractTextContent(element);
       

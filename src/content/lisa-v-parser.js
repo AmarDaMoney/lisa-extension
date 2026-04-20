@@ -156,6 +156,8 @@ class LisaVParser {
       messages = await this.extractChatGPTMessages();
     } else if (platform === 'Gemini') {
       messages = await this.extractGeminiMessages();
+    } else if (platform === 'DeepSeek') {
+      messages = await this.extractDeepSeekMessages();
     } else {
       // Generic fallback
       messages = await this.extractGenericMessages();
@@ -277,6 +279,23 @@ class LisaVParser {
   }
 
   // Generic fallback extraction
+  async extractDeepSeekMessages() {
+    const messages = [];
+    const messageContainers = document.querySelectorAll('.ds-message');
+
+    for (const container of messageContainers) {
+      // Assistant messages have .ds-markdown content, user messages don't
+      const hasMarkdown = container.querySelector('.ds-markdown') !== null;
+      const role = hasMarkdown ? 'assistant' : 'user';
+      const blocks = await this.parseMessageContent(container, role);
+      if (blocks.length > 0) {
+        messages.push(blocks);
+      }
+    }
+
+    return messages;
+  }
+
   async extractGenericMessages() {
     const messages = [];
     

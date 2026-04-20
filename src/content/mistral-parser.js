@@ -16,19 +16,29 @@ class MistralParser {
   extractMessages() {
     const messages = [];
     
-    // Mistral uses message containers
-    const messageElements = document.querySelectorAll('[class*="message"], [class*="chat-message"]');
+    // Mistral uses data-message-author-role attributes (same pattern as ChatGPT)
+    let messageElements = document.querySelectorAll('[data-message-author-role]');
+    
+    // Fallback: class-based selectors for older Mistral versions
+    if (messageElements.length === 0) {
+      messageElements = document.querySelectorAll('[class*="group/message"], [class*="message"], [class*="chat-message"]');
+    }
     
     messageElements.forEach((element, index) => {
-      // Safely get className as string (handles SVGAnimatedString)
-      const classStr = typeof element.className === 'string' 
-        ? element.className 
-        : (element.className?.baseVal || '');
-      
-      // Determine role based on class names
-      const isUser = classStr.includes('user') || 
-                     classStr.includes('human') ||
-                     element.querySelector('[class*="user"]') !== null;
+      // Primary: use data attribute for role
+      let role = element.getAttribute('data-message-author-role');
+      let isUser;
+      if (role) {
+        isUser = role === 'user';
+      } else {
+        // Fallback: class-based detection
+        const classStr = typeof element.className === 'string' 
+          ? element.className 
+          : (element.className?.baseVal || '');
+        isUser = classStr.includes('user') || 
+                 classStr.includes('human') ||
+                 element.querySelector('[class*="user"]') !== null;
+      }
       
       const textContent = this.extractTextContent(element);
       

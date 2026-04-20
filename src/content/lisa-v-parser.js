@@ -152,7 +152,7 @@ class LisaVParser {
       messages = await this.extractClaudeCodeMessages();
     } else if (platform === 'Claude') {
       messages = await this.extractClaudeMessages();
-    } else if (platform === 'ChatGPT') {
+    } else if (platform === 'ChatGPT' || platform === 'Mistral AI') {
       messages = await this.extractChatGPTMessages();
     } else if (platform === 'Gemini') {
       messages = await this.extractGeminiMessages();

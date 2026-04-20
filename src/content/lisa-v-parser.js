@@ -266,19 +266,24 @@ class LisaVParser {
   // Gemini-specific extraction
   async extractGeminiMessages() {
     const messages = [];
-    const messageContainers = document.querySelectorAll('[data-turn-id], .conversation-turn');
-    
-    for (const container of messageContainers) {
-      const isUser = container.querySelector('[data-role="user"]') !== null ||
-                     container.classList?.contains('user-turn');
-      
-      const role = isUser ? 'user' : 'assistant';
-      const blocks = await this.parseMessageContent(container, role);
-      if (blocks.length > 0) {
-        messages.push(blocks);
+    const turns = document.querySelectorAll('.conversation-container');
+
+    for (const turn of turns) {
+      // User message
+      const userQuery = turn.querySelector('[class*="user-query"]');
+      if (userQuery) {
+        const blocks = await this.parseMessageContent(userQuery, 'user');
+        if (blocks.length > 0) messages.push(blocks);
+      }
+
+      // Assistant response
+      const response = turn.querySelector('[class*="response-container"]');
+      if (response) {
+        const blocks = await this.parseMessageContent(response, 'assistant');
+        if (blocks.length > 0) messages.push(blocks);
       }
     }
-    
+
     return messages;
   }
 

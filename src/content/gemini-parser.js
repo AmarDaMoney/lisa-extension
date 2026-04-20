@@ -16,25 +16,49 @@ class GeminiParser {
   extractMessages() {
     const messages = [];
     
-    // Gemini uses message-content class structure
-    const messageElements = document.querySelectorAll('[class*="conversation-turn"], [class*="message"]');
-    
-    messageElements.forEach((element, index) => {
-      // Determine role based on classes or data attributes
-      const isUser = element.querySelector('[class*="user"]') !== null ||
-                     element.closest('[class*="user-turn"]') !== null;
-      
-      const textContent = this.extractTextContent(element);
-      
-      if (textContent && textContent.trim().length > 0) {
-        messages.push({
-          role: isUser ? 'user' : 'assistant',
-          content: textContent.trim(),
-          index: index,
-          timestamp: new Date().toISOString()
-        });
+    // Gemini uses .conversation-container with user-query and response-container inside
+    const turns = document.querySelectorAll('.conversation-container');
+
+    for (const turn of turns) {
+      // Extract user message
+      const userQuery = turn.querySelector('[class*="user-query"]');
+      if (userQuery) {
+        const userText = this.extractTextContent(userQuery);
+        if (userText && userText.trim().length > 0) {
+          // Strip "Vous avez dit" / "You said" prefix that Gemini adds
+          let cleanText = userText.trim()
+            .replace(/^Vous avez dit\s*/i, '')
+            .replace(/^You said\s*/i, '');
+          messages.push({
+            role: 'user',
+            content: cleanText.trim(),
+            index: messages.length,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
-    });
+
+      // Extract assistant response
+      const response = turn.querySelector('[class*="response-container"]');
+      if (response) {
+        const respText = this.extractTextContent(response);
+        if (respText && respText.trim().length > 0) {
+          // Strip "Gemini a dit" / "Gemini said" and reasoning prefixes
+          let cleanText = respText.trim()
+            .replace(/^Afficher le raisonnement\s*/i, '')
+            .replace(/^Show thinking\s*/i, '')
+            .replace(/^Gemini a dit\s*/i, '')
+            .replace(/^Gemini said\s*/i, '');
+          messages.push({
+            role: 'assistant',
+            content: cleanText.trim(),
+            index: messages.length,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    }
+
 
     return messages;
   }

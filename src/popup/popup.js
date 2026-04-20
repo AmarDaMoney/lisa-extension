@@ -745,13 +745,23 @@ class LISAPopup {
       if (response.success) {
         this.compressedData = response.compressed;
         
-        const originalSize = this.formatBytes(JSON.stringify(this.currentConversation).length);
-        const compressedSize = this.formatBytes(JSON.stringify(this.compressedData).length);
-        
-        document.getElementById('compressionRatio').textContent = this.compressedData.metadata.compressionRatio;
-        document.getElementById('originalSize').textContent = originalSize;
-        document.getElementById('compressedSize').textContent = compressedSize;
-        document.getElementById('compressionInfo').style.display = 'block';
+          // Calculate semantic enrichment metrics
+          const tokens = this.compressedData.semanticTokens || [];
+          let entityCount = 0;
+          let conceptCount = 0;
+          let relationshipCount = 0;
+          for (const token of tokens) {
+            const t = token.tokens || {};
+            entityCount += (t.entities || []).reduce((sum, e) => sum + (e.values || []).length, 0);
+            conceptCount += (t.concepts || []).length;
+            relationshipCount += (t.relationships || []).length;
+          }
+          
+          document.getElementById('messageCount').textContent = tokens.length;
+          document.getElementById('entityCount').textContent = entityCount;
+          document.getElementById('conceptCount').textContent = conceptCount;
+          document.getElementById('relationshipCount').textContent = relationshipCount;
+          document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
 
         // Show hashing section (visible for all, but only works for premium)

@@ -89,7 +89,7 @@ class LisaVParser {
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         if (this.isCodeBlock(node)) {
           const codeContent = node.textContent.trim();
-          if (codeContent) {
+          if (codeContent && codeContent.length >= 20) {
             blocks.push({
               t: 'code',
               lang: this.detectLanguage(node),
@@ -100,7 +100,7 @@ class LisaVParser {
           }
         } else if (node.tagName === 'PRE' || node.tagName === 'CODE') {
           const codeContent = node.textContent.trim();
-          if (codeContent) {
+          if (codeContent && codeContent.length >= 20) {
             blocks.push({
               t: 'code',
               lang: this.detectLanguage(node),
@@ -198,28 +198,48 @@ class LisaVParser {
 
     const messages = [];
     const messageContainers = document.querySelectorAll("[data-test-render-count]");
-    
+
+    // Claude UI prefixes to strip (multilingual)
+    const claudePrefixes = [
+      /^Vous avez dit\s*:?\s*/i,
+      /^You said\s*:?\s*/i,
+      /^Claude a répondu\s*:?\s*/i,
+      /^Claude replied\s*:?\s*/i,
+      /^Afficher moins\s*/i,
+      /^Show less\s*/i,
+      /\d{1,2}:\d{2}\s*(AM|PM)\s*$/i
+    ];
+    const stripClaudePrefixes = (blocks) => {
+      for (const block of blocks) {
+        if (block.v) {
+          for (const re of claudePrefixes) {
+            block.v = block.v.replace(re, '');
+          }
+          // Strip trailing timestamps (e.g. "\n8:13 AM")
+          block.v = block.v.replace(/\n\d{1,2}:\d{2}\s*(AM|PM)\s*$/i, '').trim();
+        }
+      }
+      return blocks.filter(b => b.v && b.v.length > 0);
+    };
+
     for (const container of messageContainers) {
-      // User messages have: justify-end or items-end (right-aligned) + bg-bg-300 background
-      // Assistant messages have: data-is-streaming attribute
       const hasStreaming = container.querySelector("[data-is-streaming]") !== null;
       const hasUserBg = container.querySelector(".bg-bg-300") !== null;
       const hasRightAlign = container.querySelector("[class*='justify-end']") !== null ||
                             container.querySelector("[class*='items-end']") !== null;
-      
-      // Assistant has streaming element, User has right-aligned bg-bg-300 bubble
+
       const isUser = !hasStreaming && (hasUserBg || hasRightAlign);
-      
+
       const role = isUser ? "user" : "assistant";
       const blocks = await this.parseMessageContent(container, role);
-      if (blocks.length > 0) {
-        messages.push(blocks);
+      const cleaned = stripClaudePrefixes(blocks);
+      if (cleaned.length > 0) {
+        messages.push(cleaned);
       }
     }
-    
+
     return messages;
   }
-
   // Claude Code-specific extraction
   async extractClaudeCodeMessages() {
     const messages = [];

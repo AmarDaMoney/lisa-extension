@@ -56,8 +56,16 @@ class ClaudeParser {
     // Remove button elements, icons, and UI components
     clone.querySelectorAll('button, svg, [role="button"]').forEach(el => el.remove());
     
-    // Get text content
-    return clone.textContent || clone.innerText || '';
+    // Get text content and strip Claude UI noise
+    let text = clone.textContent || clone.innerText || '';
+    text = text.replace(/^Vous avez dit\s*:?\s*/i, '');
+    text = text.replace(/^You said\s*:?\s*/i, '');
+    text = text.replace(/^Claude a répondu\s*:?\s*/i, '');
+    text = text.replace(/^Claude replied\s*:?\s*/i, '');
+    text = text.replace(/^Afficher moins\s*/i, '');
+    text = text.replace(/^Show less\s*/i, '');
+    text = text.replace(/\n\d{1,2}:\d{2}\s*(AM|PM)\s*$/i, '');
+    return text.trim();
   }
 
   extractConversation() {

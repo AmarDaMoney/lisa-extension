@@ -7,8 +7,8 @@ class LISAPopup {
     this.compressedData = null;
     this.userTier = 'free';
     this.usageStats = {
-      exportsThisWeek: 0,
-      importsThisWeek: 0,
+      exportsToday: 0,
+      importsToday: 0,
       lastResetDate: null
     };
     this.init();
@@ -123,16 +123,16 @@ class LISAPopup {
         const now = new Date();
         const lastReset = this.usageStats.lastResetDate ? new Date(this.usageStats.lastResetDate) : null;
         
-        if (!lastReset || this.isNewWeek(lastReset, now)) {
-          this.usageStats.exportsThisWeek = 0;
-          this.usageStats.importsThisWeek = 0;
+        if (!lastReset || this.isNewDay(lastReset, now)) {
+          this.usageStats.exportsToday = 0;
+          this.usageStats.importsToday = 0;
           this.usageStats.lastResetDate = now.toISOString();
           await chrome.storage.sync.set({ usageStats: this.usageStats });
         }
       } else {
         this.usageStats = {
-          exportsThisWeek: 0,
-          importsThisWeek: 0,
+          exportsToday: 0,
+          importsToday: 0,
           lastResetDate: new Date().toISOString()
         };
         await chrome.storage.sync.set({ usageStats: this.usageStats });
@@ -142,16 +142,16 @@ class LISAPopup {
     }
   }
 
-  isNewWeek(lastDate, currentDate) {
+  isNewDay(lastDate, currentDate) {
     const daysSinceReset = Math.floor((currentDate - lastDate) / (1000 * 60 * 60 * 24));
     return daysSinceReset >= 1;
   }
 
   async updateUsageStats(type) {
     if (type === 'export') {
-      this.usageStats.exportsThisWeek++;
+      this.usageStats.exportsToday++;
     } else if (type === 'import') {
-      this.usageStats.importsThisWeek++;
+      this.usageStats.importsToday++;
     }
     await chrome.storage.sync.set({ usageStats: this.usageStats });
   }
@@ -162,8 +162,8 @@ class LISAPopup {
     }
 
     const limits = {
-      export: { max: 5, current: this.usageStats.exportsThisWeek },
-      import: { max: 5, current: this.usageStats.importsThisWeek }
+      export: { max: 5, current: this.usageStats.exportsToday },
+      import: { max: 5, current: this.usageStats.importsToday }
     };
 
     const limit = limits[type];
@@ -233,7 +233,7 @@ class LISAPopup {
       const upgradeDescFree = document.querySelector('#freeUpgradeSection .settings-desc');
       if (upgradeDescFree) upgradeDescFree.textContent = 'Get 50 compressions/day + LISA Hash.';
       // Show remaining exports for free users
-      const remaining = 5 - this.usageStats.exportsThisWeek;
+      const remaining = 5 - this.usageStats.exportsToday;
       const exportBtn = document.getElementById('exportBtn');
       const saveToLibraryBtn = document.getElementById('saveToLibraryBtn');
       
@@ -898,7 +898,7 @@ class LISAPopup {
         
         // Show remaining exports for free users
         if (this.userTier === 'free') {
-          const remaining = 5 - this.usageStats.exportsThisWeek;
+          const remaining = 5 - this.usageStats.exportsToday;
             this.updatePlatformStatus(`${remaining} free exports remaining today`, true);
         }
       }
@@ -946,7 +946,7 @@ class LISAPopup {
         
         // Show remaining exports for free users
         if (this.userTier === 'free') {
-          const remaining = 5 - this.usageStats.exportsThisWeek;
+          const remaining = 5 - this.usageStats.exportsToday;
           this.updatePlatformStatus(`✅ Saved! ${remaining} free exports remaining today`, true);
         }
       } else {
@@ -1233,7 +1233,7 @@ class LISAPopup {
       await chrome.storage.local.clear();
       
       this.userTier = 'free';
-      this.usageStats = { exportsThisWeek: 0, importsThisWeek: 0 };
+      this.usageStats = { exportsToday: 0, importsToday: 0 };
       
       // Reset UI
       document.getElementById('licenseKeyInput').value = '';

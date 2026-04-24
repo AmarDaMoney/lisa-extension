@@ -89,7 +89,7 @@ class LisaVParser {
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         if (this.isCodeBlock(node)) {
           const codeContent = node.textContent.trim();
-          if (codeContent && codeContent.length >= 20) {
+          if (codeContent && codeContent.length >= 25) {
             blocks.push({
               t: 'code',
               lang: this.detectLanguage(node),
@@ -100,7 +100,7 @@ class LisaVParser {
           }
         } else if (node.tagName === 'PRE' || node.tagName === 'CODE') {
           const codeContent = node.textContent.trim();
-          if (codeContent && codeContent.length >= 20) {
+          if (codeContent && codeContent.length >= 25) {
             blocks.push({
               t: 'code',
               lang: this.detectLanguage(node),
@@ -217,6 +217,11 @@ class LisaVParser {
           }
           // Strip trailing timestamps (e.g. "\n8:13 AM")
           block.v = block.v.replace(/\n\d{1,2}:\d{2}\s*(AM|PM)\s*$/i, '').trim();
+          // Strip tool-use noise from assistant blocks
+          block.v = block.v.replace(/A effectué une recherche[^\n]*/gi, '').trim();
+          block.v = block.v.replace(/Performed a search[^\n]*/gi, '').trim();
+          block.v = block.v.replace(/Relevant chats\s*/gi, '').trim();
+          block.v = block.v.replace(/Searching memory[^\n]*/gi, '').trim();
         }
       }
       return blocks.filter(b => b.v && b.v.length > 0);

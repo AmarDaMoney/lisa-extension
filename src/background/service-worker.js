@@ -245,7 +245,7 @@ class SnapshotManager {
 
   async isAutoSaveEnabled() {
     const data = await chrome.storage.sync.get(this.SETTINGS_KEY);
-    const settings = data[this.SETTINGS_KEY] || { enabled: true };
+    const settings = data[this.SETTINGS_KEY] || { enabled: false };
     return settings.enabled;
   }
 

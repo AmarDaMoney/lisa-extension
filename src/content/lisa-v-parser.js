@@ -222,6 +222,7 @@ class LisaVParser {
       return blocks.filter(b => b.v && b.v.length > 0);
     };
 
+    const seen = new Set();
     for (const container of messageContainers) {
       const hasStreaming = container.querySelector("[data-is-streaming]") !== null;
       const hasUserBg = container.querySelector(".bg-bg-300") !== null;
@@ -234,7 +235,11 @@ class LisaVParser {
       const blocks = await this.parseMessageContent(container, role);
       const cleaned = stripClaudePrefixes(blocks);
       if (cleaned.length > 0) {
-        messages.push(cleaned);
+        const key = cleaned.map(b => b.v || "").join("").substring(0, 80);
+        if (!seen.has(key)) {
+          seen.add(key);
+          messages.push(cleaned);
+        }
       }
     }
 

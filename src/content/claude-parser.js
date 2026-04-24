@@ -19,36 +19,36 @@ class ClaudeParser {
 
   extractMessages() {
     const messages = [];
-    
+    const seen = new Set();
+
     // Claude uses specific DOM structure for messages
-    // This selector targets message containers
     const messageElements = document.querySelectorAll('[data-test-render-count]');
-    
+
     messageElements.forEach((element, index) => {
-      // Determine if user or assistant message
-      // Matches lisa-v-parser.js detection: user = right-aligned bg-bg-300 bubble, assistant = has streaming element
       const hasStreaming = element.querySelector('[data-is-streaming]') !== null;
       const hasUserBg = element.querySelector('.bg-bg-300') !== null;
       const hasRightAlign = element.querySelector("[class*='justify-end']") !== null ||
                             element.querySelector("[class*='items-end']") !== null;
       const isUser = !hasStreaming && (hasUserBg || hasRightAlign);
-      
-      // Extract text content, excluding UI elements
+
       const textContent = this.extractTextContent(element);
-      
+
       if (textContent && textContent.trim().length > 0) {
-        messages.push({
-          role: isUser ? 'user' : 'assistant',
-          content: textContent.trim(),
-          index: index,
-          timestamp: new Date().toISOString() // Claude doesn't expose timestamps easily
-        });
+        const key = textContent.trim().substring(0, 80);
+        if (!seen.has(key)) {
+          seen.add(key);
+          messages.push({
+            role: isUser ? 'user' : 'assistant',
+            content: textContent.trim(),
+            index: index,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     });
 
     return messages;
   }
-
   extractTextContent(element) {
     // Clone element to avoid modifying DOM
     const clone = element.cloneNode(true);

@@ -661,7 +661,8 @@ function createContextMenus() {
 
 // Create menus on install/update
 chrome.runtime.onInstalled.addListener((details) => {
-  console.debug('[LISA] Extension installed/updated:', details.reason);
+  chrome.runtime.setUninstallURL("https://forms.gle/2Vu8M8NQYP6eKBnR9");
+  console.debug("[LISA] Extension installed/updated:", details.reason);
   createContextMenus();
   
   // Show "What's new" for updates (not fresh installs)

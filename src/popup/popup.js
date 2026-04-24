@@ -1,5 +1,5 @@
 // LISA Core Extension - Popup Logic
-// v0.49.4 - Auto-embed integrity hash, auto-renewal/cancellation notice
+// v0.49.5 - Auto-embed integrity hash, auto-renewal/cancellation notice
 
 class LISAPopup {
   constructor() {
@@ -776,13 +776,13 @@ class LISAPopup {
           // that replace expensive NLP inference on the raw text
           const preComputedWork = entityCount + conceptCount + relationshipCount;
           const enrichedTokenEstimate = Math.round(JSON.stringify(this.compressedData).length / 4);
-          const savedPercent = rawTokenEstimate > 0 
-            ? Math.round((1 - (enrichedTokenEstimate - preComputedWork * 3) / (rawTokenEstimate + rawTokenEstimate * 0.3)) * 100)
+          const savedPercent = rawTokenEstimate > 0 && enrichedTokenEstimate < rawTokenEstimate
+            ? Math.min(95, Math.max(0, Math.round((rawTokenEstimate - enrichedTokenEstimate) / rawTokenEstimate * 100)))
             : 0;
           
           document.getElementById('rawTokens').textContent = rawTokenEstimate.toLocaleString();
           document.getElementById('enrichedTokens').textContent = enrichedTokenEstimate.toLocaleString();
-          document.getElementById('tokensSaved').textContent = '~' + Math.max(savedPercent, 0) + '% inference reduction';
+          document.getElementById('tokensSaved').textContent = savedPercent > 0 ? '~' + savedPercent + '% context reduction' : 'enriched';
           document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
 

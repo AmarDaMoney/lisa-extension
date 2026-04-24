@@ -1,6 +1,6 @@
 /**
  * LISA Semantic Analyzer
- * Version: 0.49.4
+ * Version: 0.49.5
  * 
  * Transforms raw extracted messages into structured semantic format.
  * Fails gracefully - returns original data if analysis fails.
@@ -232,7 +232,7 @@ const SemanticAnalyzer = {
         const actions = this.extractActions(msg.content);
         const topic = this.detectTopic(msg.content);
 
-        if (severities.length > 0 || files.length > 0 || actions.length > 0 || msg.content.length > 100) {
+        if (severities.length > 0 || files.length > 0 || actions.length > 0 || (msg.content.length > 500 && !msg.content.includes("```"))) {
           const id = `SA${String(anchorIndex).padStart(3, '0')}`;
           semanticAnchors[id] = {
             topic,
@@ -250,7 +250,7 @@ const SemanticAnalyzer = {
       let actionIndex = 1;
       const allActions = this.extractActions(allText);
 
-      allActions.forEach(action => {
+      allActions.slice(0, 20).forEach(action => {
         const id = `AV${String(actionIndex).padStart(3, '0')}`;
         actionVectors[id] = {
           action: action.command,

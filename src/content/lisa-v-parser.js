@@ -4,6 +4,8 @@
 class LisaVParser {
   constructor() {
     this.blocks = [];
+    const match = window.location.pathname.match(/\/(?:chat|code)\/([a-f0-9-]+)/);
+    this.conversationId = match ? match[1] : null;
   }
 
   // SHA-256 hash for code provenance

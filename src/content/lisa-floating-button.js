@@ -30,15 +30,41 @@ class LISAFloatingButton {
   async checkFloatingLimit(type) {
     // Premium users have no limits
     if (this.isPremium) return { allowed: true };
-    
+
+    // Try backend identity check first (survives reinstalls)
+    try {
+      const token = await new Promise((resolve) => {
+        chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+      });
+      if (token) {
+        const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/limits/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, action: type })
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (!data.allowed && data.reason !== 'backend_error') {
+            return {
+              allowed: false,
+              message: `Free tier: 5 ${type} saves per day. Upgrade for unlimited!`
+            };
+          }
+          if (data.allowed) return { allowed: true, remaining: data.remaining };
+        }
+      }
+    } catch (e) {
+      console.debug('[LISA] Backend limit check failed, falling back to local:', e);
+    }
+
+    // Fallback: local limit check (no Google auth or backend unreachable)
     const storageKey = `floating_${type}_today`;
     const dateKey = 'floating_limit_date';
     
     try {
       const result = await chrome.storage.sync.get([storageKey, dateKey]);
-      const today = new Date().toISOString().slice(0, 10); // UTC YYYY-MM-DD, consistent across timezones
+      const today = new Date().toISOString().slice(0, 10);
       
-      // Reset if new day
       if (result[dateKey] !== today) {
         await chrome.storage.sync.set({ 
           [dateKey]: today,

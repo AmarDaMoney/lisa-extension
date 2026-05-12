@@ -660,8 +660,9 @@ function createContextMenus() {
 }
 
 // Create menus on install/update
+
+chrome.runtime.setUninstallURL("https://forms.gle/2Vu8M8NQYP6eKBnR9");
 chrome.runtime.onInstalled.addListener((details) => {
-  chrome.runtime.setUninstallURL("https://forms.gle/2Vu8M8NQYP6eKBnR9");
   console.debug("[LISA] Extension installed/updated:", details.reason);
   createContextMenus();
   

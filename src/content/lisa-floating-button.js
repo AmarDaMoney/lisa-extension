@@ -446,36 +446,40 @@ class LISAFloatingButton {
       setTimeout(() => toast.remove(), 3000);
     }
   }
-  showUpgradePrompt() {
+  showUpgradePrompt(reason = 'limit') {
     const existing = document.querySelector('.lisa-upgrade-modal');
     if (existing) existing.remove();
+
+    const isCredits = reason === 'no_credits';
+    const title = isCredits ? '💳 Out of Credits' : '⚡ Upgrade to Pro';
+    const text = isCredits
+      ? 'You have no credits left. Top up to keep saving, or upgrade to Pro for unlimited saves.'
+      : "You\'ve reached your free daily limit. Upgrade to Pro for unlimited saves — or start with a credit bundle from just $1.";
 
     const modal = document.createElement('div');
     modal.className = 'lisa-upgrade-modal';
     modal.innerHTML = `
       <div class="lisa-modal-content">
-        <div class="lisa-modal-title">⚡ Upgrade to Premium</div>
-        <div class="lisa-modal-text">
-          Get unlimited LISA-V and Raw JSON saves, plus all premium features!
-        </div>
+        <div class="lisa-modal-title">${title}</div>
+        <div class="lisa-modal-text">${text}</div>
         <div class="lisa-modal-buttons">
           <button class="lisa-modal-btn lisa-maybe-later">Maybe Later</button>
-          <button class="lisa-modal-btn primary lisa-upgrade-now">Upgrade Now</button>
+          <button class="lisa-modal-btn lisa-buy-credits">Buy Credits from $1</button>
+          <button class="lisa-modal-btn primary lisa-upgrade-now">Upgrade to Pro — $9.99/mo</button>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
 
-    // Add event listeners (CSP-compliant, no inline onclick)
-    const maybeLaterBtn = modal.querySelector('.lisa-maybe-later');
-    const upgradeNowBtn = modal.querySelector('.lisa-upgrade-now');
-    
-    maybeLaterBtn.addEventListener('click', () => {
+    modal.querySelector('.lisa-maybe-later').addEventListener('click', () => modal.remove());
+
+    modal.querySelector('.lisa-upgrade-now').addEventListener('click', () => {
+      window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank');
       modal.remove();
     });
-    
-    upgradeNowBtn.addEventListener('click', () => {
-      window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank');
+
+    modal.querySelector('.lisa-buy-credits').addEventListener('click', () => {
+      window.open('https://lisa-web-backend-production.up.railway.app/pricing#credits', '_blank');
       modal.remove();
     });
   }

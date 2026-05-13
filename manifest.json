@@ -161,5 +161,11 @@
         "https://*.perplexity.ai/*"
       ]
     }
-  ]
+  ],
+  "oauth2": {
+    "client_id": "288694505034-n3i0v69lsarh505q35cos8m4n2v6cqnj.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  }
 }

@@ -6,7 +6,7 @@
 
 **AI Memory Library** - Capture AI conversations from Claude, ChatGPT, Gemini & more!
 
-![Version](https://img.shields.io/badge/version-0.49.6-blue)
+![Version](https://img.shields.io/badge/version-0.49.7-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 🎯 What is LISA Core?

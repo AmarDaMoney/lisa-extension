@@ -1,6 +1,6 @@
 // LISA Core - Semantic Compression Engine
 // Background Service Worker (Manifest V3)
-// v0.49.6 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
+// v0.49.7 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
 
 class LISACompressor {
   constructor() {
@@ -110,7 +110,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.49.6',
+        lisaVersion: '0.49.7',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
@@ -974,4 +974,4 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   }
 });
 
-console.debug('[LISA] Core compression engine initialized v0.49.6');
+console.debug('[LISA] Core compression engine initialized v0.49.7');

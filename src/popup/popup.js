@@ -1003,13 +1003,34 @@ class LISAPopup {
 
   async openCreditCheckout(bundle) {
     try {
-      const licenseKey = this.licenseKey || '';
-      let identifier = licenseKey;
+      // Prefer Google ID (stable across reinstalls) → fallback to license key → fallback to email prompt
+      let identifier = '';
       let email = '';
+
+      try {
+        const token = await new Promise((resolve) => {
+          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+        });
+        if (token) {
+          const r = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+          if (r.ok) {
+            const d = await r.json();
+            if (d.sub) identifier = `goog_${d.sub}`;
+          }
+        }
+      } catch (e) {
+        console.debug('[LISA] Could not get Google ID for credit checkout:', e);
+      }
+
       if (!identifier) {
-        email = prompt('Enter your email to link credits to your account:') || '';
-        if (!email) return;
-        identifier = 'email_' + email;
+        const licenseKey = this.licenseKey || '';
+        if (licenseKey) {
+          identifier = licenseKey;
+        } else {
+          email = prompt('Enter your email to link credits to your account:') || '';
+          if (!email) return;
+          identifier = 'email_' + email;
+        }
       }
       const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/purchase', {
         method: 'POST',
@@ -1031,10 +1052,36 @@ class LISAPopup {
 
   async loadCreditBalance() {
     try {
-      const licenseKey = this.licenseKey || '';
-      if (!licenseKey) return;
+      // Build identifier — same priority order as openCreditCheckout
+      let identifier = '';
+      let headers = { 'Content-Type': 'application/json' };
+
+      try {
+        const token = await new Promise((resolve) => {
+          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+        });
+        if (token) {
+          const r = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+          if (r.ok) {
+            const d = await r.json();
+            if (d.sub) identifier = `goog_${d.sub}`;
+          }
+        }
+      } catch (e) {
+        console.debug('[LISA] Could not get Google ID for credit balance:', e);
+      }
+
+      if (!identifier) {
+        const licenseKey = this.licenseKey || '';
+        if (!licenseKey) return;
+        identifier = licenseKey;
+        headers['X-License-Key'] = licenseKey;
+      } else {
+        headers['X-Google-Id'] = identifier;
+      }
+
       const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
-        headers: { 'X-License-Key': licenseKey }
+        headers
       });
       if (!response.ok) return;
       const data = await response.json();

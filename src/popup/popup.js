@@ -24,6 +24,7 @@ class LISAPopup {
     this.setupAutoSaveToggle();
     this.checkForUpdates();
     this.checkWhatsNew();
+    this.loadCreditBalance();
   }
   
   async checkWhatsNew() {
@@ -467,6 +468,23 @@ class LISAPopup {
     document.getElementById('subscribeAnnualBtn').addEventListener('click', () => {
       this.openStripeCheckout('annual');
     });
+
+    // PAYG credit bundle buttons
+    document.getElementById('buyCreditsStarterBtn').addEventListener('click', () => {
+      this.openCreditCheckout('starter');
+    });
+    document.getElementById('buyCreditsPopularBtn').addEventListener('click', () => {
+      this.openCreditCheckout('popular');
+    });
+    document.getElementById('buyCreditsPropupBtn').addEventListener('click', () => {
+      this.openCreditCheckout('pro_topup');
+    });
+
+    // Credit balance badge click → open upgrade modal
+    const creditBadge = document.getElementById('creditBalance');
+    if (creditBadge) {
+      creditBadge.addEventListener('click', () => this.openUpgradeModal());
+    }
 
     document.getElementById('learnMoreAppBtn').addEventListener('click', () => {
       this.openAppPage();
@@ -982,6 +1000,55 @@ class LISAPopup {
     }
   }
 
+
+  async openCreditCheckout(bundle) {
+    try {
+      const licenseKey = this.licenseKey || '';
+      let identifier = licenseKey;
+      let email = '';
+      if (!identifier) {
+        email = prompt('Enter your email to link credits to your account:') || '';
+        if (!email) return;
+        identifier = 'email_' + email;
+      }
+      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle, email, identifier })
+      });
+      const data = await response.json();
+      if (data.checkout_url) {
+        this.closeUpgradeModal();
+        chrome.tabs.create({ url: data.checkout_url });
+      } else {
+        this.showError('Credit checkout error. Please try again.');
+      }
+    } catch (error) {
+      console.error('[LISA] Credit checkout error:', error);
+      this.showError('Failed to open checkout. Please try again.');
+    }
+  }
+
+  async loadCreditBalance() {
+    try {
+      const licenseKey = this.licenseKey || '';
+      if (!licenseKey) return;
+      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
+        headers: { 'X-License-Key': licenseKey }
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      const balance = data.balance || 0;
+      const badge = document.getElementById('creditBalance');
+      const count = document.getElementById('creditCount');
+      if (badge && count) {
+        count.textContent = balance;
+        badge.style.display = balance > 0 ? 'inline-block' : 'none';
+      }
+    } catch (e) {
+      console.debug('[LISA] Could not load credit balance:', e);
+    }
+  }
   openAppPage() {
     const appUrl = this.userTier === 'premium' 
       ? 'https://lisa-web-backend-production.up.railway.app/app'

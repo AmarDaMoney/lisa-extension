@@ -18,6 +18,7 @@
       </div>
       <div class="user-status">
         <span id="userTier" class="tier-badge">Free</span>
+        <span id="creditBalance" class="tier-badge" style="display: none; background: var(--accent, #6366f1); cursor: pointer;" title="Your PAYG credit balance">💳 <span id="creditCount">0</span> credits</span>
         <button id="upgradeBtn" class="tier-badge upgrade-badge" style="display: none;">⭐ Upgrade</button>
       </div>
     </header>
@@ -282,11 +283,21 @@
               <div class="badge">Best Value</div>
               <h3>Annual</h3>
               <div class="price">$89.99<span>/year</span></div>
-              <div class="savings">Save $149/year</div>
+              <div class="savings">Save $30/year</div>
               <button id="subscribeAnnualBtn" class="btn btn-subscribe">Subscribe Annually</button>
             </div>
           </div>
           
+          <div style="margin: 1.5rem 0; padding: 1rem; border: 1px solid var(--border, #333); border-radius: 8px;">
+            <h3 style="margin: 0 0 0.5rem 0; font-size: 0.95rem;">💳 Or Pay As You Go</h3>
+            <p style="font-size: 0.8rem; color: var(--text-secondary, #aaa); margin: 0 0 1rem 0;">No subscription. Credits never expire.</p>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button id="buyCreditsStarterBtn" class="btn" style="flex:1; font-size:0.8rem; padding: 0.5rem;">Starter<br><strong>100 credits — $1</strong></button>
+              <button id="buyCreditsPopularBtn" class="btn btn-subscribe" style="flex:1; font-size:0.8rem; padding: 0.5rem;">Popular ⭐<br><strong>500 credits — $4</strong></button>
+              <button id="buyCreditsPropupBtn" class="btn" style="flex:1; font-size:0.8rem; padding: 0.5rem;">Pro Top-up<br><strong>1000 credits — $7</strong></button>
+            </div>
+          </div>
+
           <h3>🚀 Premium Features</h3>
           <ul class="premium-features-list">
             <li>

@@ -803,7 +803,7 @@ class LisaVParser {
     });
 
     // Update lite manifest with actual block count
-    this.blocks[liteManifestIndex].blockCount = this.blocks.length + 1;
+    this.blocks[liteManifestIndex].blockCount = this.blocks.length;
 
     // Closing sys block
     this.blocks.push({

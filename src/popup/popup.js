@@ -751,6 +751,33 @@ class LISAPopup {
       this.showError('Please extract a conversation first');
       return;
     }
+    // PAYG credit check
+    if (!this.isPremium) {
+      try {
+        const token = await new Promise((resolve) => {
+          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+        });
+        if (token) {
+          const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+          });
+          if (balResp.ok) {
+            const balData = await balResp.json();
+            if (balData.balance > 0) {
+              await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, source: 'extension' })
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.debug('[LISA] PAYG credit check failed:', e);
+      }
+    }
 
     this.showLoading('Compressing to LISA format...');
 
@@ -1089,7 +1116,7 @@ class LISAPopup {
       const badge = document.getElementById('creditBalance');
       const count = document.getElementById('creditCount');
       if (badge && count) {
-        count.textContent = balance;
+        count.textContent = "$" + (balance * 0.01).toFixed(2);
         badge.style.display = balance > 0 ? 'inline-block' : 'none';
       }
     } catch (e) {

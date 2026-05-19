@@ -30,6 +30,33 @@ class LISAFloatingButton {
   async checkFloatingLimit(type) {
     // Premium users have no limits
     if (this.isPremium) return { allowed: true };
+    // PAYG credit check
+    try {
+      const token = await new Promise((resolve) => {
+        chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+      });
+      if (token) {
+        const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        if (balResp.ok) {
+          const balData = await balResp.json();
+          if (balData.balance > 0) {
+            // Deduct 1 credit and allow
+            await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token, source: 'extension' })
+            });
+            return { allowed: true, credits: true };
+          }
+        }
+      }
+    } catch (e) {
+      console.debug('[LISA] PAYG credit check failed:', e);
+    }
 
     // Try backend identity check first (survives reinstalls)
     try {

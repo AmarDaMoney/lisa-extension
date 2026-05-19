@@ -25,6 +25,7 @@ class LISAPopup {
     this.checkForUpdates();
     this.checkWhatsNew();
     this.loadCreditBalance();
+    this.showNewsletterIfEligible();
   }
   
   async checkWhatsNew() {
@@ -541,6 +542,52 @@ class LISAPopup {
       e.preventDefault();
       this.openFeedback();
     });
+    // Newsletter signup
+    const newsletterBtn = document.getElementById('newsletterBtn');
+    if (newsletterBtn) {
+      newsletterBtn.addEventListener('click', async () => {
+        const email = document.getElementById('newsletterEmail').value.trim();
+        const msg = document.getElementById('newsletterMsg');
+        if (!email || !email.includes('@')) {
+          msg.textContent = 'Please enter a valid email.';
+          msg.style.color = '#f87171';
+          msg.style.display = 'block';
+          return;
+        }
+        newsletterBtn.disabled = true;
+        newsletterBtn.textContent = '...';
+        try {
+          const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/newsletter/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, source: 'popup' })
+          });
+          const data = await resp.json();
+          if (data.success) {
+            msg.textContent = '✅ You are on the list!';
+            msg.style.color = 'var(--success-color)';
+            document.getElementById('newsletterEmail').value = '';
+            setTimeout(() => {
+              document.getElementById('newsletterSection').style.display = 'none';
+              chrome.storage.local.set({ newsletterSubscribed: true });
+            }, 3000);
+          } else {
+            msg.textContent = 'Something went wrong. Try again.';
+            msg.style.color = '#f87171';
+            newsletterBtn.disabled = false;
+            newsletterBtn.textContent = 'Notify me';
+          }
+          msg.style.display = 'block';
+        } catch (e) {
+          msg.textContent = 'Something went wrong. Try again.';
+          msg.style.color = '#f87171';
+          newsletterBtn.disabled = false;
+          newsletterBtn.textContent = 'Notify me';
+          msg.style.display = 'block';
+        }
+      });
+    }
+
     // How to Use collapsible toggle
     document.getElementById('howToToggle').addEventListener('click', () => {
       const content = document.getElementById('howToContent');
@@ -1123,6 +1170,19 @@ class LISAPopup {
       console.debug('[LISA] Could not load credit balance:', e);
     }
   }
+  async showNewsletterIfEligible() {
+    if (this.isPremium) return;
+    try {
+      const { newsletterSubscribed } = await chrome.storage.local.get('newsletterSubscribed');
+      if (!newsletterSubscribed) {
+        const section = document.getElementById('newsletterSection');
+        if (section) section.style.display = 'block';
+      }
+    } catch (e) {
+      console.debug('[LISA] Newsletter eligibility check failed:', e);
+    }
+  }
+
   openAppPage() {
     const appUrl = this.userTier === 'premium' 
       ? 'https://lisa-web-backend-production.up.railway.app/app'

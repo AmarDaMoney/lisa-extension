@@ -1562,3 +1562,66 @@ input:checked + .toggle-slider:before {
   font-size: 11px;
   color: #4ade80;
 }
+
+/* ============================================================
+   NEWSLETTER / UPDATES
+   ============================================================ */
+
+.newsletter-section {
+  padding: 10px 16px 4px;
+  border-top: 1px solid var(--border);
+}
+.newsletter-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+.newsletter-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.newsletter-form {
+  display: flex;
+  gap: 6px;
+}
+.newsletter-input {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+}
+.newsletter-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+.newsletter-input::placeholder {
+  color: var(--text-muted);
+}
+.newsletter-btn {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.newsletter-btn:hover { background: var(--primary-dark); }
+.newsletter-msg {
+  font-size: 11px;
+  margin-top: 6px;
+  display: block;
+  color: var(--success-color);
+}

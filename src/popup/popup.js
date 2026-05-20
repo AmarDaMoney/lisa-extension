@@ -83,7 +83,10 @@ class LISAPopup {
       
       // Compare versions (simple string compare works for semver)
       if (latestVersion > currentVersion) {
-        this.showUpdateBanner(latestVersion, data.changelog);
+        const { dismissedUpdate } = await chrome.storage.local.get('dismissedUpdate');
+        if (dismissedUpdate !== latestVersion) {
+          this.showUpdateBanner(latestVersion, data.changelog);
+        }
       }
     } catch (error) {
       // Silently fail - don't block popup functionality

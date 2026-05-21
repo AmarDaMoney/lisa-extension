@@ -784,6 +784,71 @@ class LisaVParser {
       warnings: []
     };
   }
+  // Auto-generate anchor block — context summary for receiving AI
+  generateAnchorBlock(conversationBlocks, nextBlocks, metaBlock) {
+    const userBlocks      = conversationBlocks.filter(b => b.t === 'u');
+    const assistantBlocks = conversationBlocks.filter(b => b.t === 'a_text');
+    const codeBlocks      = conversationBlocks.filter(b => b.t === 'code');
+
+    // Frequency analysis over all text content
+    const allText = conversationBlocks
+      .filter(b => b.v && (b.t === 'u' || b.t === 'a_text'))
+      .map(b => b.v).join(' ');
+
+    const stopwords = new Set(['this','that','with','from','have','been','will','would','could','should',
+      'their','there','they','what','when','where','which','more','also','into','your','about',
+      'just','like','some','than','then','them','these','those','were','very','well','said','does']);
+
+    const wordFreq = {};
+    (allText.toLowerCase().match(/[a-z]{4,}/g) || []).forEach(w => {
+      if (!stopwords.has(w)) wordFreq[w] = (wordFreq[w] || 0) + 1;
+    });
+    const dominantConcepts = Object.entries(wordFreq)
+      .sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w]) => w);
+
+    // Key entities: capitalized terms + acronyms
+    const entities = new Set();
+    (allText.match(/[A-Z][a-zA-Z]{2,}/g) || []).forEach(e => entities.add(e));
+    (allText.match(/[A-Z]{2,}/g) || []).forEach(e => entities.add(e));
+
+    // Session register inference
+    const techTerms    = ['function','class','algorithm','model','deploy','api','error','database','code','system'];
+    const emotionTerms = ['feel','love','trust','believe','hope','fear','want','understand','care','human'];
+    const lower = allText.toLowerCase();
+    const techScore    = techTerms.filter(t => lower.includes(t)).length;
+    const emotionScore = emotionTerms.filter(t => lower.includes(t)).length;
+    const codeRatio    = codeBlocks.length / Math.max(conversationBlocks.length, 1);
+    let register = 'conversational';
+    if (codeRatio > 0.1 || techScore > 5)           register = 'technical';
+    else if (emotionScore > 3 && techScore < 3)     register = 'philosophical';
+    else if (techScore > 3  && emotionScore > 3)    register = 'mixed';
+
+    // Core topic: page title stripped of platform suffix, or first user message
+    let coreTopic = (typeof document !== 'undefined' ? document.title : '')
+      .replace(/ [-|] (Claude|ChatGPT|Gemini|Grok|Mistral|DeepSeek|Copilot|Perplexity).*/i, '').trim();
+    if (!coreTopic || coreTopic.length < 5) {
+      coreTopic = (userBlocks[0]?.v || '').substring(0, 100).replace(/\n/g, ' ').trim();
+    }
+
+    // Open tasks
+    const openTasks = nextBlocks.filter(b => !b.resolved).map(b => b.action).filter(Boolean);
+
+    return {
+      t: 'anchor',
+      role: 'system',
+      v: {
+        core_topic:        coreTopic,
+        platform:          metaBlock.platform || 'unknown',
+        message_count:     { user: userBlocks.length, assistant: assistantBlocks.length },
+        dominant_concepts: dominantConcepts,
+        key_entities:      [...entities].slice(0, 10),
+        session_register:  register,
+        open_tasks:        openTasks,
+        generated_by:      'LISA v0.50.0'
+      }
+    };
+  }
+
   // Build complete LISA-V with relationships and next blocks
   async finalize() {
     // --- Phase 1: Generate all derived blocks ---
@@ -808,7 +873,9 @@ class LisaVParser {
     // Line 3: summary — executive brief (completed vs open tasks)
     this.blocks.push(this.generateSummaryBlock(nextBlocks));
 
-    // Lines 4-N: next blocks — open tasks before any conversation content
+    // Line 4: anchor — auto-generated context for receiving AI
+    this.blocks.push(this.generateAnchorBlock(conversationBlocks, nextBlocks, metaBlock));
+    // Lines 5-N: next blocks — open tasks before any conversation content
     this.blocks.push(...nextBlocks);
 
     // Lines N+1+: conversation content (user messages, assistant text, code)

@@ -15,52 +15,32 @@ class GrokParser {
 
   async extractMessages() {
     const messages = [];
-    
-    // Grok uses message wrappers with items-end (user) / items-start (assistant)
+
+    // Primary: Grok wraps each turn with items-end (user) / items-start (assistant)
     const messageWrappers = document.querySelectorAll('.relative.group.flex.flex-col.justify-center.w-full');
-    
+
     for (const wrapper of messageWrappers) {
-      const hasItemsEnd = wrapper.className.includes('items-end');
-      const hasItemsStart = wrapper.className.includes('items-start');
-      
-      let role = null;
-      if (hasItemsEnd) role = 'user';
-      else if (hasItemsStart) role = 'assistant';
-      
+      const role = wrapper.classList.contains('items-end') ? 'user'
+                 : wrapper.classList.contains('items-start') ? 'assistant'
+                 : null;
       if (!role) continue;
-      
+
       const messageBubble = wrapper.querySelector('[class*="message-bubble"]');
       if (!messageBubble) continue;
-      
+
       const textContent = this.extractTextContent(messageBubble);
-      
       if (textContent && textContent.trim().length > 0) {
-        messages.push({
-          role: role,
-          content: textContent.trim(),
-          index: messages.length,
-          timestamp: new Date().toISOString()
-        });
+        messages.push({ role, content: textContent.trim(), index: messages.length, timestamp: new Date().toISOString() });
       }
     }
-    
-    // Fallback for older Grok versions
+
+    // Fallback: data-testid attributes only (safer than class wildcards)
     if (messages.length === 0) {
-      const fallbackElements = document.querySelectorAll('[data-testid*="message"], [class*="message"], article');
-      fallbackElements.forEach((element, index) => {
-        const isUser = element.querySelector('[data-testid="User-Name"]') !== null ||
-                       element.textContent.includes('You:') ||
-                       element.closest('[class*="user"]') !== null;
-        
-        const textContent = this.extractTextContent(element);
-        
+      document.querySelectorAll('[data-testid*="message"]').forEach((el, i) => {
+        const isUser = el.querySelector('[data-testid="User-Name"]') !== null;
+        const textContent = this.extractTextContent(el);
         if (textContent && textContent.trim().length > 0) {
-          messages.push({
-            role: isUser ? 'user' : 'assistant',
-            content: textContent.trim(),
-            index: index,
-            timestamp: new Date().toISOString()
-          });
+          messages.push({ role: isUser ? 'user' : 'assistant', content: textContent.trim(), index: i, timestamp: new Date().toISOString() });
         }
       });
     }
@@ -78,11 +58,10 @@ class GrokParser {
   }
 
   async extractConversation() {
+    this.conversationId = this.extractConversationId();
     const messages = await this.extractMessages();
-    
-    if (messages.length === 0) {
-      return null;
-    }
+
+    if (messages.length === 0) return null;
 
     return {
       platform: this.platform,

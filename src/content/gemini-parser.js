@@ -72,24 +72,22 @@ class GeminiParser {
     return clone.textContent || clone.innerText || '';
   }
 
-  extractConversation() {
+  async extractConversation() {
+    this.conversationId = this.extractConversationId();
     const messages = this.extractMessages();
-    
-    if (messages.length === 0) {
-      return null;
-    }
 
-    // Get title from conversation-title element or first user message
+    if (messages.length === 0) return null;
+
     const titleElement = document.querySelector('.conversation-title');
     const firstUserMsg = messages.find(m => m.role === 'user');
-    const title = titleElement?.textContent?.trim() 
+    const title = titleElement?.textContent?.trim()
       || (firstUserMsg ? firstUserMsg.content.slice(0, 50) + (firstUserMsg.content.length > 50 ? '...' : '') : 'Gemini Conversation');
 
     return {
       platform: this.platform,
       conversationId: this.conversationId,
       url: window.location.href,
-      title: title,
+      title,
       extractedAt: new Date().toISOString(),
       messageCount: messages.length,
       messages: messages
@@ -97,14 +95,14 @@ class GeminiParser {
   }
 
   initializeListener() {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       if (request.action === 'ping') {
         sendResponse({ success: true, platform: this.platform });
         return true;
       }
       if (request.action === 'extractConversation') {
         try {
-          const conversation = this.extractConversation();
+          const conversation = await this.extractConversation();
           sendResponse({ success: true, data: conversation });
         } catch (error) {
           console.error('[LISA] Gemini extraction error:', error);

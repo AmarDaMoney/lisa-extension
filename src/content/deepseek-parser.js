@@ -15,30 +15,24 @@ class DeepSeekParser {
 
   extractMessages() {
     const messages = [];
-    
-    // DeepSeek uses .ds-message containers
+
+    // Primary: .ds-message is DeepSeek's stable message container
     let messageElements = document.querySelectorAll('.ds-message');
-    
-    // Fallback: broader class-based selectors
+
+    // Fallback: data-message-role attribute (more reliable than class wildcards)
     if (messageElements.length === 0) {
-      messageElements = document.querySelectorAll('[class*="Message"], [class*="message"], [data-message-role]');
+      messageElements = document.querySelectorAll('[data-message-role]');
     }
-    
+
     messageElements.forEach((element, index) => {
-      // DeepSeek: assistant messages contain .ds-markdown, user messages don't
-      const hasMarkdown = element.querySelector('.ds-markdown') !== null;
-      const hasAvatar = element.querySelector('.ds-icon, [class*="avatar"]') !== null;
-      const isUser = !hasMarkdown && !hasAvatar;
-      
+      const dataRole = element.getAttribute('data-message-role');
+      const role = dataRole
+        ? (dataRole === 'user' ? 'user' : 'assistant')
+        : (element.querySelector('.ds-markdown') ? 'assistant' : 'user');
+
       const textContent = this.extractTextContent(element);
-      
       if (textContent && textContent.trim().length > 0) {
-        messages.push({
-          role: isUser ? 'user' : 'assistant',
-          content: textContent.trim(),
-          index: index,
-          timestamp: new Date().toISOString()
-        });
+        messages.push({ role, content: textContent.trim(), index, timestamp: new Date().toISOString() });
       }
     });
 
@@ -47,20 +41,33 @@ class DeepSeekParser {
 
   extractTextContent(element) {
     const clone = element.cloneNode(true);
-    
-    // Remove UI elements
-    clone.querySelectorAll('button, svg, [role="button"], [class*="action"]').forEach(el => el.remove());
-    
-    return clone.textContent || clone.innerText || '';
+    clone.querySelectorAll('button, svg, [role="button"], [class*="action"], [class*="copy"]').forEach(el => el.remove());
+    const prose = clone.querySelector('.ds-markdown') || clone.querySelector('[class*="content"]');
+    return (prose ? prose.textContent : (clone.textContent || clone.innerText || '')).trim();
   }
 
-  extractConversation() {
-    const messages = this.extractMessages();
-    
-    if (messages.length === 0) {
-      return null;
+  async extractConversation() {
+    this.conversationId = this.extractConversationId();
+    const progressive = window.lisaProgressive;
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > 0;
+    if (!bufferReady) {
+      const scroller = document.querySelector('.ds-conversation-wrapper, main');
+      if (scroller) {
+        scroller.scrollTop = 0;
+        await new Promise(r => setTimeout(r, 700));
+      }
     }
-
+    let messages = this.extractMessages();
+    if (window.lisaProgressive) {
+      const merged = window.lisaProgressive.mergeWithBuffer(messages);
+      messages = merged.map((m, i) => ({
+        role:      m.role || 'assistant',
+        content:   m.content || m.v || '',
+        index:     i,
+        timestamp: m.timestamp || m.capturedAt || new Date().toISOString()
+      }));
+    }
+    if (messages.length === 0) return null;
     return {
       platform: this.platform,
       conversationId: this.conversationId,
@@ -73,7 +80,7 @@ class DeepSeekParser {
   }
 
   initializeListener() {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       if (request.action === 'ping') {
         sendResponse({ success: true, platform: this.platform });
         return true;

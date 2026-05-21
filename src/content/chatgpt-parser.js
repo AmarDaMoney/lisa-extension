@@ -15,37 +15,18 @@ class ChatGPTParser {
 
   extractMessages() {
     const messages = [];
-    
-    // ChatGPT message structure - updated selectors for current DOM
-    // Try multiple selector strategies
+
+    // Primary selector — ChatGPT tags every message turn with data-message-author-role
     let messageGroups = document.querySelectorAll('[data-message-author-role]');
-    
-    // Fallback if first selector doesn't work
+
+    // Fallback: article elements (used in some ChatGPT layouts)
     if (messageGroups.length === 0) {
-      messageGroups = document.querySelectorAll('[class*="group"]');
+      messageGroups = document.querySelectorAll('article[data-testid], [role="article"]');
     }
-    
-    // Another fallback - look for conversation turns
-    if (messageGroups.length === 0) {
-      messageGroups = document.querySelectorAll('article, [role="article"]');
-    }
-    
+
     messageGroups.forEach((element, index) => {
-      // Multiple ways to determine role
-      let role = element.getAttribute('data-message-author-role');
-      
-      if (!role) {
-        // Check class names for hints
-        const classes = element.className || '';
-        if (classes.includes('user') || element.querySelector('[data-message-author-role="user"]')) {
-          role = 'user';
-        } else {
-          role = 'assistant';
-        }
-      }
-      
+      const role = element.getAttribute('data-message-author-role') || 'assistant';
       const textContent = this.extractTextContent(element);
-      
       if (textContent && textContent.trim().length > 0) {
         messages.push({
           role: role === 'user' ? 'user' : 'assistant',
@@ -60,18 +41,21 @@ class ChatGPTParser {
   }
 
   extractTextContent(element) {
-    // Clone to avoid DOM modification
     const clone = element.cloneNode(true);
-    
-    // Remove buttons, icons, and UI elements
-    clone.querySelectorAll('button, svg, [role="button"], .sr-only').forEach(el => el.remove());
-    
-    // Get markdown content if available, otherwise plain text
-    const markdownDiv = clone.querySelector('[class*="markdown"]');
-    return markdownDiv ? markdownDiv.textContent : (clone.textContent || clone.innerText || '');
+
+    // Strip UI chrome — buttons, icons, copy controls, sr-only labels
+    clone.querySelectorAll('button, svg, [role="button"], .sr-only, [data-testid*="action"]').forEach(el => el.remove());
+
+    // Prefer markdown/prose container; fall back to full text
+    const prose = clone.querySelector('[class*="markdown"], [class*="prose"], [data-message-content]');
+    const text = prose ? prose.textContent : (clone.textContent || clone.innerText || '');
+    return text.trim();
   }
 
   async extractConversation() {
+    // Refresh conversationId — may be stale after SPA navigation
+    this.conversationId = this.extractConversationId();
+
     // Fallback: scroll to top if progressive buffer is off or cold (no buffered data yet)
     const progressive = window.lisaProgressive;
     const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > 0;

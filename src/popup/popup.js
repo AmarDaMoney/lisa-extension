@@ -1711,11 +1711,12 @@ class LISAPopup {
     if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
   }
 
-  submitFeedback() {
+  async submitFeedback() {
     const subject = document.getElementById('feedbackSubject').value;
     const message = document.getElementById('feedbackMessage').value.trim();
     const email = document.getElementById('feedbackEmail').value.trim();
     const msg = document.getElementById('feedbackMsg');
+    const btn = document.getElementById('feedbackSend');
 
     if (!message) {
       msg.style.display = 'block';
@@ -1724,21 +1725,36 @@ class LISAPopup {
       return;
     }
 
-    const body = encodeURIComponent(
-      (email ? `From: ${email}
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    msg.style.display = 'none';
 
-` : '') + message
-    );
-    const subjectEncoded = encodeURIComponent(`[LISA Core] ${subject}`);
-    chrome.tabs.create({
-      url: `mailto:contact@sat-chain.com?subject=${subjectEncoded}&body=${body}`
-    });
+    try {
+      const version = chrome.runtime.getManifest().version;
+      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, message, email, version })
+      });
+      const data = await response.json();
 
-    msg.style.display = 'block';
-    msg.style.color = '#4caf50';
-    msg.textContent = '✓ Opening your email client...';
-
-    setTimeout(() => this.hideFeedbackPanel(), 1800);
+      if (data.success) {
+        msg.style.display = 'block';
+        msg.style.color = '#4caf50';
+        msg.textContent = '✓ Feedback sent — thank you!';
+        document.getElementById('feedbackMessage').value = '';
+        document.getElementById('feedbackEmail').value = '';
+        setTimeout(() => this.hideFeedbackPanel(), 2000);
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (e) {
+      msg.style.display = 'block';
+      msg.style.color = '#e05555';
+      msg.textContent = `Failed to send: ${e.message}`;
+      btn.disabled = false;
+      btn.textContent = 'Send Feedback';
+    }
   }
 
   formatBytes(bytes) {

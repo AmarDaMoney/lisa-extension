@@ -83,6 +83,7 @@ class LisaVParser {
         if (text) {
           blocks.push({
             t: role === 'user' ? 'u' : 'a_text',
+            role: role,
             v: text
           });
         }
@@ -284,8 +285,18 @@ class LisaVParser {
   // ChatGPT-specific extraction
   async extractChatGPTMessages() {
     const messages = [];
+
+    // ChatGPT virtualises long conversations — only bottom ~5 messages are DOM-mounted.
+    // Scroll to top first to force full render before querying.
+    const scroller = document.querySelector('div[class*="overflow-y-auto"]') ||
+                     document.querySelector('main');
+    if (scroller) {
+      scroller.scrollTop = 0;
+      await new Promise(r => setTimeout(r, 700));
+    }
+
     const messageContainers = document.querySelectorAll('[data-message-author-role]');
-    
+
     for (const container of messageContainers) {
       const role = container.getAttribute('data-message-author-role') || 'assistant';
       const blocks = await this.parseMessageContent(container, role);
@@ -293,7 +304,7 @@ class LisaVParser {
         messages.push(blocks);
       }
     }
-    
+
     return messages;
   }
 

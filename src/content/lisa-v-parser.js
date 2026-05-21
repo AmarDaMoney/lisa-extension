@@ -288,7 +288,10 @@ class LisaVParser {
     // Scroll fallback if buffer has no advantage over current DOM
     const progressive = window.lisaProgressive;
     const domCount = document.querySelectorAll('[data-message-author-role]').length;
-    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount;
+    const currentConvId = window.location.pathname.match(/\/c\/([a-f0-9-]+)/)?.[1] || '';
+    const bufferConvId = progressive?.conversationId || '';
+    const bufferMatchesConv = !currentConvId || !bufferConvId || bufferConvId.endsWith(currentConvId);
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;
     if (!bufferReady) {
       const scroller = document.querySelector('div[class*="overflow-y-auto"]') || document.querySelector('main');
       if (scroller) {

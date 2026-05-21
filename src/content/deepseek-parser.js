@@ -50,7 +50,9 @@ class DeepSeekParser {
     this.conversationId = this.extractConversationId();
     const progressive = window.lisaProgressive;
     const domCount = document.querySelectorAll('.ds-message, [data-message-role]').length;
-    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount;
+    const bufferConvId = progressive?.conversationId || '';
+    const bufferMatchesConv = !this.conversationId || !bufferConvId || bufferConvId.endsWith(this.conversationId);
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;
     if (!bufferReady) {
       const scroller = document.querySelector('.ds-conversation-wrapper, main');
       if (scroller) {

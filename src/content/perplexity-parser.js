@@ -82,7 +82,7 @@ class PerplexityParser {
   }
 
   initializeListener() {
-    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.action === 'ping') {
         sendResponse({ success: true, platform: this.platform });
         return true;

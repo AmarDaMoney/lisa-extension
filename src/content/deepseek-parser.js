@@ -49,7 +49,8 @@ class DeepSeekParser {
   async extractConversation() {
     this.conversationId = this.extractConversationId();
     const progressive = window.lisaProgressive;
-    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > 0;
+    const domCount = document.querySelectorAll('.ds-message, [data-message-role]').length;
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount;
     if (!bufferReady) {
       const scroller = document.querySelector('.ds-conversation-wrapper, main');
       if (scroller) {

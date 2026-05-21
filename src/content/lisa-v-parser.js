@@ -285,6 +285,17 @@ class LisaVParser {
   // ChatGPT-specific extraction
   async extractChatGPTMessages() {
     const messages = [];
+    // Scroll fallback if buffer has no advantage over current DOM
+    const progressive = window.lisaProgressive;
+    const domCount = document.querySelectorAll('[data-message-author-role]').length;
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount;
+    if (!bufferReady) {
+      const scroller = document.querySelector('div[class*="overflow-y-auto"]') || document.querySelector('main');
+      if (scroller) {
+        scroller.scrollTop = 0;
+        await new Promise(r => setTimeout(r, 700));
+      }
+    }
     const messageContainers = document.querySelectorAll('[data-message-author-role]');
     for (const container of messageContainers) {
       const role = container.getAttribute('data-message-author-role') || 'assistant';

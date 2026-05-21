@@ -58,7 +58,8 @@ class ChatGPTParser {
 
     // Fallback: scroll to top if progressive buffer is off or cold (no buffered data yet)
     const progressive = window.lisaProgressive;
-    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > 0;
+    const domCount = document.querySelectorAll('[data-message-author-role]').length;
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount;
     if (!bufferReady) {
       const scroller = document.querySelector('div[class*="overflow-y-auto"]') ||
                        document.querySelector('main');

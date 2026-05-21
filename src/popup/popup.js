@@ -22,7 +22,6 @@ class LISAPopup {
     this.setupEventListeners();
     this.loadSnapshots();
     this.setupAutoSaveToggle();
-    this.setupProgressiveCaptureMode();
     this.checkForUpdates();
     this.checkWhatsNew();
     this.loadCreditBalance();
@@ -544,7 +543,13 @@ class LISAPopup {
     // Links
     document.getElementById('feedbackLink').addEventListener('click', (e) => {
       e.preventDefault();
-      this.openFeedback();
+      this.showFeedbackPanel();
+    });
+    document.getElementById('feedbackBack').addEventListener('click', () => {
+      this.hideFeedbackPanel();
+    });
+    document.getElementById('feedbackSend').addEventListener('click', () => {
+      this.submitFeedback();
     });
     // Newsletter signup
     const newsletterBtn = document.getElementById('newsletterBtn');
@@ -1536,29 +1541,6 @@ class LISAPopup {
     });
   }
 
-  async setupProgressiveCaptureMode() {
-    const select = document.getElementById('progressiveCaptureMode');
-    if (!select) return;
-    try {
-      const { progressiveCaptureMode } = await chrome.storage.sync.get('progressiveCaptureMode');
-      select.value = progressiveCaptureMode || 'auto';
-    } catch (e) {
-      console.error('[LISA] Failed to get progressive capture mode:', e);
-    }
-    select.addEventListener('change', async () => {
-      try {
-        await chrome.storage.sync.set({ progressiveCaptureMode: select.value });
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab?.id) {
-          chrome.tabs.sendMessage(tab.id, { action: 'setProgressiveMode', mode: select.value });
-        }
-        this.trackEvent('progressive_mode_changed', { mode: select.value });
-      } catch (e) {
-        console.error('[LISA] Failed to set progressive capture mode:', e);
-      }
-    });
-  }
-
   async downloadSnapshot(id) {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
@@ -1709,8 +1691,44 @@ class LISAPopup {
     return div.innerHTML;
   }
   
-  openFeedback() {
-    chrome.tabs.create({ url: 'mailto:contact@sat-chain.com?subject=LISA%20Feedback' });
+  showFeedbackPanel() {
+    document.getElementById('feedbackPanel').style.display = 'flex';
+  }
+
+  hideFeedbackPanel() {
+    document.getElementById('feedbackPanel').style.display = 'none';
+    const msg = document.getElementById('feedbackMsg');
+    if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+  }
+
+  submitFeedback() {
+    const subject = document.getElementById('feedbackSubject').value;
+    const message = document.getElementById('feedbackMessage').value.trim();
+    const email = document.getElementById('feedbackEmail').value.trim();
+    const msg = document.getElementById('feedbackMsg');
+
+    if (!message) {
+      msg.style.display = 'block';
+      msg.style.color = '#e05555';
+      msg.textContent = 'Please enter a message before sending.';
+      return;
+    }
+
+    const body = encodeURIComponent(
+      (email ? `From: ${email}
+
+` : '') + message
+    );
+    const subjectEncoded = encodeURIComponent(`[LISA Core] ${subject}`);
+    chrome.tabs.create({
+      url: `mailto:contact@sat-chain.com?subject=${subjectEncoded}&body=${body}`
+    });
+
+    msg.style.display = 'block';
+    msg.style.color = '#4caf50';
+    msg.textContent = '✓ Opening your email client...';
+
+    setTimeout(() => this.hideFeedbackPanel(), 1800);
   }
 
   formatBytes(bytes) {

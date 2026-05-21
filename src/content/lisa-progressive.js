@@ -19,7 +19,7 @@ class LisaProgressiveCapture {
 
   async init() {
     const { progressiveCaptureMode } = await chrome.storage.sync.get('progressiveCaptureMode');
-    this.mode = progressiveCaptureMode || 'auto';
+    this.mode = progressiveCaptureMode || 'on';
     this.conversationId = this.getConversationId();
 
     if (this.mode !== 'off') {

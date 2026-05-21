@@ -152,28 +152,35 @@
       </div>
     </div>
 
-    <!-- Progressive Capture Section -->
-    <div class="section">
-      <div class="section-header">
-        <h3>🔄 Progressive Capture</h3>
-        <select id="progressiveCaptureMode" class="mode-select" title="Controls how LISA buffers messages as they render">
-          <option value="auto">Auto</option>
-          <option value="on">Always On</option>
-          <option value="off">Off</option>
-        </select>
+    <!-- Feedback Panel (hidden by default) -->
+    <div id="feedbackPanel" style="display:none;" class="feedback-panel">
+      <div class="feedback-header">
+        <button id="feedbackBack" class="feedback-back">← Back</button>
+        <h3>Send Feedback</h3>
       </div>
-      <p class="setting-hint">Auto: activates when virtualisation is detected (recommended). Always On: buffers every message. Off: standard capture only.</p>
-    </div>
-    
-    <!-- Newsletter / Updates -->
-    <div id="newsletterSection" class="newsletter-section" style="display:none;">
-      <div class="newsletter-inner">
-        <span class="newsletter-label">📬 Stay updated on new features</span>
-        <div class="newsletter-form">
-          <input type="email" id="newsletterEmail" placeholder="your@email.com" class="newsletter-input" />
-          <button id="newsletterBtn" class="newsletter-btn">Notify me</button>
+      <div class="feedback-body">
+        <label class="feedback-label">Subject</label>
+        <select id="feedbackSubject" class="feedback-select">
+          <option value="Bug Report">🐛 Bug Report</option>
+          <option value="Feature Request">💡 Feature Request</option>
+          <option value="General Feedback">💬 General Feedback</option>
+          <option value="Other">📌 Other</option>
+        </select>
+        <label class="feedback-label">Message <span class="feedback-required">*</span></label>
+        <textarea id="feedbackMessage" class="feedback-textarea" placeholder="Tell us what's on your mind..." rows="5"></textarea>
+        <label class="feedback-label">Your email <span class="feedback-optional">(optional)</span></label>
+        <input type="email" id="feedbackEmail" class="feedback-input" placeholder="your@email.com" />
+        <button id="feedbackSend" class="feedback-send-btn">Send Feedback</button>
+        <p id="feedbackMsg" class="feedback-msg" style="display:none;"></p>
+      </div>
+      <div class="feedback-divider"></div>
+      <div class="feedback-notify">
+        <span class="feedback-notify-label">📬 Stay updated on new features</span>
+        <div class="feedback-notify-row">
+          <input type="email" id="newsletterEmail" placeholder="your@email.com" class="feedback-input" />
+          <button id="newsletterBtn" class="feedback-notify-btn">Notify me</button>
         </div>
-        <span id="newsletterMsg" class="newsletter-msg" style="display:none;"></span>
+        <span id="newsletterMsg" class="feedback-notify-msg" style="display:none;"></span>
       </div>
     </div>
 

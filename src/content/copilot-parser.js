@@ -16,30 +16,16 @@ class CopilotParser {
   extractMessages() {
     const messages = [];
     
-    // Copilot uses user-message and ai-message class patterns
-    const userMessages = document.querySelectorAll('[class*="user-message"]');
-    const aiMessages = document.querySelectorAll('[class*="ai-message"]');
-
-    // Collect all messages with their position in DOM for correct ordering
+    // Query both roles together — querySelectorAll returns DOM order, no sort needed
+    const allElements = document.querySelectorAll('[class*="user-message"], [class*="ai-message"]');
     const allMessages = [];
-    
-    userMessages.forEach(el => {
-      // Skip non-content containers (e.g. wrapper divs that also match)
+    allElements.forEach(el => {
+      const role = el.className.includes('user-message') ? 'user' : 'assistant';
       const textContent = this.extractTextContent(el);
       if (textContent && textContent.trim().length > 0) {
-        allMessages.push({ el, role: 'user', pos: el.getBoundingClientRect().top });
+        allMessages.push({ el, role });
       }
     });
-
-    aiMessages.forEach(el => {
-      const textContent = this.extractTextContent(el);
-      if (textContent && textContent.trim().length > 0) {
-        allMessages.push({ el, role: 'assistant', pos: el.getBoundingClientRect().top });
-      }
-    });
-
-    // Sort by vertical position to maintain conversation order
-    allMessages.sort((a, b) => a.pos - b.pos);
 
     // Deduplicate — nested elements may match multiple times
     const seen = new Set();
@@ -70,7 +56,8 @@ class CopilotParser {
     return contentDiv ? (contentDiv.textContent || contentDiv.innerText || '') : (clone.textContent || clone.innerText || '');
   }
 
-  extractConversation() {
+  async extractConversation() {
+    this.conversationId = this.extractConversationId();
     const messages = this.extractMessages();
     
     if (messages.length === 0) {
@@ -89,14 +76,14 @@ class CopilotParser {
   }
 
   initializeListener() {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       if (request.action === 'ping') {
         sendResponse({ success: true, platform: this.platform });
         return true;
       }
       if (request.action === 'extractConversation') {
         try {
-          const conversation = this.extractConversation();
+          const conversation = await this.extractConversation();
           sendResponse({ success: true, data: conversation });
         } catch (error) {
           console.error('[LISA] Copilot extraction error:', error);

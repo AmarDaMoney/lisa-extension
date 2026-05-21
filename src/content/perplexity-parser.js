@@ -62,7 +62,8 @@ class PerplexityParser {
     return clone.textContent || clone.innerText || '';
   }
 
-  extractConversation() {
+  async extractConversation() {
+    this.conversationId = this.extractConversationId();
     const messages = this.extractMessages();
     
     if (messages.length === 0) {
@@ -81,14 +82,14 @@ class PerplexityParser {
   }
 
   initializeListener() {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       if (request.action === 'ping') {
         sendResponse({ success: true, platform: this.platform });
         return true;
       }
       if (request.action === 'extractConversation') {
         try {
-          const conversation = this.extractConversation();
+          const conversation = await this.extractConversation();
           sendResponse({ success: true, data: conversation });
         } catch (error) {
           console.error('[LISA] Perplexity extraction error:', error);

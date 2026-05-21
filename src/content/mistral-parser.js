@@ -21,7 +21,7 @@ class MistralParser {
     
     // Fallback: class-based selectors for older Mistral versions
     if (messageElements.length === 0) {
-      messageElements = document.querySelectorAll('[class*="group/message"], [class*="message"], [class*="chat-message"]');
+      messageElements = document.querySelectorAll('[class*="group/message"], [class*="chat-message"]');
     }
     
     messageElements.forEach((element, index) => {
@@ -64,7 +64,8 @@ class MistralParser {
     return clone.textContent || clone.innerText || '';
   }
 
-  extractConversation() {
+  async extractConversation() {
+    this.conversationId = this.extractConversationId();
     const messages = this.extractMessages();
     
     if (messages.length === 0) {
@@ -83,14 +84,14 @@ class MistralParser {
   }
 
   initializeListener() {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       if (request.action === 'ping') {
         sendResponse({ success: true, platform: this.platform });
         return true;
       }
       if (request.action === 'extractConversation') {
         try {
-          const conversation = this.extractConversation();
+          const conversation = await this.extractConversation();
           sendResponse({ success: true, data: conversation });
         } catch (error) {
           console.error('[LISA] Mistral extraction error:', error);

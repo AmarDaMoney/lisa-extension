@@ -971,7 +971,17 @@ class LISAPopup {
     const title = (this.compressedData.metadata?.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
     const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
-    const dataStr = JSON.stringify(this.compressedData, null, 2);
+    const downloadData = {
+      platform: this.compressedData.metadata?.platform || 'Unknown',
+      url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || '',
+      title: this.compressedData.metadata?.title || 'Compressed Conversation',
+      messageCount: this.compressedData.metadata?.messageCount || 0,
+      messages: this.compressedData.semanticTokens || this.compressedData.compressed || [],
+      format: 'compressed',
+      exportedAt: new Date().toISOString(),
+      raw: this.compressedData
+    };
+    const dataStr = JSON.stringify(downloadData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
 

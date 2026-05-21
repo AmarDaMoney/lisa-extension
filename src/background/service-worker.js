@@ -483,22 +483,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
 
-        // Extract conversation from the tab
-        let extractResponse;
-        try {
-          extractResponse = await chrome.tabs.sendMessage(tab.id, { action: 'extractConversation' });
-        } catch (err) {
-          sendResponse({ success: false, error: 'Could not connect to page. Try refreshing.' });
-          return;
-        }
-        
-        if (!extractResponse || !extractResponse.success) {
-          sendResponse({ success: false, error: extractResponse?.error || 'Extraction failed' });
-          return;
+        // Skip re-extraction when caller already provides data (e.g. popup compress path)
+        let extractResponse = null;
+        if (!request.data) {
+          try {
+            extractResponse = await chrome.tabs.sendMessage(tab.id, { action: 'extractConversation' });
+          } catch (err) {
+            sendResponse({ success: false, error: 'Could not connect to page. Try refreshing.' });
+            return;
+          }
+          if (!extractResponse || !extractResponse.success) {
+            sendResponse({ success: false, error: extractResponse?.error || 'Extraction failed' });
+            return;
+          }
         }
 
         // Ensure required fields exist
-          const data = request.data || extractResponse.data || {};
+          const data = request.data || extractResponse?.data || {};
           data.platform = data.platform || snapshotManager.getPlatformName(tab.url);
           data.url = data.url || tab.url;
           data.title = data.title || tab.title || 'Untitled';

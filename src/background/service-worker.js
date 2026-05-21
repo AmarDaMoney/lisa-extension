@@ -503,11 +503,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           data.url = data.url || tab.url;
           data.title = data.title || tab.title || 'Untitled';
           data.messageCount = data.messageCount || (data.messages?.length || 0);
-          
-          // Cache for auto-save on tab close (only if extracted from page)
-          if (!request.data) {
-            conversationCache.set(tab.id, JSON.parse(JSON.stringify(data)));
-          }
 
           // Tag format if provided
           if (request.format) data.format = request.format;
@@ -607,24 +602,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   
-  // Handle pre-cache request from content script on page hide (fixes tab-close race)
-  if (request.action === 'preCacheConversation') {
-    (async () => {
-      try {
-        const tab = sender.tab;
-        if (!tab) return;
-        const resp = await chrome.tabs.sendMessage(tab.id, { action: 'extractConversation' });
-        if (resp?.success && resp.data && resp.data.messages?.length > 0) {
-          conversationCache.set(tab.id, resp.data);
-          console.debug(`[LISA] Pre-cached conversation for tab ${tab.id}`);
-        }
-      } catch (err) {
-        console.warn('[LISA] Pre-cache failed (tab may be closing):', err.message);
-      }
-    })();
-    sendResponse({ success: true });
-    return false;
-  }
 
   // Handle analytics tracking
   if (request.action === 'trackEvent') {
@@ -890,7 +867,6 @@ setInterval(() => {
 
 // Track tabs with AI platforms for auto-save
 const aiPlatformTabs = new Map();
-const conversationCache = new Map(); // Cache last extraction per tab
 
 // Detect when user navigates to AI platform
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -920,58 +896,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 // Auto-save when AI platform tab is closed
-chrome.tabs.onRemoved.addListener(async (tabId) => {
+chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
-  
-  const tabInfo = aiPlatformTabs.get(tabId);
-  if (!tabInfo) return;
-  
   aiPlatformTabs.delete(tabId);
-  
-  // Check if auto-save is enabled
-  const autoSaveEnabled = await snapshotManager.isAutoSaveEnabled();
-  if (!autoSaveEnabled) {
-    console.debug('[LISA] Auto-save disabled, skipping snapshot');
-    return;
-  }
-  
-  try {
-    // Try to get conversation from the tab before it fully closes
-    // Note: This may not always work if tab is already gone
-    console.debug(`[LISA] Tab closed: ${tabInfo.platform} - attempting auto-save`);
-    
-    // Check cache for last extracted conversation
-    const cachedData = conversationCache.get(tabId);
-    conversationCache.delete(tabId); // Clean up
-    
-    let snapshot;
-    if (cachedData && cachedData.messages && cachedData.messages.length > 0) {
-      snapshot = {
-        ...cachedData,
-        extractedAt: new Date().toISOString(),
-        note: "Tab closed - restored from cache"
-      };
-    } else {
-      snapshot = {
-        platform: tabInfo.platform,
-        url: tabInfo.url,
-        title: tabInfo.title,
-        messageCount: 0,
-        messages: [],
-        extractedAt: new Date().toISOString(),
-        note: "Tab closed - metadata only. Use manual export for full conversation."
-      };
-    }
-    
-    await snapshotManager.saveSnapshot(snapshot, 'auto-close');
-    showNotification('LISA Auto-Save', `📸 Saved: ${tabInfo.title || tabInfo.platform}`);
-    
-  } catch (error) {
-    console.error('[LISA] Auto-save failed:', error);
-    try {
-      showNotification('LISA Auto-Save', `⚠️ Auto-save failed: ${error.message}`);
-    } catch (_) { /* notification may fail if extension context is gone */ }
-  }
 });
-
-console.debug('[LISA] Core compression engine initialized v0.49.8');
+console.debug('[LISA] Core compression engine initialized v0.50.0');

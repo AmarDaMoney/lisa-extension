@@ -136,6 +136,8 @@ class LISACompressor {
     const originalSize = JSON.stringify(conversation).length;
     const compressedSize = JSON.stringify(compressed).length;
     compressed.metadata.compressionRatio = (originalSize / compressedSize).toFixed(2);
+    compressed.anchor = this.generateSemanticAnchor(compressed);
+    compressed._instructions = 'LISA semantic export. Each semanticTokens entry = one conversation turn with entities, weighted concepts, relationships, and intent. Read anchor for session context. Use semanticTokens[].summary for condensed turns. Upload to any AI and say: read this LISA file and continue the conversation.';
 
     return compressed;
   }

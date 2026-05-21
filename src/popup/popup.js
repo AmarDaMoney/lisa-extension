@@ -972,6 +972,7 @@ class LISAPopup {
     const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
     const downloadData = {
+      _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
       platform: this.compressedData.metadata?.platform || 'Unknown',
       url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || '',
       title: this.compressedData.metadata?.title || 'Compressed Conversation',

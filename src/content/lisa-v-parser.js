@@ -875,7 +875,13 @@ class LisaVParser {
 
     // Line 4: anchor — auto-generated context for receiving AI
     this.blocks.push(this.generateAnchorBlock(conversationBlocks, nextBlocks, metaBlock));
-    // Lines 5-N: next blocks — open tasks before any conversation content
+    // Line 5: instructions — tells any unfamiliar AI what to do with this file
+    this.blocks.push({
+      t: 'instructions',
+      role: 'system',
+      v: 'LISA-V verbatim export. Block types: u=user message, a_text=assistant response, code=code block, next=action item, rel=relationship. Read the anchor block above for session context and dominant concepts. Continue the conversation from the last turn. Integrity verified via per-block SHA-256 hashes and merkle root in the final manifest block.'
+    });
+    // Lines 6-N: next blocks — open tasks before any conversation content
     this.blocks.push(...nextBlocks);
 
     // Lines N+1+: conversation content (user messages, assistant text, code)

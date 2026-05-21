@@ -200,6 +200,49 @@ class LISACompressor {
       }
     };
   }
+
+  generateSemanticAnchor(compressed) {
+    const tokens = compressed.semanticTokens || [];
+    const userTokens      = tokens.filter(t => t.role === 'user');
+    const assistantTokens = tokens.filter(t => t.role === 'assistant');
+    const conceptMap = {};
+    tokens.forEach(t => {
+      (t.tokens?.concepts || []).forEach(c => {
+        conceptMap[c.term] = (conceptMap[c.term] || 0) + (c.weight || 1);
+      });
+    });
+    const dominantConcepts = Object.entries(conceptMap)
+      .sort((a, b) => b[1] - a[1]).slice(0, 8).map(([term]) => term);
+    const entitySet = new Set();
+    tokens.forEach(t => {
+      (t.tokens?.entities || []).forEach(e => (e.values || []).forEach(v => entitySet.add(v)));
+    });
+    const intentCount = {};
+    tokens.forEach(t => { const i = t.tokens?.intent; if (i) intentCount[i] = (intentCount[i]||0)+1; });
+    const sessionIntent = Object.entries(intentCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'statement';
+    const hasCodeRatio = tokens.filter(t => t.tokens?.context?.hasCode).length / Math.max(tokens.length,1);
+    const techConcepts    = ['code','function','error','deploy','api','model','class','data','system'];
+    const emotionConcepts = ['feel','love','trust','hope','care','human','understand','want','believe'];
+    const techScore    = dominantConcepts.filter(c => techConcepts.includes(c)).length;
+    const emotionScore = dominantConcepts.filter(c => emotionConcepts.includes(c)).length;
+    let register = 'conversational';
+    if (hasCodeRatio > 0.15 || techScore > 3)     register = 'technical';
+    else if (emotionScore > 2 && techScore < 2)   register = 'philosophical';
+    else if (techScore > 2   && emotionScore > 2) register = 'mixed';
+    const coreTopic = compressed.metadata?.title ||
+      (userTokens[0]?.summary || '').substring(0, 100).trim();
+    return {
+      core_topic:        coreTopic,
+      platform:          compressed.metadata?.platform || 'unknown',
+      message_count:     { user: userTokens.length, assistant: assistantTokens.length },
+      dominant_concepts: dominantConcepts,
+      key_entities:      [...entitySet].slice(0, 12),
+      session_intent:    sessionIntent,
+      session_register:  register,
+      open_tasks:        [],
+      generated_by:      'LISA v0.50.0'
+    };
+  }
 }
 
 class LISAHasher {

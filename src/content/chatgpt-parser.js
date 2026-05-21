@@ -71,12 +71,21 @@ class ChatGPTParser {
     return markdownDiv ? markdownDiv.textContent : (clone.textContent || clone.innerText || '');
   }
 
-  extractConversation() {
-    const messages = this.extractMessages();
-    
-    if (messages.length === 0) {
-      return null;
+  async extractConversation() {
+    let messages = this.extractMessages();
+
+    // Merge with progressive buffer — recovers virtualised messages
+    if (window.lisaProgressive) {
+      const merged = window.lisaProgressive.mergeWithBuffer(messages);
+      messages = merged.map((m, i) => ({
+        role:      m.role || 'assistant',
+        content:   m.content || m.v || '',
+        index:     i,
+        timestamp: m.timestamp || m.capturedAt || new Date().toISOString()
+      }));
     }
+
+    if (messages.length === 0) return null;
 
     return {
       platform: this.platform,
@@ -90,14 +99,14 @@ class ChatGPTParser {
   }
 
   initializeListener() {
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       if (request.action === 'ping') {
         sendResponse({ success: true, platform: this.platform });
         return true;
       }
       if (request.action === 'extractConversation') {
         try {
-          const conversation = this.extractConversation();
+          const conversation = await this.extractConversation();
           sendResponse({ success: true, data: conversation });
         } catch (error) {
           console.error('[LISA] ChatGPT extraction error:', error);

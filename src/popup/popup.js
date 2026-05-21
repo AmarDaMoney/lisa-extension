@@ -22,6 +22,7 @@ class LISAPopup {
     this.setupEventListeners();
     this.loadSnapshots();
     this.setupAutoSaveToggle();
+    this.setupProgressiveCaptureMode();
     this.checkForUpdates();
     this.checkWhatsNew();
     this.loadCreditBalance();
@@ -1531,6 +1532,29 @@ class LISAPopup {
         this.trackEvent('auto_save_toggled', { enabled: toggle.checked });
       } catch (error) {
         console.error('[LISA] Failed to set auto-save:', error);
+      }
+    });
+  }
+
+  async setupProgressiveCaptureMode() {
+    const select = document.getElementById('progressiveCaptureMode');
+    if (!select) return;
+    try {
+      const { progressiveCaptureMode } = await chrome.storage.sync.get('progressiveCaptureMode');
+      select.value = progressiveCaptureMode || 'auto';
+    } catch (e) {
+      console.error('[LISA] Failed to get progressive capture mode:', e);
+    }
+    select.addEventListener('change', async () => {
+      try {
+        await chrome.storage.sync.set({ progressiveCaptureMode: select.value });
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id) {
+          chrome.tabs.sendMessage(tab.id, { action: 'setProgressiveMode', mode: select.value });
+        }
+        this.trackEvent('progressive_mode_changed', { mode: select.value });
+      } catch (e) {
+        console.error('[LISA] Failed to set progressive capture mode:', e);
       }
     });
   }

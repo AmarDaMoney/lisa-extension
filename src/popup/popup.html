@@ -142,14 +142,27 @@
     <div class="section snapshots-section">
       <div class="section-header">
         <h3>📚 Sync to Library</h3>
-        <label class="toggle-switch">
-          <input type="checkbox" id="autoSaveToggle" checked>
-          <span class="toggle-slider"></span>
+        <label class="toggle-switch" title="Auto-save disabled — use manual export">
+          <input type="checkbox" id="autoSaveToggle" disabled>
+          <span class="toggle-slider" style="opacity:0.4;cursor:not-allowed;"></span>
         </label>
       </div>
       <div id="snapshotsList" class="snapshots-list">
-        <p class="empty-state">No snapshots yet. Close an AI chat tab to auto-save.</p>
+        <p class="empty-state">No snapshots yet. Use the export button to save.</p>
       </div>
+    </div>
+
+    <!-- Progressive Capture Section -->
+    <div class="section">
+      <div class="section-header">
+        <h3>🔄 Progressive Capture</h3>
+        <select id="progressiveCaptureMode" class="mode-select" title="Controls how LISA buffers messages as they render">
+          <option value="auto">Auto</option>
+          <option value="on">Always On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+      <p class="setting-hint">Auto: activates when virtualisation is detected (recommended). Always On: buffers every message. Off: standard capture only.</p>
     </div>
     
     <!-- Newsletter / Updates -->

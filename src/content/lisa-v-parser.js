@@ -285,18 +285,7 @@ class LisaVParser {
   // ChatGPT-specific extraction
   async extractChatGPTMessages() {
     const messages = [];
-
-    // ChatGPT virtualises long conversations — only bottom ~5 messages are DOM-mounted.
-    // Scroll to top first to force full render before querying.
-    const scroller = document.querySelector('div[class*="overflow-y-auto"]') ||
-                     document.querySelector('main');
-    if (scroller) {
-      scroller.scrollTop = 0;
-      await new Promise(r => setTimeout(r, 700));
-    }
-
     const messageContainers = document.querySelectorAll('[data-message-author-role]');
-
     for (const container of messageContainers) {
       const role = container.getAttribute('data-message-author-role') || 'assistant';
       const blocks = await this.parseMessageContent(container, role);
@@ -304,7 +293,17 @@ class LisaVParser {
         messages.push(blocks);
       }
     }
-
+    // Prepend virtualised messages from progressive buffer
+    if (window.lisaProgressive && window.lisaProgressive.buffer.size > 0) {
+      const domHashes = new Set(
+        messages.flatMap(mb => mb.map(b => window.lisaProgressive.simpleHash(b.v || '')))
+      );
+      const missing = Array.from(window.lisaProgressive.buffer.values())
+        .filter(b => !domHashes.has(b.hash))
+        .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
+        .map(b => [{ t: b.t, role: b.role, v: b.v }]);
+      if (missing.length > 0) messages.unshift(...missing);
+    }
     return messages;
   }
 

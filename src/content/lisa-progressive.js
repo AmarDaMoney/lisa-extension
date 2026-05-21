@@ -31,6 +31,9 @@ class LisaProgressiveCapture {
       }
     }
 
+    this.watchVisibility();
+    this.watchNavigation();
+
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (msg.action === 'setProgressiveMode') {
         this.setMode(msg.mode).then(() => sendResponse({ success: true }));
@@ -212,6 +215,57 @@ class LisaProgressiveCapture {
       .filter(b => !domHashes.has(b.hash))
       .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
     return missing.length > 0 ? [...missing, ...domBlocks] : domBlocks;
+  }
+
+  pause() {
+    this.observer?.disconnect();
+  }
+
+  resume() {
+    if (this.mode === 'off') return;
+    const root = document.querySelector('main') || document.body;
+    if (this.observer) {
+      this.observer.observe(root, { childList: true, subtree: true });
+    } else {
+      this.startObserver();
+    }
+    if (this.active) this.captureAllVisible();
+  }
+
+  watchVisibility() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pause();
+      } else {
+        this.resume();
+      }
+    });
+  }
+
+  async handleNewConversation() {
+    const newId = this.getConversationId();
+    if (newId === this.conversationId) return;
+    console.log(`[LISA Progressive] New conversation: ${newId}`);
+    await this.saveBuffer();
+    this.conversationId = newId;
+    this.buffer.clear();
+    this.virtualizationDetected = false;
+    this.active = (this.mode === 'on');
+    await this.loadBuffer();
+    this.observer?.disconnect();
+    this.observer = null;
+    if (this.mode !== 'off') {
+      this.startObserver();
+      if (this.mode === 'on') this.captureAllVisible();
+    }
+  }
+
+  watchNavigation() {
+    const origPush    = history.pushState.bind(history);
+    const origReplace = history.replaceState.bind(history);
+    history.pushState    = (...args) => { origPush(...args);    setTimeout(() => this.handleNewConversation(), 150); };
+    history.replaceState = (...args) => { origReplace(...args); setTimeout(() => this.handleNewConversation(), 150); };
+    window.addEventListener('popstate', () => setTimeout(() => this.handleNewConversation(), 150));
   }
 }
 

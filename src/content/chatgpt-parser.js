@@ -72,6 +72,17 @@ class ChatGPTParser {
   }
 
   async extractConversation() {
+    // Fallback: scroll to top if progressive buffer is off or cold (no buffered data yet)
+    const progressive = window.lisaProgressive;
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > 0;
+    if (!bufferReady) {
+      const scroller = document.querySelector('div[class*="overflow-y-auto"]') ||
+                       document.querySelector('main');
+      if (scroller) {
+        scroller.scrollTop = 0;
+        await new Promise(r => setTimeout(r, 700));
+      }
+    }
     let messages = this.extractMessages();
 
     // Merge with progressive buffer — recovers virtualised messages

@@ -217,6 +217,46 @@ class LisaProgressiveCapture {
     return missing.length > 0 ? [...missing, ...domBlocks] : domBlocks;
   }
 
+  // Sweep scroll top→bottom, capturing messages at each step
+  // Stops when buffer count stabilises (no new messages in 2 consecutive steps)
+  async performScrollSweep(scroller, stepDelay = 350) {
+    if (!scroller) return;
+    const savedTop = scroller.scrollTop;
+
+    // Start at top
+    scroller.scrollTop = 0;
+    await new Promise(r => setTimeout(r, stepDelay));
+    this.captureAllVisible();
+
+    const step = scroller.clientHeight || 500;
+    let lastCount = this.buffer.size;
+    let stableRounds = 0;
+
+    while (stableRounds < 2) {
+      scroller.scrollTop += step;
+      await new Promise(r => setTimeout(r, stepDelay));
+      this.captureAllVisible();
+
+      const newCount = this.buffer.size;
+      if (newCount === lastCount) {
+        stableRounds++;
+      } else {
+        stableRounds = 0;
+        lastCount = newCount;
+      }
+
+      // Stop if we hit the bottom
+      if (scroller.scrollTop >= scroller.scrollHeight - scroller.clientHeight - 10) {
+        this.captureAllVisible();
+        break;
+      }
+    }
+
+    // Return to bottom — user expects to be at end of conversation
+    scroller.scrollTop = scroller.scrollHeight;
+    await new Promise(r => setTimeout(r, 200));
+  }
+
   pause() {
     this.observer?.disconnect();
   }

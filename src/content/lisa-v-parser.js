@@ -784,6 +784,53 @@ class LisaVParser {
       warnings: []
     };
   }
+  // Interleave checkpoint blocks every N turns for truncation resilience
+  generateCheckpoints(conversationBlocks, interval = 15) {
+    const result = [];
+    let turnCount = 0;
+    let sinceLastCheckpoint = [];
+    let checkpointIndex = 0;
+    for (const block of conversationBlocks) {
+      result.push(block);
+      if (block.t === 'u' || block.t === 'a_text') {
+        sinceLastCheckpoint.push(block);
+        turnCount++;
+        if (turnCount % interval === 0) {
+          result.push(this.buildCheckpointBlock(sinceLastCheckpoint, checkpointIndex, turnCount));
+          checkpointIndex++;
+          sinceLastCheckpoint = [];
+        }
+      }
+    }
+    return result;
+  }
+
+  buildCheckpointBlock(blocks, index, turnCount) {
+    const text = blocks.map(b => b.v || '').join(' ');
+    const stopwords = new Set(['this','that','with','from','have','been','will','would','could',
+      'should','their','there','they','what','when','where','which','more','also','into',
+      'your','about','just','like','some','than','then','them','these','those','were','very','well']);
+    const freq = {};
+    (text.toLowerCase().match(/\b[a-z]{4,}\b/g) || []).forEach(w => {
+      if (!stopwords.has(w)) freq[w] = (freq[w] || 0) + 1;
+    });
+    const topConcepts = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 5).map(([w]) => w);
+    const lastUser      = [...blocks].reverse().find(b => b.t === 'u');
+    const lastAssistant = [...blocks].reverse().find(b => b.t === 'a_text');
+    return {
+      t: 'checkpoint',
+      role: 'system',
+      checkpoint_index: index,
+      turns_covered: turnCount,
+      v: {
+        segment_concepts:     topConcepts,
+        last_user_turn:       (lastUser?.v      || '').substring(0, 150).replace(/\n/g, ' ').trim(),
+        last_assistant_turn:  (lastAssistant?.v || '').substring(0, 150).replace(/\n/g, ' ').trim(),
+        note: `Checkpoint ${index + 1} — context preserved through turn ${turnCount}.`
+      }
+    };
+  }
+
   // Auto-generate anchor block — context summary for receiving AI
   generateAnchorBlock(conversationBlocks, nextBlocks, metaBlock) {
     const userBlocks      = conversationBlocks.filter(b => b.t === 'u');
@@ -884,8 +931,8 @@ class LisaVParser {
     // Lines 6-N: next blocks — open tasks before any conversation content
     this.blocks.push(...nextBlocks);
 
-    // Lines N+1+: conversation content (user messages, assistant text, code)
-    this.blocks.push(...conversationBlocks);
+    // Lines N+1+: conversation content with checkpoints every 15 turns
+    this.blocks.push(...this.generateCheckpoints(conversationBlocks));
 
     // Relationships after conversation
     this.blocks.push(...relationships);

@@ -201,6 +201,33 @@ class LISACompressor {
     };
   }
 
+  generateRawAnchor(conversation) {
+    const messages = conversation.messages || [];
+    const userMsgs      = messages.filter(m => m.role === 'user');
+    const assistantMsgs = messages.filter(m => m.role === 'assistant');
+    // Sample first + last 5 messages for concept extraction
+    const sample = [...messages.slice(0, 5), ...messages.slice(-5)];
+    const allText = sample.map(m => m.content || m.v || '').join(' ');
+    const stopwords = new Set(['this','that','with','from','have','been','will','would','could',
+      'should','their','there','they','what','when','where','which','more','also','into',
+      'your','about','just','like','some','than','then','them','these','those','were','very','well']);
+    const freq = {};
+    (allText.toLowerCase().match(/[a-z]{4,}/g) || []).forEach(w => {
+      if (!stopwords.has(w)) freq[w] = (freq[w] || 0) + 1;
+    });
+    const dominantConcepts = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 6).map(([w]) => w);
+    const coreTopic = conversation.title ||
+      (userMsgs[0]?.content || userMsgs[0]?.v || '').substring(0, 100).replace(/\n/g, ' ').trim();
+    return {
+      core_topic:        coreTopic,
+      platform:          conversation.platform || 'unknown',
+      message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
+      dominant_concepts: dominantConcepts,
+      generated_by:      'LISA v0.50.0',
+      note:              'Lightweight anchor — raw verbatim format'
+    };
+  }
+
   generateSemanticAnchor(compressed) {
     const tokens = compressed.semanticTokens || [];
     const userTokens      = tokens.filter(t => t.role === 'user');
@@ -330,6 +357,12 @@ class SnapshotManager {
         snapshot.rootId = snapshot.id;
       }
 
+      // Inject lightweight anchor if not already present
+      if (!conversation.anchor && (conversation.messages || []).length > 0) {
+        snapshot.anchor = this.generateRawAnchor(conversation);
+      } else if (conversation.anchor) {
+        snapshot.anchor = conversation.anchor;
+      }
       // Phase 6: Generate content hash (non-fatal — save proceeds even if hashing fails)
       try {
         snapshot.hash = await this.hashContent(JSON.stringify(conversation));

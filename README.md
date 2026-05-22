@@ -6,7 +6,7 @@
 
 **AI Memory Library** - Capture AI conversations from Claude, ChatGPT, Gemini & more!
 
-![Version](https://img.shields.io/badge/version-0.50.0-blue)
+![Version](https://img.shields.io/badge/version-0.50.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 🎯 What is LISA Core?
@@ -19,13 +19,12 @@ LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into
 
 ## ✨ Features
 
-- 🔄 **9 Platform Support** - Claude, ChatGPT, Gemini, Grok, Mistral, DeepSeek, Copilot, Perplexity + Universal
+- 🔄 **9 Platform Support** - Claude (+ Claude Code), ChatGPT, Gemini, Grok, Mistral, DeepSeek, Copilot, Perplexity 
 - 📤 **One-Click Export** - Extract full conversations with a single click
 - ✂️ **Selection Export** - Right-click to export selected text snippets
 - 🗜️ **Semantic Compression** - 4:1 to 5:1 compression ratio
 - 💾 **Floating Save Button** - Quick access LISA-V and Raw JSON exports
 - 📋 **LISA-V Format** - Verbatim conversation capture with code separation
-- 📸 **Auto-Snapshots** - Automatically save when closing AI chat tabs
 - 🔐 **LISA Hash** - Cryptographic integrity verification (Premium)
 - ☁️ **Web App Sync** - Connect with LISA Core Web App
 - 📜 **Version History** - Git-style tracking of conversation evolution

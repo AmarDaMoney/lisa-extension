@@ -51,6 +51,10 @@ class LisaProgressiveCapture {
         this.clearBuffer().then(() => sendResponse({ success: true }));
         return true;
       }
+      if (msg.action === 'injectFileAttachment') {
+        this.injectFiles(msg).then(r => sendResponse(r)).catch(e => sendResponse({ success: false, error: e.message }));
+        return true;
+      }
     });
   }
 
@@ -298,6 +302,59 @@ class LisaProgressiveCapture {
       this.startObserver();
       if (this.mode === 'on') this.captureAllVisible();
     }
+  }
+
+  // ── File injection into platform chat input ──
+  async injectFiles(msg) {
+    const files = msg.files || [{ filename: msg.filename, content: msg.content }];
+    const mimeType = msg.mimeType || 'text/markdown';
+
+    // Create File objects
+    const fileObjects = files.map(f => {
+      const blob = new Blob([f.content], { type: mimeType });
+      return new File([blob], f.filename, { type: mimeType, lastModified: Date.now() });
+    });
+
+    // Strategy 1: Find the platform's file input and set files
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      const dt = new DataTransfer();
+      fileObjects.forEach(f => dt.items.add(f));
+      fileInput.files = dt.files;
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      return { success: true, method: 'fileInput', count: fileObjects.length };
+    }
+
+    // Strategy 2: Simulate drag-and-drop on the chat input area
+    const dropTargets = [
+      'div[contenteditable="true"]',
+      'textarea',
+      '#prompt-textarea',
+      '[class*="input"]',
+      '[class*="composer"]',
+      '[class*="chat-input"]',
+      'main',
+    ];
+
+    let target = null;
+    for (const selector of dropTargets) {
+      target = document.querySelector(selector);
+      if (target) break;
+    }
+
+    if (target) {
+      const dt = new DataTransfer();
+      fileObjects.forEach(f => dt.items.add(f));
+
+      const dragOver = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt });
+      const drop = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt });
+
+      target.dispatchEvent(dragOver);
+      target.dispatchEvent(drop);
+      return { success: true, method: 'dragDrop', count: fileObjects.length };
+    }
+
+    return { success: false, error: 'No file input or drop target found on this platform' };
   }
 
   watchNavigation() {

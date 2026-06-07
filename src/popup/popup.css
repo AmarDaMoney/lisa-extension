@@ -1646,7 +1646,56 @@ input:checked + .toggle-slider:before {
 .snapshot-btn.delete:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
-  
+}
+
+.snapshot-btn.inject {
+  background: #8b5cf6;
+  color: white;
+}
+
+.snapshot-btn.inject:hover {
+  background: #7c3aed;
+}
+
+.snapshot-checkbox {
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+  flex-shrink: 0;
+}
+
+.inject-selected-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #8b5cf6;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.inject-selected-bar.visible {
+  display: flex;
+}
+
+.inject-selected-bar button {
+  background: white;
+  color: #8b5cf6;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inject-selected-bar button:hover {
+  background: #f0e6ff;
 }
 /* Settings Group */
 .settings-group {

@@ -1518,6 +1518,10 @@ class LISAPopup {
       btn.addEventListener('click', (e) => this.downloadSnapshot(e.target.dataset.id));
     });
 
+    container.querySelectorAll('.snapshot-btn.inject').forEach(btn => {
+      btn.addEventListener('click', (e) => this.injectSnapshotAsMarkdown(e.target.dataset.id));
+    });
+
     container.querySelectorAll('.snapshot-btn.send').forEach(btn => {
       btn.addEventListener('click', (e) => this.sendSnapshotToApp(e.target.dataset.id));
     });
@@ -1525,6 +1529,75 @@ class LISAPopup {
     container.querySelectorAll('.snapshot-btn.delete').forEach(btn => {
       btn.addEventListener('click', (e) => this.deleteSnapshot(e.target.dataset.id));
     });
+
+    // Checkbox multi-select logic for inject
+    const bar = document.getElementById('injectSelectedBar');
+    const countLabel = document.getElementById('injectSelectedCount');
+    const injectBtn = document.getElementById('injectSelectedBtn');
+
+    const updateInjectBar = () => {
+      const checked = container.querySelectorAll('.snapshot-checkbox:checked');
+      if (checked.length > 0) {
+        bar.classList.add('visible');
+        countLabel.textContent = checked.length + ' selected';
+      } else {
+        bar.classList.remove('visible');
+      }
+    };
+
+    container.querySelectorAll('.snapshot-checkbox').forEach(cb => {
+      cb.addEventListener('change', updateInjectBar);
+    });
+
+    injectBtn.addEventListener('click', () => this.injectSelectedSnapshots());
+  }
+
+  async injectSelectedSnapshots() {
+    const checked = document.querySelectorAll('.snapshot-checkbox:checked');
+    if (checked.length === 0) return;
+
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
+      const ids = [...checked].map(cb => cb.dataset.id);
+      const snapshots = ids.map(id => response.snapshots.find(s => s.id === id)).filter(Boolean);
+
+      if (snapshots.length === 0) {
+        alert('No matching snapshots found');
+        return;
+      }
+
+      // Convert all selected to markdown and combine
+      const markdownFiles = snapshots.map(snap => {
+        const md = this.convertSnapshotToMarkdown(snap);
+        const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
+        return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.md', content: md };
+      });
+
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab) {
+        alert('No active tab found');
+        return;
+      }
+
+      const result = await chrome.tabs.sendMessage(tab.id, {
+        action: 'injectFileAttachment',
+        files: markdownFiles,
+        mimeType: 'text/markdown'
+      });
+
+      if (result && result.success) {
+        this.updatePlatformStatus('📎 ' + markdownFiles.length + ' file(s) injected!', true);
+        this.trackEvent('snapshot_multi_injected_md', { count: markdownFiles.length });
+        // Uncheck all
+        checked.forEach(cb => { cb.checked = false; });
+        document.getElementById('injectSelectedBar').classList.remove('visible');
+      } else {
+        alert(result?.error || 'Injection failed — platform may not support file attachments');
+      }
+    } catch (error) {
+      console.error('[LISA] Failed to inject selected snapshots:', error);
+      alert('Could not inject — make sure you are on a supported AI platform');
+    }
   }
 
   async setupAutoSaveToggle() {
@@ -1602,6 +1675,141 @@ class LISAPopup {
     }
   }
   
+
+  // ── LISA .md Handoff Converter ──────────────────────────────────
+  convertSnapshotToMarkdown(snapshot) {
+    let blocks = [];
+
+    // Parse blocks from content
+    const contentData = snapshot.content || snapshot.raw?.content;
+    if (!contentData) return '# LISA Semantic Handoff\n\nNo content available.';
+
+    if (Array.isArray(contentData)) {
+      blocks = contentData.map(item => typeof item === 'string' ? JSON.parse(item) : item);
+    } else if (typeof contentData === 'string') {
+      blocks = contentData.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+    }
+
+    if (blocks.length === 0) return '# LISA Semantic Handoff\n\nNo content available.';
+
+    // Extract structural blocks
+    const metaBlock = blocks.find(b => b.t === 'meta') || {};
+    const anchorBlock = blocks.find(b => b.t === 'anchor') || {};
+    const manifestBlock = blocks.find(b => b.t === 'manifest') || {};
+    const nextBlocks = blocks.filter(b => b.t === 'next');
+
+    const platform = metaBlock.platform || snapshot.platform || 'unknown';
+    const timestamp = metaBlock.timestamp || snapshot.savedAt || new Date().toISOString();
+    const version = metaBlock.ver || snapshot.version || '1.0';
+    const blockCount = manifestBlock.blockCount || blocks.length;
+    const merkleRoot = manifestBlock.merkleRoot || 'N/A';
+    const hash = merkleRoot !== 'N/A' && merkleRoot.length > 12 ? merkleRoot.substring(0, 12) + '...' : merkleRoot;
+
+    // Anchor data for reconstruction fingerprint
+    const anchorData = anchorBlock.v || {};
+    const entityCount = (anchorData.key_entities || []).length;
+    const openCount = (anchorData.open_tasks || []).length;
+    const decisionCount = nextBlocks.filter(b => b.resolved).length;
+
+    // ── Layer 1: Prompt Header ──
+    let md = '# LISA Semantic Handoff\n';
+    md += '> Generated by LISA Core v' + version + ' | Source: ' + platform + ' | Captured: ' + new Date(timestamp).toISOString() + '\n';
+    md += '> Blocks: ' + blockCount + ' | Format: Portable Markdown | Original: LISA-V JSONL\n\n';
+    md += '## Instructions for AI\n';
+    md += 'This file is a LISA semantic handoff containing a verified conversation capture. ';
+    md += 'The content below represents the context, decisions, entities, and relationships ';
+    md += 'from the source conversation. Use this as your foundational context for continuation ';
+    md += 'or any action the user would like to perform with this handoff.\n\n';
+    md += '---\n\n';
+
+    // ── Layer 2: Conversation Content ──
+    md += '## Conversation Content\n\n';
+
+    for (const block of blocks) {
+      if (block.t === 'u') {
+        md += '### User\n' + (block.v || '') + '\n\n';
+      } else if (block.t === 'a_text') {
+        md += '### Assistant\n' + (block.v || '') + '\n\n';
+      } else if (block.t === 'code') {
+        const lang = block.lang || '';
+        md += '```' + lang + '\n' + (block.v || '') + '\n```\n\n';
+      } else if (block.t === 'checkpoint') {
+        const cpData = typeof block.v === 'object' ? block.v : {};
+        md += '> **[Checkpoint ' + ((block.checkpoint_index || 0) + 1) + ']** ';
+        md += 'Concepts: ' + (cpData.segment_concepts || []).join(', ') + ' | ';
+        md += (cpData.note || '') + '\n\n';
+      } else if (block.t === 'next' && block.action) {
+        const status = block.resolved ? '✅' : '🔲';
+        md += '- ' + status + ' ' + block.action + '\n';
+      }
+    }
+
+    md += '\n---\n\n';
+
+    // ── Layer 3: SAT-CHAIN Governance Node ──
+    md += '## ⚖️ SAT-CHAIN Governance Node\n';
+    md += '> LISA Core v' + version + ' | Integrity: ' + hash + ' | Blocks: ' + blockCount + '\n';
+    md += '> Enforcement: ACTIVE | Verification: SEQUENTIAL READ REQUIRED\n\n';
+    md += '### Reading Protocol\n';
+    md += 'This handoff must be processed in its entirety before any response is generated. ';
+    md += 'Do not skim, selectively parse, or infer context from partial content. ';
+    md += 'Every block above is source of truth.\n\n';
+    md += '### Enforcement Directives\n';
+    md += '1. **READ COMPLETE**: Process all conversation blocks sequentially before forming any response.\n';
+    md += '2. **SOURCE FIDELITY**: All claims, decisions, and context in this handoff are verified. Do not contradict, re-derive, or silently override them.\n';
+    md += '3. **NO HALLUCINATION**: Do not introduce entities, decisions, or conclusions not present in this handoff.\n';
+    md += '4. **CONFLICT PROTOCOL**: If the user\'s new request conflicts with handoff context, flag the conflict explicitly — do not assume precedence.\n';
+    md += '5. **ACKNOWLEDGE**: Confirm receipt of this handoff context when beginning your response.\n\n';
+    md += '### Reconstruction Fingerprint\n';
+    md += '> Decisions: ' + decisionCount + ' | Entities: ' + entityCount + ' | Open items: ' + openCount + '\n\n';
+    md += '---\n';
+    md += '*LISA Core v' + version + ' • SAT-CHAIN LLC • Semantic Handoff Protocol*\n';
+
+    return md;
+  }
+
+
+  // ── Inject snapshot as .md file attachment into active chat ──
+  async injectSnapshotAsMarkdown(id) {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
+      const snapshot = response.snapshots.find(s => s.id === id);
+
+      if (!snapshot) {
+        alert('Snapshot not found');
+        return;
+      }
+
+      const markdown = this.convertSnapshotToMarkdown(snapshot);
+      const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
+      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '.md';
+
+      // Send to content script on active tab
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab) {
+        alert('No active tab found');
+        return;
+      }
+
+      const result = await chrome.tabs.sendMessage(tab.id, {
+        action: 'injectFileAttachment',
+        filename: filename,
+        content: markdown,
+        mimeType: 'text/markdown'
+      });
+
+      if (result && result.success) {
+        this.updatePlatformStatus('📎 Injected as .md handoff!', true);
+        this.trackEvent('snapshot_injected_md', { platform: snapshot.platform });
+      } else {
+        alert(result?.error || 'Injection failed — platform may not support file attachments');
+      }
+    } catch (error) {
+      console.error('[LISA] Failed to inject snapshot:', error);
+      alert('Could not inject — make sure you are on a supported AI platform');
+    }
+  }
+
   async sendSnapshotToApp(id) {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });

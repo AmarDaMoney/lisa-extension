@@ -1496,6 +1496,7 @@ class LISAPopup {
 
     container.innerHTML = snapshots.map(snap => `
       <div class="snapshot-item" data-id="${snap.id}">
+          <input type="checkbox" class="snapshot-checkbox" data-id="${snap.id}" title="Select for injection">
         <div class="snapshot-info">
           <div class="snapshot-title">${this.escapeHtml(snap.title === snap.platform || !snap.title ? 'Untitled Conversation' : snap.title)}</div>
           <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}${snap.format === 'lisa-v' ? ' • 📝 LISA-V' : snap.format === 'compressed' ? ' • 🗜️ Comp' : snap.source === 'floating-button' || snap.format === 'raw' ? ' • 📄 Raw' : ''}</div>
@@ -1503,6 +1504,7 @@ class LISAPopup {
         <div class="snapshot-actions">
           <button class="snapshot-btn history" data-root-id="${snap.rootId || snap.id}" title="Version History">🕒</button>
           <button class="snapshot-btn download" data-id="${snap.id}" title="Download JSON">💾</button>
+            <button class="snapshot-btn inject" data-id="${snap.id}" title="Inject as .md handoff">📎</button>
           <button class="snapshot-btn send" data-id="${snap.id}" title="Send to App">📤</button>
           <button class="snapshot-btn delete" data-id="${snap.id}" title="Delete">🗑️</button>
         </div>

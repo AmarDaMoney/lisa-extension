@@ -254,12 +254,33 @@ class LisaVParser {
   // Claude Code-specific extraction
   async extractClaudeCodeMessages() {
     const messages = [];
-    const messageContainers = document.querySelectorAll('[class*="group/message"]');
+
+    // Scroll sweep for virtual transcript
+    const progressive = window.lisaProgressive;
+    const scroller = document.querySelector('[data-testid="epitaxy-virtual-transcript"]')
+                  || document.querySelector('.epitaxy-chat-panel-body')
+                  || document.querySelector('main');
+    if (scroller && progressive) {
+      await progressive.performScrollSweep(scroller);
+    } else if (scroller) {
+      scroller.scrollTop = 0;
+      await new Promise(r => setTimeout(r, 700));
+      scroller.scrollTop = scroller.scrollHeight;
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    const entries = document.querySelectorAll('[data-epitaxy-entry]');
     
-    for (const container of messageContainers) {
-      const classList = container.className;
-      const isUser = classList.includes('bg-bg-200') || container.querySelector('.bg-bg-200');
+    for (const entry of entries) {
+      const isUser = !!entry.querySelector('.epitaxy-user-turn');
       const role = isUser ? 'user' : 'assistant';
+
+      // For user: extract from the user turn container
+      // For assistant: extract from the full entry (includes markdown + tool blocks)
+      const container = isUser
+        ? (entry.querySelector('.epitaxy-user-turn') || entry)
+        : entry;
+
       const blocks = await this.parseMessageContent(container, role);
       if (blocks.length > 0) {
         messages.push(blocks);

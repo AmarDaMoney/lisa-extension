@@ -26,7 +26,20 @@ class ClaudeCodeParser {
     return clone.textContent.trim();
   }
 
-  extractMessages() {
+  async extractMessages() {
+    // Scroll sweep for virtual transcript
+    const scroller = document.querySelector('[data-testid="epitaxy-virtual-transcript"]')
+                  || document.querySelector('.epitaxy-chat-panel-body')
+                  || document.querySelector('main');
+    if (scroller && window.lisaProgressive) {
+      await window.lisaProgressive.performScrollSweep(scroller);
+    } else if (scroller) {
+      scroller.scrollTop = 0;
+      await new Promise(r => setTimeout(r, 700));
+      scroller.scrollTop = scroller.scrollHeight;
+      await new Promise(r => setTimeout(r, 500));
+    }
+
     const messages = [];
     const entries = document.querySelectorAll('[data-epitaxy-entry]');
     
@@ -70,8 +83,8 @@ class ClaudeCodeParser {
     return tasks;
   }
 
-  extractConversation() {
-    const messages = this.extractMessages();
+  async extractConversation() {
+    const messages = await this.extractMessages();
     const tasks = this.extractTaskBlocks();
 
     if (messages.length === 0) return null;
@@ -95,8 +108,13 @@ class ClaudeCodeParser {
       if (request.action === 'ping') {
         sendResponse({ success: true, platform: this.platform });
       } else if (request.action === 'extractConversation') {
-        const data = this.extractConversation();
-        sendResponse({ success: !!data, data });
+        this.extractConversation()
+          .then(data => sendResponse({ success: !!data, data }))
+          .catch(error => {
+            console.error('[LISA] Claude Code extraction error:', error);
+            sendResponse({ success: false, error: error.message });
+          });
+        return true;
       }
       return true;
     });

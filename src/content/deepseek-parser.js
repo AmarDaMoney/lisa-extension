@@ -91,13 +91,13 @@ class DeepSeekParser {
         return true;
       }
       if (request.action === 'extractConversation') {
-        try {
-          const conversation = this.extractConversation();
-          sendResponse({ success: true, data: conversation });
-        } catch (error) {
-          console.error('[LISA] DeepSeek extraction error:', error);
-          sendResponse({ success: false, error: error.message });
-        }
+        this.extractConversation()
+          .then(conversation => sendResponse({ success: true, data: conversation }))
+          .catch(error => {
+            console.error('[LISA] DeepSeek extraction error:', error);
+            sendResponse({ success: false, error: error.message });
+          });
+        return true;
       }
       return true;
     });

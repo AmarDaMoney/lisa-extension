@@ -1681,15 +1681,26 @@ class LISAPopup {
   // ── LISA .md Handoff Converter ──────────────────────────────────
   convertSnapshotToMarkdown(snapshot) {
     let blocks = [];
+    let isLisaV = snapshot.format === 'lisa-v';
 
-    // Parse blocks from content
+    // Parse blocks from content — handle both LISA-V and raw/compressed formats
     const contentData = snapshot.content || snapshot.raw?.content;
-    if (!contentData) return '# LISA Semantic Handoff\n\nNo content available.';
+    const messagesData = snapshot.messages || snapshot.raw?.messages || snapshot.raw?.semanticTokens || snapshot.raw?.compressed;
 
-    if (Array.isArray(contentData)) {
-      blocks = contentData.map(item => typeof item === 'string' ? JSON.parse(item) : item);
-    } else if (typeof contentData === 'string') {
-      blocks = contentData.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+    if (contentData) {
+      if (Array.isArray(contentData)) {
+        blocks = contentData.map(item => typeof item === 'string' ? JSON.parse(item) : item);
+      } else if (typeof contentData === 'string') {
+        blocks = contentData.split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+      }
+    } else if (messagesData && Array.isArray(messagesData)) {
+      // Raw/compressed format — convert messages to LISA-V-style blocks
+      isLisaV = false;
+      blocks = messagesData.map(m => ({
+        t: (m.role === 'user') ? 'u' : 'a_text',
+        role: m.role || 'assistant',
+        v: m.content || m.v || m.text || ''
+      }));
     }
 
     if (blocks.length === 0) return '# LISA Semantic Handoff\n\nNo content available.';

@@ -359,7 +359,7 @@ class SnapshotManager {
 
       // Inject lightweight anchor if not already present
       if (!conversation.anchor && (conversation.messages || []).length > 0) {
-        snapshot.anchor = this.generateRawAnchor(conversation);
+        snapshot.anchor = compressor.generateRawAnchor(conversation);
       } else if (conversation.anchor) {
         snapshot.anchor = conversation.anchor;
       }

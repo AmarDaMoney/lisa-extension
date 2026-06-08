@@ -3,6 +3,7 @@
  * Version: 0.50.2
  * 
  * Extracts conversations from Claude Code sessions (claude.ai/code/session_*)
+ * Updated for epitaxy-based virtual transcript UI
  */
 
 class ClaudeCodeParser {
@@ -15,38 +16,44 @@ class ClaudeCodeParser {
     return match ? match[1] : null;
   }
 
-  isUserMessage(container) {
-    if (container.classList.contains('bg-bg-200')) return true;
-    if (container.querySelector('.bg-bg-200')) return true;
-    if (container.classList.contains('text-text-100')) return false;
-    return false;
+  isUserMessage(entry) {
+    return !!entry.querySelector('.epitaxy-user-turn');
   }
 
   extractTextContent(element) {
     const clone = element.cloneNode(true);
-    clone.querySelectorAll('button, svg, [role="button"]').forEach(el => el.remove());
+    clone.querySelectorAll('button, svg, [role="button"], [aria-hidden="true"]').forEach(el => el.remove());
     return clone.textContent.trim();
   }
 
   extractMessages() {
     const messages = [];
-    const containers = document.querySelectorAll('[class*="group/message"]');
+    const entries = document.querySelectorAll('[data-epitaxy-entry]');
     
-    containers.forEach((container, index) => {
-      const role = this.isUserMessage(container) ? 'user' : 'assistant';
-      
-      let paragraphs = container.querySelectorAll('p[node="[object Object]"]');
-      if (paragraphs.length === 0) {
-        paragraphs = container.querySelectorAll('.space-y-2 p, .space-y-2');
-      }
-      
-      const content = Array.from(paragraphs)
-        .map(p => this.extractTextContent(p))
-        .filter(t => t.length > 0)
-        .join('\n');
-      
-      if (content) {
-        messages.push({ role, content, index, timestamp: new Date().toISOString() });
+    entries.forEach((entry, index) => {
+      if (this.isUserMessage(entry)) {
+        // User message — text in p.text-body elements inside epitaxy-user-turn
+        const userTurn = entry.querySelector('.epitaxy-user-turn');
+        if (!userTurn) return;
+        const paragraphs = userTurn.querySelectorAll('p.text-body, p[class*="whitespace-pre-wrap"]');
+        const content = Array.from(paragraphs)
+          .map(p => p.textContent.trim())
+          .filter(t => t.length > 0)
+          .join('\n');
+        if (content) {
+          messages.push({ role: 'user', content, index, timestamp: new Date().toISOString() });
+        }
+      } else {
+        // Assistant message — text in .epitaxy-markdown elements
+        const markdownBlocks = entry.querySelectorAll('.epitaxy-markdown');
+        if (markdownBlocks.length === 0) return;
+        const content = Array.from(markdownBlocks)
+          .map(block => this.extractTextContent(block))
+          .filter(t => t.length > 0)
+          .join('\n\n');
+        if (content) {
+          messages.push({ role: 'assistant', content, index, timestamp: new Date().toISOString() });
+        }
       }
     });
 
@@ -55,12 +62,10 @@ class ClaudeCodeParser {
 
   extractTaskBlocks() {
     const tasks = [];
-    document.querySelectorAll('[class*="group/status"]').forEach((btn, index) => {
-      const summary = btn.querySelector('.truncate');
-      if (summary) {
-        const text = summary.textContent.trim();
-        if (text) tasks.push({ type: 'task', summary: text, index });
-      }
+    // Tool use blocks — buttons with collapsed tool info
+    document.querySelectorAll('[class*="group/tool"]').forEach((btn, index) => {
+      const text = btn.textContent.trim();
+      if (text) tasks.push({ type: 'task', summary: text.substring(0, 200), index });
     });
     return tasks;
   }
@@ -103,5 +108,5 @@ class ClaudeCodeParser {
   const parser = new ClaudeCodeParser();
   parser.initializeListener();
   chrome.runtime.sendMessage({ action: 'parserReady', platform: 'Claude Code' }).catch(() => {});
-  console.debug('[LISA] ClaudeCodeParser initialized');
+  console.debug('[LISA] ClaudeCodeParser initialized (epitaxy v2)');
 })();

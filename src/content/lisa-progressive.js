@@ -84,6 +84,7 @@ class LisaProgressiveCapture {
   getMessageSelector() {
     const host = window.location.hostname;
     if (host.includes('chatgpt.com'))           return '[data-message-author-role]';
+    if (host.includes('claude.ai') && window.location.pathname.startsWith('/code/')) return '[data-epitaxy-entry]';
     if (host.includes('claude.ai'))             return '[class*="group/message"]';
     if (host.includes('gemini.google'))         return '.conversation-container';
     if (host.includes('grok.com'))              return '.relative.group.flex.flex-col.justify-center';

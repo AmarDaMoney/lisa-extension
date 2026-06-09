@@ -276,12 +276,21 @@ class LisaVParser {
       const role = isUser ? 'user' : 'assistant';
 
       // For user: extract from the user turn container
-      // For assistant: extract from the full entry (includes markdown + tool blocks)
-      const container = isUser
-        ? (entry.querySelector('.epitaxy-user-turn') || entry)
-        : entry;
-
-      const blocks = await this.parseMessageContent(container, role);
+      // For assistant: extract ONLY from .epitaxy-markdown blocks to avoid
+      // tool-use button label contamination (French UI: "Mis à jour tâches", "exécuté", etc.)
+      let blocks = [];
+      if (isUser) {
+        const container = entry.querySelector('.epitaxy-user-turn') || entry;
+        blocks = await this.parseMessageContent(container, role);
+      } else {
+        const markdownBlocks = entry.querySelectorAll('.epitaxy-markdown');
+        if (markdownBlocks.length > 0) {
+          for (const mdBlock of markdownBlocks) {
+            const mdBlocks = await this.parseMessageContent(mdBlock, role);
+            blocks.push(...mdBlocks);
+          }
+        }
+      }
       if (blocks.length > 0) {
         messages.push(blocks);
       }

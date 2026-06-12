@@ -88,6 +88,8 @@ class LisaVParser {
           });
         }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
+        // Skip UI noise: sr-only headings, hover bars, buttons, SVGs
+        if (node.matches && node.matches('button, svg, [role="button"], .sr-only, [class*="opacity-0"]')) return;
         if (this.isCodeBlock(node)) {
           const codeContent = node.textContent.trim();
           if (codeContent && codeContent.length >= 25) {

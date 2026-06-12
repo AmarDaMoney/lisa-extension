@@ -111,7 +111,10 @@ class LisaProgressiveCapture {
 
   captureElement(el) {
     const role = this.getRoleFromElement(el);
-    const text = el.textContent.trim();
+    // Clone and strip UI noise before extracting text (mirrors claude-parser.js fix)
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('button, svg, [role="button"], .sr-only, [class*="opacity-0"]').forEach(n => n.remove());
+    const text = clone.textContent.trim();
     if (!text || text.length < 5) return;
     const hash = this.simpleHash(text);
     if (this.buffer.has(hash)) return;

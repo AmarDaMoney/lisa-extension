@@ -1713,13 +1713,13 @@ class LISAPopup {
 
     const platform = metaBlock.platform || snapshot.platform || 'unknown';
     const timestamp = metaBlock.timestamp || snapshot.savedAt || new Date().toISOString();
-    const version = metaBlock.ver || snapshot.version || '1.0';
+    const version = (chrome.runtime?.getManifest?.().version) || metaBlock.ver || '1.0';
     const blockCount = manifestBlock.blockCount || blocks.length;
-    const merkleRoot = manifestBlock.merkleRoot || 'N/A';
+    const merkleRoot = manifestBlock.merkleRoot || snapshot.hash || 'N/A';
     const hash = merkleRoot !== 'N/A' && merkleRoot.length > 12 ? merkleRoot.substring(0, 12) + '...' : merkleRoot;
 
     // Anchor data for reconstruction fingerprint
-    const anchorData = anchorBlock.v || {};
+    const anchorData = anchorBlock.v || snapshot.anchor || {};
     const entityCount = (anchorData.key_entities || []).length;
     const openCount = (anchorData.open_tasks || []).length;
     const decisionCount = nextBlocks.filter(b => b.resolved).length;

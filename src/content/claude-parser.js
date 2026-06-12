@@ -54,7 +54,7 @@ class ClaudeParser {
     const clone = element.cloneNode(true);
     
     // Remove button elements, icons, and UI components
-    clone.querySelectorAll('button, svg, [role="button"]').forEach(el => el.remove());
+    clone.querySelectorAll('button, svg, [role="button"], .sr-only, [class*="opacity-0"]').forEach(el => el.remove());
     
     // Get text content and strip Claude UI noise
     let text = clone.textContent || clone.innerText || '';
@@ -65,6 +65,8 @@ class ClaudeParser {
     text = text.replace(/^Afficher moins\s*/i, '');
     text = text.replace(/^Show less\s*/i, '');
     text = text.replace(/\n\d{1,2}:\d{2}\s*(AM|PM)\s*$/i, '');
+    // Collapse consecutive duplicate lines (UI labels can render twice)
+    text = text.split('\n').filter((ln, i, a) => i === 0 || ln.trim() === '' || ln.trim() !== a[i-1].trim()).join('\n');
     return text.trim();
   }
 

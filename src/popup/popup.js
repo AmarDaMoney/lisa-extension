@@ -1696,7 +1696,7 @@ class LISAPopup {
     } else if (messagesData && Array.isArray(messagesData)) {
       // Raw/compressed format — convert messages to LISA-V-style blocks
       isLisaV = false;
-      blocks = messagesData.filter(m => !String(m.summary || '').includes('LISA-V verbatim export. Block types:')).map(m => ({
+      blocks = messagesData.filter(m => !String(m.summary || m.content || m.v || m.text || '').includes('LISA-V verbatim export. Block types:')).map(m => ({
         t: (m.role === 'user') ? 'u' : 'a_text',
         role: m.role || 'assistant',
         v: m.content || m.v || m.text || m.summary || ''
@@ -1796,7 +1796,7 @@ class LISAPopup {
 
       const markdown = this.convertSnapshotToMarkdown(snapshot);
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
-      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '.md';
+      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + (snapshot.format || 'lisa-v') + '.md';
 
       // Send to content script on active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

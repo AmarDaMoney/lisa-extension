@@ -1699,7 +1699,7 @@ class LISAPopup {
       blocks = messagesData.map(m => ({
         t: (m.role === 'user') ? 'u' : 'a_text',
         role: m.role || 'assistant',
-        v: m.content || m.v || m.text || ''
+        v: m.content || m.v || m.text || m.summary || ''
       }));
     }
 

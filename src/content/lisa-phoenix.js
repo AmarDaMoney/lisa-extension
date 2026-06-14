@@ -237,7 +237,12 @@
       this._watchPlatformWarning();
 
       // Catch up with messages already captured before phoenix loaded
+      // Try immediately (in case progressive already finished)
       this._scanExistingBuffer();
+      // Also listen for progressive ready signal (handles async race)
+      document.addEventListener('lisa-progressive-ready', () => {
+        if (this.messageCount === 0) this._scanExistingBuffer();
+      });
 
       console.log('[LISA Phoenix] CPE ready — ' + this.platform + ' — amber=' + Math.round(this.thresholds.amber / 1000) + 'K, red=' + Math.round(this.thresholds.red / 1000) + 'K');
     }

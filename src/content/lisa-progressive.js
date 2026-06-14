@@ -32,6 +32,11 @@ class LisaProgressiveCapture {
       }
     }
 
+    // Signal that progressive init is complete and buffer is populated
+    document.dispatchEvent(new CustomEvent('lisa-progressive-ready', {
+      detail: { bufferSize: this.buffer.size, mode: this.mode }
+    }));
+
     this.watchVisibility();
     this.watchNavigation();
 

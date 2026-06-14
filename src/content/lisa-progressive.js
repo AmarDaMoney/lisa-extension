@@ -91,7 +91,7 @@ class LisaProgressiveCapture {
     const host = window.location.hostname;
     if (host.includes('chatgpt.com'))           return '[data-message-author-role]';
     if (host.includes('claude.ai') && window.location.pathname.startsWith('/code/')) return '[data-epitaxy-entry]';
-    if (host.includes('claude.ai'))             return '[class*="group/message"]';
+    if (host.includes('claude.ai'))             return '[data-is-streaming], [data-user-message-bubble]';
     if (host.includes('gemini.google'))         return '.conversation-container';
     if (host.includes('grok.com'))              return '.relative.group.flex.flex-col.justify-center';
     if (host.includes('deepseek.com'))          return '.ds-message';
@@ -102,8 +102,10 @@ class LisaProgressiveCapture {
   }
 
   getRoleFromElement(el) {
-    return el.getAttribute('data-message-author-role') ||
-           (el.classList.contains('user') ? 'user' : 'assistant');
+    if (el.getAttribute('data-message-author-role')) return el.getAttribute('data-message-author-role');
+    if (el.hasAttribute('data-user-message-bubble')) return 'user';
+    if (el.classList.contains('user')) return 'user';
+    return 'assistant';
   }
 
   simpleHash(str) {

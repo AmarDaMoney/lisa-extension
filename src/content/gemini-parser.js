@@ -119,11 +119,11 @@ class GeminiParser {
 
 // Initialize parser
 const parser = new GeminiParser();
-
-} // end double-load guard
 parser.initializeListener();
 
 chrome.runtime.sendMessage({ 
   action: 'parserReady', 
   platform: 'Gemini' 
 });
+
+} // end double-load guard

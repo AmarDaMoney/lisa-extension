@@ -378,7 +378,15 @@ class LisaProgressiveCapture {
     const textContent = msg.content || (msg.files && msg.files[0] && msg.files[0].content) || (files[0] && files[0].text);
     if (textContent) {
       try {
-        await navigator.clipboard.writeText(textContent);
+        // Use textarea trick — navigator.clipboard needs document focus
+        // which the popup may steal
+        const ta = document.createElement('textarea');
+        ta.value = textContent;
+        ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
         // Focus the composer so user can paste immediately
         const editor = document.querySelector('div[contenteditable="true"]');
         if (editor) editor.focus();

@@ -331,29 +331,8 @@ class LisaProgressiveCapture {
       return new File([blob], f.filename, { type: mimeType, lastModified: Date.now() });
     });
 
-    // Strategy 0: Trigger dynamic file input creation (Gemini, others)
-    // Some platforms only create input[type="file"] after clicking a trigger button
-    let fileInput = document.querySelector('input[type="file"]');
-    if (!fileInput) {
-      const triggers = [
-        '.hidden-local-file-image-selector-button',  // Gemini
-        'button[xapfileselectortrigger]',             // Gemini (attribute)
-        'button[aria-label*="upload"]',
-        'button[aria-label*="attach"]'
-      ];
-      for (const sel of triggers) {
-        const btn = document.querySelector(sel);
-        if (btn) {
-          btn.click();
-          // Wait briefly for the dynamic file input to appear
-          await new Promise(r => setTimeout(r, 300));
-          fileInput = document.querySelector('input[type="file"]');
-          if (fileInput) break;
-        }
-      }
-    }
-
     // Strategy 1: Find the platform's file input and set files
+    const fileInput = document.querySelector('input[type="file"]');
     if (fileInput) {
       const dt = new DataTransfer();
       fileObjects.forEach(f => dt.items.add(f));

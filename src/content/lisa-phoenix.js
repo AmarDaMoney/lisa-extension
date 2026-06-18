@@ -72,6 +72,11 @@
       this._evaluatePressure();
       this._updateGauge();
       this._persistState();
+      // Re-show modal after snooze threshold passed
+      if (this.state === STATES.RED && this.snoozeUntil && this.estimatedTokens >= this.snoozeUntil) {
+        this.snoozeUntil = null;
+        this._showRebirthModal();
+      }
     }
 
     _evaluatePressure() {
@@ -104,6 +109,76 @@
         }
       }));
       console.log(`[LISA Phoenix] State → ${this.state.toUpperCase()} (~${Math.round(this.estimatedTokens / 1000)}K tokens, ${this.messageCount} msgs)`);
+      if (this.state === STATES.RED) this._showRebirthModal();
+    }
+
+    // ── Rebirth Modal (spec §7.2 — non-blocking) ──
+    _showRebirthModal() {
+      if (document.getElementById('lisa-phoenix-modal')) return; // already showing
+      const tokK = Math.round(this.estimatedTokens / 1000);
+      const redK = Math.round(this.thresholds.red / 1000);
+
+      const overlay = document.createElement('div');
+      overlay.id = 'lisa-phoenix-modal';
+      Object.assign(overlay.style, {
+        position: 'fixed', bottom: '124px', right: '20px', zIndex: '100000',
+        width: '320px', background: 'rgba(15,15,20,0.96)', color: '#e2e8f0',
+        borderRadius: '12px', padding: '20px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        border: '1px solid rgba(248,113,113,0.4)',
+        fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+        fontSize: '13px', lineHeight: '1.5'
+      });
+
+      overlay.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <span style="font-size:20px;">⚠️</span>
+          <span style="font-weight:600;font-size:14px;color:#f87171;">Context Capacity Warning</span>
+        </div>
+        <p style="margin:0 0 16px;color:rgba(226,232,240,0.8);">
+          ~${tokK}K of ~${redK}K estimated tokens used.
+          Responses may degrade. LISA can reincarnate this session —
+          distilled context, fresh window, zero re-explaining.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button id="lisa-phoenix-rebirth-btn" style="
+            padding:10px 16px;border:none;border-radius:8px;cursor:pointer;
+            background:linear-gradient(135deg,#dc2626,#b91c1c);color:white;
+            font-weight:600;font-size:13px;transition:opacity 0.2s;
+          ">🔥 Rebirth now</button>
+          <button id="lisa-phoenix-export-btn" style="
+            padding:8px 16px;border:1px solid rgba(255,255,255,0.15);border-radius:8px;
+            cursor:pointer;background:transparent;color:#e2e8f0;
+            font-size:12px;transition:opacity 0.2s;
+          ">📎 Export handoff manually</button>
+          <button id="lisa-phoenix-snooze-btn" style="
+            padding:8px 16px;border:none;border-radius:8px;cursor:pointer;
+            background:transparent;color:rgba(226,232,240,0.5);
+            font-size:11px;
+          ">Remind me later</button>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      // ── Button handlers ──
+      document.getElementById('lisa-phoenix-rebirth-btn').addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform });
+        overlay.remove();
+      });
+
+      document.getElementById('lisa-phoenix-export-btn').addEventListener('click', () => {
+        // Trigger existing LISA save flow via floating button
+        const lisaBtn = document.querySelector('#lisa-floating-btn, #lisa-save-btn, [id*="lisa"][id*="btn"]');
+        if (lisaBtn) lisaBtn.click();
+        overlay.remove();
+      });
+
+      document.getElementById('lisa-phoenix-snooze-btn').addEventListener('click', () => {
+        overlay.remove();
+        // Snooze: re-show after ~10K more tokens
+        this.snoozeUntil = this.estimatedTokens + 10000;
+      });
     }
 
     // ── Gauge UI ──

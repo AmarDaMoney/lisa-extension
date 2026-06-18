@@ -772,7 +772,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const filename = 'LISA_REBIRTH_' + data.platform + '_' + Date.now() + '.md';
 
         // 4. Open new tab
-        const newChatUrl = NEW_CHAT_URLS[data.platform] || NEW_CHAT_URLS['claude'];
+        // Use request.platform (from phoenix detector, matches URL map keys)
+        const newChatUrl = NEW_CHAT_URLS[request.platform] || NEW_CHAT_URLS[data.platform] || NEW_CHAT_URLS['claude'];
         const newTab = await chrome.tabs.create({ url: newChatUrl });
 
         // 5. Store pending injection — handshake completes on TAB_READY

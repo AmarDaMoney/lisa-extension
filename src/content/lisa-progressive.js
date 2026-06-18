@@ -375,9 +375,10 @@ class LisaProgressiveCapture {
     // Strategy 3: Clipboard pipeline (Gemini and other isTrusted-guarded platforms)
     // Synthetic DOM events are dropped by defensive frontends. Instead,
     // write the handoff to clipboard and prompt user to paste.
-    if (msg.content) {
+    const textContent = msg.content || (msg.files && msg.files[0] && msg.files[0].content) || (files[0] && files[0].text);
+    if (textContent) {
       try {
-        await navigator.clipboard.writeText(msg.content);
+        await navigator.clipboard.writeText(textContent);
         // Focus the composer so user can paste immediately
         const editor = document.querySelector('div[contenteditable="true"]');
         if (editor) editor.focus();

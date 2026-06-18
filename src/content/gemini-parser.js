@@ -1,6 +1,9 @@
 // Gemini Conversation Parser
 // Extracts conversation data from Gemini web interface
 
+// Guard against double-injection (manifest + ensureContentScriptLoaded)
+if (typeof GeminiParser === 'undefined') {
+
 class GeminiParser {
   constructor() {
     this.platform = 'Gemini';
@@ -116,6 +119,8 @@ class GeminiParser {
 
 // Initialize parser
 const parser = new GeminiParser();
+
+} // end double-load guard
 parser.initializeListener();
 
 chrome.runtime.sendMessage({ 

@@ -370,7 +370,18 @@ class LisaProgressiveCapture {
       return { success: true, method: 'dragDrop', count: fileObjects.length };
     }
 
-    return { success: false, error: 'No file input or drop target found on this platform' };
+    // Strategy 3: Direct text paste into composer (fallback for Gemini etc.)
+    const editor = document.querySelector('div[contenteditable="true"]');
+    if (editor && msg.content) {
+      editor.focus();
+      // Use execCommand for proper input event chain
+      document.execCommand('insertText', false, msg.content);
+      // Trigger input event in case execCommand didn't
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+      return { success: true, method: 'textPaste', count: 1 };
+    }
+
+    return { success: false, error: 'No file input, drop target, or composer found on this platform' };
   }
 
   watchNavigation() {

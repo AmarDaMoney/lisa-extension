@@ -359,6 +359,61 @@
       });
 
       console.log('[LISA Phoenix] CPE ready — ' + this.platform + ' — amber=' + Math.round(this.thresholds.amber / 1000) + 'K, red=' + Math.round(this.thresholds.red / 1000) + 'K');
+
+      // Signal readiness for rebirth injection + listen for completion
+      this._signalTabReady();
+      this._listenForRebirthComplete();
+    }
+
+    // ── New-tab ready signal for rebirth handshake (spec §4.3) ──
+    _signalTabReady() {
+      const composerSelectors = [
+        'div[contenteditable="true"]',
+        'textarea',
+        '#prompt-textarea',
+        '[class*="composer"]',
+        'input[type="file"]'
+      ];
+      const findComposer = () => composerSelectors.some(s => document.querySelector(s));
+
+      // If composer already exists, signal immediately
+      if (findComposer()) {
+        chrome.runtime.sendMessage({ type: 'PHOENIX_TAB_READY' });
+        return;
+      }
+
+      // Otherwise watch for it (max 15s timeout per spec §4.3)
+      const obs = new MutationObserver(() => {
+        if (findComposer()) {
+          obs.disconnect();
+          clearTimeout(timeout);
+          chrome.runtime.sendMessage({ type: 'PHOENIX_TAB_READY' });
+        }
+      });
+      obs.observe(document.body, { childList: true, subtree: true });
+      const timeout = setTimeout(() => obs.disconnect(), 15000);
+    }
+
+    // ── Rebirth complete toast on source tab ──
+    _listenForRebirthComplete() {
+      chrome.runtime.onMessage.addListener((msg) => {
+        if (msg.type === 'PHOENIX_REBIRTH_COMPLETE') {
+          const toast = document.createElement('div');
+          toast.id = 'lisa-phoenix-toast';
+          Object.assign(toast.style, {
+            position: 'fixed', top: '20px', right: '20px', zIndex: '100001',
+            background: 'rgba(15,15,20,0.95)', color: '#4ade80',
+            padding: '14px 20px', borderRadius: '10px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: '13px', fontWeight: '500',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            border: '1px solid rgba(74,222,128,0.3)'
+          });
+          toast.textContent = '\u2705 Session reborn \u2014 parent preserved in library.';
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 6000);
+        }
+      });
     }
   }
 

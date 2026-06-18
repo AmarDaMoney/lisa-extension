@@ -1,6 +1,6 @@
 /**
  * LISA Semantic Analyzer
- * Version: 0.50.3
+ * Version: 0.51.0
  * 
  * Transforms raw extracted messages into structured semantic format.
  * Fails gracefully - returns original data if analysis fails.

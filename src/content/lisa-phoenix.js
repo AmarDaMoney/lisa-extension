@@ -39,6 +39,7 @@
       this.language = 'default';       // TODO: wire to LISA language detection
       this.gauge = null;
       this.platformWarningFired = false;
+      this._saveTimer = null;
 
       this._init();
     }
@@ -70,6 +71,7 @@
       this.messageCount++;
       this._evaluatePressure();
       this._updateGauge();
+      this._persistState();
     }
 
     _evaluatePressure() {
@@ -220,8 +222,42 @@
       }
     }
 
+    // ── Persistence: remember CPE state across page reloads ──
+    _getStorageKey() {
+      return 'phoenix:' + location.hostname + location.pathname;
+    }
+
+    async _loadPersistedState() {
+      try {
+        const key = this._getStorageKey();
+        const data = await chrome.storage.local.get(key);
+        const saved = data[key];
+        if (saved && saved.estimatedTokens > this.estimatedTokens) {
+          this.estimatedTokens = saved.estimatedTokens;
+          this.messageCount = saved.messageCount || 0;
+          this.state = saved.state || STATES.GREEN;
+          this._updateGauge();
+          console.log('[LISA Phoenix] Restored — ~' + Math.round(this.estimatedTokens / 1000) + 'K tokens, ' + this.state.toUpperCase());
+        }
+      } catch (e) { /* storage unavailable — fall through to buffer scan */ }
+    }
+
+    _persistState() {
+      clearTimeout(this._saveTimer);
+      this._saveTimer = setTimeout(() => {
+        try {
+          chrome.storage.local.set({ [this._getStorageKey()]: {
+            estimatedTokens: this.estimatedTokens,
+            messageCount: this.messageCount,
+            state: this.state,
+            updatedAt: new Date().toISOString()
+          }});
+        } catch (e) { /* ignore */ }
+      }, 2000);
+    }
+
     // ── Boot ──
-    _init() {
+    async _init() {
       if (this.platform === 'unknown') return;
 
       document.addEventListener('lisa-message-captured', (e) => {
@@ -235,6 +271,9 @@
       }
 
       this._watchPlatformWarning();
+
+      // Load persisted state first (survives page reloads)
+      await this._loadPersistedState();
 
       // Catch up with messages already captured before phoenix loaded
       // Try immediately (in case progressive already finished)

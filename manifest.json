@@ -11,7 +11,8 @@
     "downloads",
     "contextMenus",
     "notifications",
-    "identity"
+    "identity",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "https://claude.ai/*",

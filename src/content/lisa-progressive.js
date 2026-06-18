@@ -370,15 +370,34 @@ class LisaProgressiveCapture {
       return { success: true, method: 'dragDrop', count: fileObjects.length };
     }
 
-    // Strategy 3: Direct text paste into composer (fallback for Gemini etc.)
-    const editor = document.querySelector('div[contenteditable="true"]');
-    if (editor && msg.content) {
-      editor.focus();
-      // Use execCommand for proper input event chain
-      document.execCommand('insertText', false, msg.content);
-      // Trigger input event in case execCommand didn't
-      editor.dispatchEvent(new Event('input', { bubbles: true }));
-      return { success: true, method: 'textPaste', count: 1 };
+    // Strategy 3: Clipboard pipeline (Gemini and other isTrusted-guarded platforms)
+    // Synthetic DOM events are dropped by defensive frontends. Instead,
+    // write the handoff to clipboard and prompt user to paste.
+    if (msg.content) {
+      try {
+        await navigator.clipboard.writeText(msg.content);
+        // Focus the composer so user can paste immediately
+        const editor = document.querySelector('div[contenteditable="true"]');
+        if (editor) editor.focus();
+        // Show paste prompt
+        const toast = document.createElement('div');
+        toast.id = 'lisa-paste-prompt';
+        Object.assign(toast.style, {
+          position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: '100001', background: 'rgba(15,15,20,0.95)', color: '#fbbf24',
+          padding: '14px 24px', borderRadius: '10px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+          fontSize: '14px', fontWeight: '500',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          border: '1px solid rgba(251,191,36,0.3)'
+        });
+        toast.textContent = '\u{1F4CB} Handoff copied — press Ctrl+V (Cmd+V) to paste into composer';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 8000);
+        return { success: true, method: 'clipboard', count: 1 };
+      } catch (e) {
+        console.warn('[LISA] Clipboard write failed:', e);
+      }
     }
 
     return { success: false, error: 'No file input, drop target, or composer found on this platform' };

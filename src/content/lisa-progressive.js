@@ -342,6 +342,8 @@ class LisaProgressiveCapture {
     }
 
     // Strategy 2: Simulate drag-and-drop on the chat input area
+    // Skip on platforms that drop synthetic events (isTrusted guard)
+    const noSyntheticDrop = /gemini\.google/.test(window.location.hostname);
     const dropTargets = [
       'div[contenteditable="true"]',
       'textarea',
@@ -358,7 +360,7 @@ class LisaProgressiveCapture {
       if (target) break;
     }
 
-    if (target) {
+    if (target && !noSyntheticDrop) {
       const dt = new DataTransfer();
       fileObjects.forEach(f => dt.items.add(f));
 

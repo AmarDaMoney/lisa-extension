@@ -117,6 +117,13 @@
       if (document.getElementById('lisa-phoenix-modal')) return; // already showing
       const tokK = Math.round(this.estimatedTokens / 1000);
       const redK = Math.round(this.thresholds.red / 1000);
+      const isWarning = this.state === STATES.RED;
+      const title = isWarning ? 'Context Capacity Warning' : 'Session Rebirth';
+      const icon = isWarning ? '⚠️' : '🔥';
+      const titleColor = isWarning ? '#f87171' : '#fbbf24';
+      const description = isWarning
+        ? 'Responses may degrade. LISA can reincarnate this session — distilled context, fresh window, zero re-explaining.'
+        : 'Start a fresh session with full context carried over — distilled, clean, and ready to continue.';
 
       const overlay = document.createElement('div');
       overlay.id = 'lisa-phoenix-modal';
@@ -132,13 +139,12 @@
 
       overlay.innerHTML = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-          <span style="font-size:20px;">⚠️</span>
-          <span style="font-weight:600;font-size:14px;color:#f87171;">Context Capacity Warning</span>
+          <span style="font-size:20px;">${icon}</span>
+          <span style="font-weight:600;font-size:14px;color:${titleColor};">${title}</span>
         </div>
         <p style="margin:0 0 16px;color:rgba(226,232,240,0.8);">
           ~${tokK}K of ~${redK}K estimated tokens used.
-          Responses may degrade. LISA can reincarnate this session —
-          distilled context, fresh window, zero re-explaining.
+          ${description}
         </p>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <button id="lisa-phoenix-rebirth-btn" style="
@@ -199,8 +205,16 @@
 
       // Long-press → debug readout (spec §3: hidden debug, gauge long-press)
       let timer;
-      g.addEventListener('mousedown', () => { timer = setTimeout(() => this._showDebug(), 800); });
-      g.addEventListener('mouseup',    () => clearTimeout(timer));
+      // Short click → rebirth modal; long-press (800ms) → debug readout
+      let longPressed = false;
+      g.addEventListener('mousedown', () => {
+        longPressed = false;
+        timer = setTimeout(() => { longPressed = true; this._showDebug(); }, 800);
+      });
+      g.addEventListener('mouseup', () => {
+        clearTimeout(timer);
+        if (!longPressed) this._showRebirthModal();
+      });
       g.addEventListener('mouseleave', () => clearTimeout(timer));
 
       document.body.appendChild(g);

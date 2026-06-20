@@ -152,6 +152,18 @@
             background:linear-gradient(135deg,#dc2626,#b91c1c);color:white;
             font-weight:600;font-size:13px;transition:opacity 0.2s;
           ">🔥 Rebirth now</button>
+          <div id="lisa-phoenix-xplat" style="position:relative;">
+            <button id="lisa-phoenix-xplat-btn" style="
+              padding:8px 16px;border:1px solid rgba(251,191,36,0.3);border-radius:8px;
+              cursor:pointer;background:transparent;color:#fbbf24;
+              font-size:12px;width:100%;text-align:left;
+            ">🌐 Rebirth on another platform ▾</button>
+            <div id="lisa-phoenix-xplat-list" style="
+              display:none;margin-top:4px;background:rgba(20,20,30,0.98);
+              border:1px solid rgba(251,191,36,0.2);border-radius:8px;
+              overflow:hidden;
+            "></div>
+          </div>
           <button id="lisa-phoenix-export-btn" style="
             padding:8px 16px;border:1px solid rgba(255,255,255,0.15);border-radius:8px;
             cursor:pointer;background:transparent;color:#e2e8f0;
@@ -194,6 +206,47 @@
             + ' for unlimited rebirths, or use the manual export below.';
           btn.parentNode.insertBefore(note, btn.nextSibling);
         }
+      });
+
+      // Cross-platform picker
+      const xplatBtn = document.getElementById('lisa-phoenix-xplat-btn');
+      const xplatList = document.getElementById('lisa-phoenix-xplat-list');
+      const platforms = [
+        ['claude', 'Claude'], ['chatgpt', 'ChatGPT'], ['gemini', 'Gemini'],
+        ['grok', 'Grok'], ['mistral', 'Mistral'], ['deepseek', 'DeepSeek'],
+        ['copilot', 'Copilot'], ['perplexity', 'Perplexity']
+      ].filter(([id]) => id !== this.platform);
+
+      xplatBtn.addEventListener('click', () => {
+        const showing = xplatList.style.display !== 'none';
+        if (showing) { xplatList.style.display = 'none'; return; }
+        xplatList.innerHTML = platforms.map(([id, name]) =>
+          '<div class="lisa-xplat-opt" data-platform="' + id + '" style="' +
+          'padding:8px 16px;cursor:pointer;color:#e2e8f0;font-size:12px;' +
+          'border-bottom:1px solid rgba(255,255,255,0.05);' +
+          'transition:background 0.15s;"' +
+          ' onmouseover="this.style.background=\'rgba(251,191,36,0.1)\'" ' +
+          ' onmouseout="this.style.background=\'transparent\'">' + name + '</div>'
+        ).join('');
+        xplatList.style.display = 'block';
+        xplatList.querySelectorAll('.lisa-xplat-opt').forEach(opt => {
+          opt.addEventListener('click', async () => {
+            const target = opt.dataset.platform;
+            const storage = await chrome.storage.sync.get(['userTier', 'rebirthCount', 'rebirthDate']);
+            const tier = storage.userTier || 'free';
+            const today = new Date().toISOString().slice(0, 10);
+            let count = (storage.rebirthDate === today) ? (storage.rebirthCount || 0) : 0;
+            if (tier === 'premium' || count < 5) {
+              if (tier !== 'premium') {
+                await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
+              }
+              chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: target });
+              overlay.remove();
+            } else {
+              alert('Daily rebirth limit reached (5/5). Upgrade to Premium for unlimited.');
+            }
+          });
+        });
       });
 
       document.getElementById('lisa-phoenix-export-btn').addEventListener('click', () => {

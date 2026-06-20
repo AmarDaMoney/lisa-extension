@@ -1499,10 +1499,11 @@ class LISAPopup {
           <input type="checkbox" class="snapshot-checkbox" data-id="${snap.id}" title="Select for injection">
         <div class="snapshot-info">
           <div class="snapshot-title">${this.escapeHtml(snap.title === snap.platform || !snap.title ? 'Untitled Conversation' : snap.title)}</div>
-          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}${snap.format === 'lisa-v' ? ' • 📝 LISA-V' : snap.format === 'compressed' ? ' • 🗜️ Comp' : snap.source === 'floating-button' || snap.format === 'raw' ? ' • 📄 Raw' : ''}</div>
+          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}${snap.phoenix ? ' • 🔥 Gen ' + snap.phoenix.generation : ''}${snap.format === 'lisa-v' ? ' • 📝 LISA-V' : snap.format === 'compressed' ? ' • 🗜️ Comp' : snap.source === 'floating-button' || snap.format === 'raw' ? ' • 📄 Raw' : ''}</div>
         </div>
         <div class="snapshot-actions">
           <button class="snapshot-btn history" data-root-id="${snap.rootId || snap.id}" title="Version History">🕒</button>
+          ${snap.phoenix ? '<button class="snapshot-btn lineage" data-session-id="' + snap.phoenix.session_id + '" title="Phoenix Lineage">🔗</button>' : ''}
           <button class="snapshot-btn download" data-id="${snap.id}" title="Download JSON">💾</button>
             <button class="snapshot-btn inject" data-id="${snap.id}" title="Inject as .md handoff">📎</button>
           <button class="snapshot-btn send" data-id="${snap.id}" title="Send to App">📤</button>
@@ -1530,6 +1531,10 @@ class LISAPopup {
 
     container.querySelectorAll('.snapshot-btn.delete').forEach(btn => {
       btn.addEventListener('click', (e) => this.deleteSnapshot(e.target.dataset.id));
+    });
+
+    container.querySelectorAll('.snapshot-btn.lineage').forEach(btn => {
+      btn.addEventListener('click', (e) => this.showLineageView(e.target.dataset.sessionId));
     });
 
     // Checkbox multi-select logic for inject
@@ -1904,6 +1909,67 @@ class LISAPopup {
     } catch (error) {
       console.error('[LISA] Failed to get version history:', error);
       alert('Failed to load history');
+    }
+  }
+
+  async showLineageView(sessionId) {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
+      if (!response.success || !response.snapshots) {
+        alert('Could not load snapshots');
+        return;
+      }
+
+      const phoenixSnaps = response.snapshots.filter(s => s.phoenix);
+      const bySessionId = {};
+      phoenixSnaps.forEach(s => { bySessionId[s.phoenix.session_id] = s; });
+
+      // Walk chain backwards to genesis
+      let current = bySessionId[sessionId];
+      const chain = [];
+      const visited = new Set();
+      while (current && !visited.has(current.phoenix.session_id)) {
+        chain.unshift(current);
+        visited.add(current.phoenix.session_id);
+        const parentId = current.phoenix.parent_session_id;
+        current = parentId ? bySessionId[parentId] : null;
+      }
+
+      // Walk chain forwards to descendants
+      const childMap = {};
+      phoenixSnaps.forEach(s => {
+        if (s.phoenix.parent_session_id) {
+          childMap[s.phoenix.parent_session_id] = s;
+        }
+      });
+      let desc = childMap[sessionId];
+      while (desc && !visited.has(desc.phoenix.session_id)) {
+        chain.push(desc);
+        visited.add(desc.phoenix.session_id);
+        desc = childMap[desc.phoenix.session_id];
+      }
+
+      if (chain.length === 0) {
+        alert('No lineage data found.');
+        return;
+      }
+
+      const lines = chain.map((s, i) => {
+        const gen = s.phoenix.generation || 1;
+        const plat = s.phoenix.platform || s.platform || '?';
+        const hash = s.phoenix.chain_hash ? s.phoenix.chain_hash.slice(0, 12) : 'N/A';
+        const date = s.phoenix.reborn_at ? new Date(s.phoenix.reborn_at).toLocaleString() : 'genesis';
+        const title = (s.title || 'Untitled').substring(0, 40);
+        const marker = s.phoenix.session_id === sessionId ? ' \u25c0 current' : '';
+        const arrow = i < chain.length - 1 ? '\n    \u2193 reborn' : '';
+        return 'Gen ' + gen + ' | ' + plat + ' | ' + title + marker
+          + '\n    Hash: ' + hash + ' | ' + date + arrow;
+      });
+
+      alert('\ud83d\udd25 Phoenix Lineage (' + chain.length + ' sessions)\n\n' + lines.join('\n'));
+    } catch (error) {
+      console.error('[LISA] Lineage view error:', error);
+      alert('Failed to load lineage');
     }
   }
 

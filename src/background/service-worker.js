@@ -520,7 +520,10 @@ function generateContinuationHandoff(data, platform) {
     + '5. Conversation language: continue in the language the user was using.\n\n'
     + '## SESSION LINEAGE\n'
     + '- Parent session: ' + title + ' (' + platform + ', ' + messages.length + ' messages)\n'
+    + '- Generation: ' + (data.phoenix ? data.phoenix.generation : 1) + ' in this work chain\n'
+    + '- Session ID: ' + (data.phoenix ? data.phoenix.session_id : 'genesis') + '\n'
     + '- Reborn at: ' + new Date().toISOString() + '\n'
+    + '- Integrity: ' + (data.phoenix && data.phoenix.chain_hash ? 'SHA-256 ' + data.phoenix.chain_hash.slice(0, 16) : 'pending') + '\n'
     + '- Distilled: ' + earlyMessages.length + ' early messages summarized, '
     + recentMessages.length + ' recent messages verbatim\n\n'
     + '---\n\n'
@@ -794,10 +797,39 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         data.url = data.url || sourceTab.url;
         data.title = data.title || sourceTab.title || 'Untitled';
         data.messageCount = data.messageCount || (data.messages?.length || 0);
-        await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
+        // Compute lineage before saving
+        const sessionId = 'phx-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        const parentLineage = data.phoenix || null;
+        const generation = parentLineage ? (parentLineage.generation || 1) + 1 : 1;
+
+        // Save snapshot with lineage
+        data.phoenix = {
+          session_id: sessionId,
+          parent_session_id: parentLineage ? parentLineage.session_id : null,
+          generation: generation,
+          platform: data.platform,
+          parent_platform: parentLineage ? parentLineage.platform : null,
+          reborn_at: new Date().toISOString(),
+          trigger: request.trigger || 'manual'
+        };
+        const snapshot = await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
 
         // 3. Generate continuation handoff
         const mdContent = generateContinuationHandoff(data, data.platform);
+
+        // Compute handoff hash + chain hash
+        const encoder = new TextEncoder();
+        const hashBuf = await crypto.subtle.digest('SHA-256', encoder.encode(mdContent));
+        const handoffHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        const parentChain = parentLineage ? (parentLineage.chain_hash || '') : '';
+        const chainBuf = await crypto.subtle.digest('SHA-256', encoder.encode(parentChain + handoffHash));
+        const chainHash = Array.from(new Uint8Array(chainBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        data.phoenix.handoff_hash = handoffHash;
+        data.phoenix.chain_hash = chainHash;
+
+        // Update snapshot with hashes
+        await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
+
         const filename = 'LISA_REBIRTH_' + data.platform + '_' + Date.now() + '.md';
 
         // 4. Open new tab

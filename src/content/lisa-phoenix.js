@@ -164,11 +164,7 @@
               overflow:hidden;
             "></div>
           </div>
-          <button id="lisa-phoenix-export-btn" style="
-            padding:8px 16px;border:1px solid rgba(255,255,255,0.15);border-radius:8px;
-            cursor:pointer;background:transparent;color:#e2e8f0;
-            font-size:12px;transition:opacity 0.2s;
-          ">📎 Export handoff manually</button>
+
           <button id="lisa-phoenix-snooze-btn" style="
             padding:8px 16px;border:none;border-radius:8px;cursor:pointer;
             background:transparent;color:rgba(226,232,240,0.5);
@@ -247,13 +243,6 @@
             }
           });
         });
-      });
-
-      document.getElementById('lisa-phoenix-export-btn').addEventListener('click', () => {
-        // Trigger existing LISA save flow via floating button
-        const lisaBtn = document.querySelector('#lisa-floating-btn, #lisa-save-btn, [id*="lisa"][id*="btn"]');
-        if (lisaBtn) lisaBtn.click();
-        overlay.remove();
       });
 
       document.getElementById('lisa-phoenix-snooze-btn').addEventListener('click', () => {

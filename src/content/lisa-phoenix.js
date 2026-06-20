@@ -168,9 +168,24 @@
       document.body.appendChild(overlay);
 
       // ── Button handlers ──
-      document.getElementById('lisa-phoenix-rebirth-btn').addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform });
-        overlay.remove();
+      document.getElementById('lisa-phoenix-rebirth-btn').addEventListener('click', async () => {
+        const { userTier } = await chrome.storage.sync.get('userTier');
+        if (userTier === 'premium') {
+          chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform });
+          overlay.remove();
+        } else {
+          // Free tier: show upgrade prompt, keep manual export available
+          const btn = document.getElementById('lisa-phoenix-rebirth-btn');
+          btn.style.background = 'rgba(100,100,100,0.3)';
+          btn.style.cursor = 'default';
+          btn.innerHTML = '\u{1F512} Premium feature';
+          const note = document.createElement('p');
+          note.style.cssText = 'margin:8px 0 0;color:#fbbf24;font-size:12px;line-height:1.4;';
+          note.innerHTML = 'One-click rebirth is a Premium feature. '
+            + '<a href="https://sat-chain.com" target="_blank" style="color:#fbbf24;text-decoration:underline;">Upgrade</a>'
+            + ' or use the manual export below.';
+          btn.parentNode.insertBefore(note, btn.nextSibling);
+        }
       });
 
       document.getElementById('lisa-phoenix-export-btn').addEventListener('click', () => {

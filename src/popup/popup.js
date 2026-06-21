@@ -175,7 +175,7 @@ class LISAPopup {
     if (limit.current >= limit.max) {
       return {
         allowed: false,
-        message: `Free tier limit: ${limit.max} ${type}s per day. Upgrade to Premium for unlimited access!`,
+        message: `You're moving fast today — that's ${limit.current} ${type}s, and the free plan covers ${limit.max} per day. Premium keeps everything uncapped, across every device. Ready to keep your momentum going?`,
         current: limit.current,
         max: limit.max
       };
@@ -226,17 +226,17 @@ class LISAPopup {
       const goPremiumBtn = document.getElementById('settingsSubscribeBtn');
       if (goPremiumBtn) goPremiumBtn.style.display = 'none';
       const upgradeHeader = document.getElementById('upgradeHeader');
-      if (upgradeHeader) upgradeHeader.innerHTML = '✅ Premium Active';
+      if (upgradeHeader) upgradeHeader.innerHTML = '✅ Your context is secure';
       const upgradeDesc = document.querySelector('#freeUpgradeSection .settings-desc');
-      if (upgradeDesc) upgradeDesc.textContent = '50 compressions/day + LISA Hash. Access your library below.';
+      if (upgradeDesc) upgradeDesc.textContent = 'Every conversation kept, every device synced, nothing capped.';
     } else {
       upgradeBtn.style.display = 'inline-block';
       const goPremiumBtnShow = document.getElementById('settingsSubscribeBtn');
       if (goPremiumBtnShow) goPremiumBtnShow.style.display = 'inline-block';
       const upgradeHeaderFree = document.getElementById('upgradeHeader');
-      if (upgradeHeaderFree) upgradeHeaderFree.innerHTML = '🚀 Upgrade to Premium';
+      if (upgradeHeaderFree) upgradeHeaderFree.innerHTML = '🚀 Never lose a thread';
       const upgradeDescFree = document.querySelector('#freeUpgradeSection .settings-desc');
-      if (upgradeDescFree) upgradeDescFree.textContent = 'Get 50 compressions/day + LISA Hash.';
+      if (upgradeDescFree) upgradeDescFree.textContent = 'Keep every conversation across every device — with nothing capped.';
       // Show remaining exports for free users
       const remaining = 5 - this.usageStats.exportsToday;
       const exportBtn = document.getElementById('exportBtn');
@@ -1428,9 +1428,9 @@ class LISAPopup {
       const goPremiumBtn = document.getElementById('settingsSubscribeBtn');
       if (goPremiumBtn) goPremiumBtn.style.display = 'none';
       const upgradeHeader = document.getElementById('upgradeHeader');
-      if (upgradeHeader) upgradeHeader.innerHTML = '✅ Premium Active';
+      if (upgradeHeader) upgradeHeader.innerHTML = '✅ Your context is secure';
       const upgradeDesc = document.querySelector('#freeUpgradeSection .settings-desc');
-      if (upgradeDesc) upgradeDesc.textContent = '50 compressions/day + LISA Hash. Access your library below.';
+      if (upgradeDesc) upgradeDesc.textContent = 'Every conversation kept, every device synced, nothing capped.';
     } else {
       tierBadge.textContent = 'Free';
       tierBadge.classList.remove('premium');
@@ -1438,9 +1438,9 @@ class LISAPopup {
       const goPremiumBtnShow = document.getElementById('settingsSubscribeBtn');
       if (goPremiumBtnShow) goPremiumBtnShow.style.display = 'inline-block';
       const upgradeHeaderFree = document.getElementById('upgradeHeader');
-      if (upgradeHeaderFree) upgradeHeaderFree.innerHTML = '🚀 Upgrade to Premium';
+      if (upgradeHeaderFree) upgradeHeaderFree.innerHTML = '🚀 Never lose a thread';
       const upgradeDescFree = document.querySelector('#freeUpgradeSection .settings-desc');
-      if (upgradeDescFree) upgradeDescFree.textContent = 'Get 50 compressions/day + LISA Hash.';
+      if (upgradeDescFree) upgradeDescFree.textContent = 'Keep every conversation across every device — with nothing capped.';
     }
   }
 

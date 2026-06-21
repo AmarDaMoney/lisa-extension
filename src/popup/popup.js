@@ -1593,7 +1593,7 @@ class LISAPopup {
       });
 
       if (result && result.success) {
-        this.updatePlatformStatus('📎 ' + markdownFiles.length + ' file(s) injected!', true);
+        this.updatePlatformStatus('📎 Context transferred — ' + markdownFiles.length + ' handoff(s) carried forward', true);
         this.trackEvent('snapshot_multi_injected_md', { count: markdownFiles.length });
         // Uncheck all
         checked.forEach(cb => { cb.checked = false; });
@@ -1818,7 +1818,19 @@ class LISAPopup {
       });
 
       if (result && result.success) {
-        this.updatePlatformStatus('📎 Injected as .md handoff!', true);
+        // Compute value metrics from snapshot
+        const msgs = snapshot.messages || snapshot.raw?.messages || snapshot.raw?.semanticTokens || [];
+        const msgCount = snapshot.messageCount || msgs.length || 0;
+        let entities = 0, concepts = 0;
+        for (const m of msgs) {
+          const t = m.tokens || {};
+          entities += (t.entities || []).reduce((sum, e) => sum + (e.values || []).length, 0);
+          concepts += (t.concepts || []).length;
+        }
+        const badge = entities > 0 || concepts > 0
+          ? '📎 Context transferred — ' + msgCount + ' messages, ' + entities + ' entities resolved, ' + concepts + ' concepts preserved'
+          : '📎 Context transferred — ' + msgCount + ' messages carried forward';
+        this.updatePlatformStatus(badge, true);
         this.trackEvent('snapshot_injected_md', { platform: snapshot.platform });
       } else {
         alert(result?.error || 'Injection failed — platform may not support file attachments');

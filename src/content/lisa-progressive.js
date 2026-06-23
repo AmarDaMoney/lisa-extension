@@ -252,17 +252,22 @@ class LisaProgressiveCapture {
     scrollTo(0);
     await new Promise(r => setTimeout(r, stepDelay));
     this.captureAllVisible();
+    console.log('[LISA Sweep] start — buffer:', this.buffer.size, 'scrollH:', scroller.scrollHeight);
 
     const step = Math.max(scroller.clientHeight - 100, 300);
     let lastCount = this.buffer.size;
     let stableRounds = 0;
+    let sweepStep = 0;
 
     while (stableRounds < 3) {
+      sweepStep++;
       scrollTo(scroller.scrollTop + step);
       await new Promise(r => setTimeout(r, stepDelay));
       this.captureAllVisible();
 
       const newCount = this.buffer.size;
+      const domNow = document.querySelectorAll(this.getMessageSelector()).length;
+      console.log('[LISA Sweep] step', sweepStep, '— scrollTop:', scroller.scrollTop, 'dom:', domNow, 'buffer:', newCount, 'stable:', stableRounds);
       if (newCount === lastCount) {
         stableRounds++;
       } else {
@@ -273,9 +278,12 @@ class LisaProgressiveCapture {
       // Stop if we hit the bottom
       if (scroller.scrollTop >= scroller.scrollHeight - scroller.clientHeight - 10) {
         this.captureAllVisible();
+        console.log('[LISA Sweep] hit bottom at step', sweepStep, '— final buffer:', this.buffer.size);
         break;
       }
     }
+
+    if (stableRounds >= 3) console.log('[LISA Sweep] exited: stable for 3 rounds at step', sweepStep, '— buffer:', this.buffer.size);
 
     // Return to bottom — user expects to be at end of conversation
     scrollTo(scroller.scrollHeight);

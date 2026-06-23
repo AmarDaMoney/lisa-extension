@@ -146,6 +146,21 @@
           ~${tokK}K of ~${redK}K estimated tokens used.
           ${description}
         </p>
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <button id="lisa-phoenix-mode-distilled" class="lisa-phoenix-mode active" style="
+            flex:1;padding:6px 8px;border:1px solid rgba(74,222,128,0.4);border-radius:6px;
+            cursor:pointer;background:rgba(74,222,128,0.15);color:#4ade80;
+            font-size:11px;font-weight:600;transition:all 0.2s;
+          ">✨ Distilled</button>
+          <button id="lisa-phoenix-mode-full" class="lisa-phoenix-mode" style="
+            flex:1;padding:6px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:6px;
+            cursor:pointer;background:transparent;color:rgba(226,232,240,0.6);
+            font-size:11px;font-weight:500;transition:all 0.2s;
+          ">📜 Full fidelity</button>
+        </div>
+        <div id="lisa-phoenix-mode-desc" style="margin-bottom:12px;font-size:11px;color:rgba(226,232,240,0.5);line-height:1.4;">
+          Summarized context + last 10 messages verbatim. Lighter, faster.
+        </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <button id="lisa-phoenix-rebirth-btn" style="
             padding:10px 16px;border:none;border-radius:8px;cursor:pointer;
@@ -175,6 +190,34 @@
 
       document.body.appendChild(overlay);
 
+      // ── Mode toggle ──
+      let rebirthMode = 'distilled';
+      const modeDistilled = document.getElementById('lisa-phoenix-mode-distilled');
+      const modeFull = document.getElementById('lisa-phoenix-mode-full');
+      const modeDesc = document.getElementById('lisa-phoenix-mode-desc');
+
+      modeDistilled.addEventListener('click', () => {
+        rebirthMode = 'distilled';
+        modeDistilled.style.background = 'rgba(74,222,128,0.15)';
+        modeDistilled.style.borderColor = 'rgba(74,222,128,0.4)';
+        modeDistilled.style.color = '#4ade80';
+        modeFull.style.background = 'transparent';
+        modeFull.style.borderColor = 'rgba(255,255,255,0.15)';
+        modeFull.style.color = 'rgba(226,232,240,0.6)';
+        modeDesc.textContent = 'Summarized context + last 10 messages verbatim. Lighter, faster.';
+      });
+
+      modeFull.addEventListener('click', () => {
+        rebirthMode = 'full';
+        modeFull.style.background = 'rgba(251,191,36,0.15)';
+        modeFull.style.borderColor = 'rgba(251,191,36,0.4)';
+        modeFull.style.color = '#fbbf24';
+        modeDistilled.style.background = 'transparent';
+        modeDistilled.style.borderColor = 'rgba(255,255,255,0.15)';
+        modeDistilled.style.color = 'rgba(226,232,240,0.6)';
+        modeDesc.textContent = 'Every message verbatim. Best for debugging or review by another model.';
+      });
+
       // ── Button handlers ──
       document.getElementById('lisa-phoenix-rebirth-btn').addEventListener('click', async () => {
         const storage = await chrome.storage.sync.get(['userTier', 'rebirthCount', 'rebirthDate']);
@@ -187,7 +230,7 @@
           if (tier !== 'premium') {
             await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
           }
-          chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform });
+          chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform, mode: rebirthMode });
           overlay.remove();
         } else {
           // Free tier limit reached
@@ -236,7 +279,7 @@
               if (tier !== 'premium') {
                 await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
               }
-              chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: target });
+              chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: target, mode: rebirthMode });
               overlay.remove();
             } else {
               alert('Daily rebirth limit reached (5/5). Upgrade to Premium for unlimited.');

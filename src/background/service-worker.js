@@ -469,47 +469,61 @@ const NEW_CHAT_URLS = {
 
 const pendingRebirths = new Map();
 
-function generateContinuationHandoff(data, platform) {
+function generateContinuationHandoff(data, platform, mode) {
   const messages = data.messages || [];
   const title = data.title || 'Untitled';
-  const RECENT_TURNS = 10;
+  mode = mode || 'distilled';
 
-  // Split messages: early context (summarized) vs recent (verbatim)
-  const recentStart = Math.max(0, messages.length - RECENT_TURNS);
-  const earlyMessages = messages.slice(0, recentStart);
-  const recentMessages = messages.slice(recentStart);
-
-  // Build early context summary (topics covered, not full text)
   let earlySummary = '';
-  if (earlyMessages.length > 0) {
-    earlySummary = '## EARLIER CONTEXT (' + earlyMessages.length + ' messages summarized)\n\n';
-    // Extract key topics from early messages (skip command noise)
-    const topics = [];
-    earlyMessages.forEach(m => {
-      if (m.role !== 'user') {
-        const text = m.content || m.text || m.v || '';
-        const firstLine = text.split('\n')[0].substring(0, 120).trim();
-        // Skip command instructions, code, and low-signal lines
-        if (firstLine.length > 30
-            && !/^(Command|command|bash|python|grep|sed|cat |node |git )/i.test(firstLine)
-            && !/^[\`\$#>|{]/.test(firstLine)
-            && !/matches?:|replaced|aborted|syntax/i.test(firstLine)) {
-          topics.push('- ' + firstLine);
-        }
-      }
-    });
-    if (topics.length > 0) {
-      earlySummary += 'Key points covered:\n' + topics.slice(-15).join('\n') + '\n\n';
-    }
-  }
+  let recentContent = '';
+  let earlyMessages, recentMessages;
 
-  // Build recent turns verbatim
-  let recentContent = '## RECENT CONVERSATION (last ' + recentMessages.length + ' messages — verbatim)\n\n';
-  recentMessages.forEach(m => {
-    const role = (m.role === 'user') ? 'User' : 'Assistant';
-    const text = m.content || m.text || m.v || '';
-    if (text) recentContent += '### ' + role + '\n' + text + '\n\n';
-  });
+  if (mode === 'full') {
+    // Full fidelity: every message verbatim
+    earlyMessages = [];
+    recentMessages = messages;
+    recentContent = '## FULL CONVERSATION (' + messages.length + ' messages \u2014 verbatim)\n\n';
+    messages.forEach(m => {
+      const role = (m.role === 'user') ? 'User' : 'Assistant';
+      const text = m.content || m.text || m.v || '';
+      if (text) recentContent += '### ' + role + '\n' + text + '\n\n';
+    });
+  } else {
+    // Distilled: summarized early + last N verbatim
+    const RECENT_TURNS = 10;
+    const recentStart = Math.max(0, messages.length - RECENT_TURNS);
+    earlyMessages = messages.slice(0, recentStart);
+    recentMessages = messages.slice(recentStart);
+
+    // Build early context summary (topics covered, not full text)
+    if (earlyMessages.length > 0) {
+      earlySummary = '## EARLIER CONTEXT (' + earlyMessages.length + ' messages summarized)\n\n';
+      const topics = [];
+      earlyMessages.forEach(m => {
+        if (m.role !== 'user') {
+          const text = m.content || m.text || m.v || '';
+          const firstLine = text.split('\n')[0].substring(0, 120).trim();
+          if (firstLine.length > 30
+              && !/^(Command|command|bash|python|grep|sed|cat |node |git )/i.test(firstLine)
+              && !/^[\`\$#>|{]/.test(firstLine)
+              && !/matches?:|replaced|aborted|syntax/i.test(firstLine)) {
+            topics.push('- ' + firstLine);
+          }
+        }
+      });
+      if (topics.length > 0) {
+        earlySummary += 'Key points covered:\n' + topics.slice(-15).join('\n') + '\n\n';
+      }
+    }
+
+    // Build recent turns verbatim
+    recentContent = '## RECENT CONVERSATION (last ' + recentMessages.length + ' messages — verbatim)\n\n';
+    recentMessages.forEach(m => {
+      const role = (m.role === 'user') ? 'User' : 'Assistant';
+      const text = m.content || m.text || m.v || '';
+      if (text) recentContent += '### ' + role + '\n' + text + '\n\n';
+    });
+  }
 
   return '# LISA SESSION REBIRTH — CONTINUATION DIRECTIVE\n\n'
     + 'You are RESUMING work in progress, not starting a new task. The previous\n'
@@ -530,8 +544,7 @@ function generateContinuationHandoff(data, platform) {
     + '- Session ID: ' + (data.phoenix ? data.phoenix.session_id : 'genesis') + '\n'
     + '- Reborn at: ' + new Date().toISOString() + '\n'
     + '- Integrity: ' + (data.phoenix && data.phoenix.chain_hash ? 'SHA-256 ' + data.phoenix.chain_hash.slice(0, 16) : 'pending') + '\n'
-    + '- Distilled: ' + earlyMessages.length + ' early messages summarized, '
-    + recentMessages.length + ' recent messages verbatim\n\n'
+    + '- Mode: ' + (mode === 'full' ? 'Full fidelity (' + messages.length + ' messages verbatim)' : 'Distilled (' + earlyMessages.length + ' summarized, ' + recentMessages.length + ' verbatim)') + '\n\n'
     + '---\n\n'
     + earlySummary
     + recentContent
@@ -840,7 +853,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const snapshot = await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
 
         // 3. Generate continuation handoff
-        const mdContent = generateContinuationHandoff(data, data.platform);
+        const mdContent = generateContinuationHandoff(data, data.platform, request.mode || 'distilled');
 
         // Compute handoff hash + chain hash
         const encoder = new TextEncoder();

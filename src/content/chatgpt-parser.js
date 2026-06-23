@@ -63,10 +63,24 @@ class ChatGPTParser {
     const bufferMatchesConv = !this.conversationId || !bufferConvId || bufferConvId.endsWith(this.conversationId);
     const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;
     if (!bufferReady) {
-      // Pick the overflow-y-auto with largest scrollHeight (avoids sidebar)
-      const scrollCandidates = [...document.querySelectorAll('div[class*="overflow-y-auto"]')];
-      const scroller = scrollCandidates.sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
-                       || document.querySelector('main');
+      // Walk up from a message element to find the actual scrolling container
+      // (class-name-agnostic — survives ChatGPT DOM reshuffles)
+      let scroller = null;
+      const anchorMsg = document.querySelector('[data-message-author-role]');
+      if (anchorMsg) {
+        let el = anchorMsg.parentElement;
+        while (el && el !== document.body) {
+          if (el.scrollHeight > el.clientHeight + 50) {
+            const style = getComputedStyle(el);
+            if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+              scroller = el;
+              break;
+            }
+          }
+          el = el.parentElement;
+        }
+      }
+      if (!scroller) scroller = document.querySelector('main');
       if (scroller && window.lisaProgressive) {
         await window.lisaProgressive.performScrollSweep(scroller);
       } else if (scroller) {

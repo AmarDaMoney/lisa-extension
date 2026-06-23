@@ -239,21 +239,26 @@ class LisaProgressiveCapture {
 
   // Sweep scroll top→bottom, capturing messages at each step
   // Stops when buffer count stabilises (no new messages in 2 consecutive steps)
-  async performScrollSweep(scroller, stepDelay = 350) {
+  async performScrollSweep(scroller, stepDelay = 500) {
     if (!scroller) return;
-    const savedTop = scroller.scrollTop;
+
+    // Helper: scroll + dispatch event to wake virtualizers listening on 'scroll'
+    const scrollTo = (top) => {
+      scroller.scrollTo({ top, behavior: 'instant' });
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+    };
 
     // Start at top
-    scroller.scrollTop = 0;
+    scrollTo(0);
     await new Promise(r => setTimeout(r, stepDelay));
     this.captureAllVisible();
 
-    const step = scroller.clientHeight || 500;
+    const step = Math.max(scroller.clientHeight - 100, 300);
     let lastCount = this.buffer.size;
     let stableRounds = 0;
 
-    while (stableRounds < 2) {
-      scroller.scrollTop += step;
+    while (stableRounds < 3) {
+      scrollTo(scroller.scrollTop + step);
       await new Promise(r => setTimeout(r, stepDelay));
       this.captureAllVisible();
 
@@ -273,7 +278,7 @@ class LisaProgressiveCapture {
     }
 
     // Return to bottom — user expects to be at end of conversation
-    scroller.scrollTop = scroller.scrollHeight;
+    scrollTo(scroller.scrollHeight);
     await new Promise(r => setTimeout(r, 200));
   }
 

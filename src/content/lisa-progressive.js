@@ -124,13 +124,18 @@ class LisaProgressiveCapture {
     clone.querySelectorAll('button, svg, [role="button"], .sr-only, [class*="opacity-0"]').forEach(n => n.remove());
     const text = clone.textContent.trim();
     if (!text || text.length < 5) return;
+    // Filter out file-attachment widget noise
+    if (text.includes('[object Object]')) return;
     const hash = this.simpleHash(text);
     if (this.buffer.has(hash)) return;
+    if (!this._captureSeq) this._captureSeq = 0;
+    this._captureSeq++;
     this.buffer.set(hash, {
       hash,
       role,
       t: role === 'user' ? 'u' : 'a_text',
       v: text,
+      seq: this._captureSeq,
       capturedAt: new Date().toISOString()
     });
     this.scheduleSave();
@@ -230,10 +235,19 @@ class LisaProgressiveCapture {
   // domBlocks: flat array of blocks currently visible in the DOM
   mergeWithBuffer(domBlocks) {
     if (this.buffer.size === 0) return domBlocks;
-    const domHashes = new Set(domBlocks.map(b => this.simpleHash(b.v || b.content || '')));
+    // Hash domBlocks using same first-100-char hash as captureElement
+    const domHashes = new Set(domBlocks.map(b => {
+      const text = (b.v || b.content || '').trim();
+      return this.simpleHash(text);
+    }));
+    // Also hash with stripped text to catch UI-noise differences
+    domBlocks.forEach(b => {
+      const text = (b.v || b.content || '').replace(/\s+/g, ' ').trim();
+      domHashes.add(this.simpleHash(text));
+    });
     const missing = Array.from(this.buffer.values())
       .filter(b => !domHashes.has(b.hash))
-      .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+      .sort((a, b) => (a.seq || 0) - (b.seq || 0));
     return missing.length > 0 ? [...missing, ...domBlocks] : domBlocks;
   }
 

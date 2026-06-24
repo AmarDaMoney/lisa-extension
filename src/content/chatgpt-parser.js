@@ -1,7 +1,12 @@
+// Re-injection guard — ChatGPT SPA re-injects content scripts on navigation
+if (window.__lisaChatGPTLoaded) { /* already loaded */ }
+else {
+window.__lisaChatGPTLoaded = true;
+
+(() => {
 // ChatGPT Conversation Parser
 // Extracts conversation data from ChatGPT web interface
 
-if (typeof ChatGPTParser === 'undefined') {
 class ChatGPTParser {
   constructor() {
     this.platform = 'ChatGPT';
@@ -143,4 +148,6 @@ chrome.runtime.sendMessage({
   action: 'parserReady', 
   platform: 'ChatGPT' 
 });
-}  // end re-injection guard
+
+})();
+}

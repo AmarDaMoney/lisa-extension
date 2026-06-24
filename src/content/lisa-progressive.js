@@ -239,55 +239,75 @@ class LisaProgressiveCapture {
 
   // Sweep scroll top→bottom, capturing messages at each step
   // Stops when buffer count stabilises (no new messages in 2 consecutive steps)
-  async performScrollSweep(scroller, stepDelay = 500) {
+  async performScrollSweep(scroller, stepDelay = 600) {
     if (!scroller) return;
 
-    // Helper: scroll + dispatch event to wake virtualizers listening on 'scroll'
     const scrollTo = (top) => {
       scroller.scrollTo({ top, behavior: 'instant' });
       scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
     };
 
-    // Start at top
+    const sel = this.getMessageSelector();
+    const domCount = () => document.querySelectorAll(sel).length;
+
+    // Start at top, double capture (let virtualizer settle, then grab)
     scrollTo(0);
     await new Promise(r => setTimeout(r, stepDelay));
     this.captureAllVisible();
-    console.log('[LISA Sweep] start — buffer:', this.buffer.size, 'scrollH:', scroller.scrollHeight);
+    await new Promise(r => setTimeout(r, 250));
+    this.captureAllVisible();
+    console.log('[LISA Sweep] start — buffer:', this.buffer.size,
+                'dom:', domCount(), 'scrollH:', scroller.scrollHeight,
+                'clientH:', scroller.clientHeight);
 
-    const step = Math.max(scroller.clientHeight - 100, 300);
-    let lastCount = this.buffer.size;
+    // Half-viewport step = more overlap, fewer messages skipped between mount/unmount
+    const step = Math.max(Math.floor(scroller.clientHeight / 2), 250);
+
+    let lastBufferSize = this.buffer.size;
     let stableRounds = 0;
     let sweepStep = 0;
 
-    while (stableRounds < 3) {
+    while (stableRounds < 4) {
       sweepStep++;
       scrollTo(scroller.scrollTop + step);
+
+      // Double capture: once after virtualizer mounts, once after it settles
       await new Promise(r => setTimeout(r, stepDelay));
       this.captureAllVisible();
+      await new Promise(r => setTimeout(r, 250));
+      this.captureAllVisible();
 
-      const newCount = this.buffer.size;
-      const domNow = document.querySelectorAll(this.getMessageSelector()).length;
-      console.log('[LISA Sweep] step', sweepStep, '— scrollTop:', scroller.scrollTop, 'dom:', domNow, 'buffer:', newCount, 'stable:', stableRounds);
-      if (newCount === lastCount) {
-        stableRounds++;
-      } else {
-        stableRounds = 0;
-        lastCount = newCount;
+      const dom = domCount();
+      const atBottom = scroller.scrollTop >=
+                       scroller.scrollHeight - scroller.clientHeight - 10;
+
+      console.log('[LISA Sweep] step', sweepStep,
+                  '— scrollTop:', scroller.scrollTop,
+                  'dom:', dom, 'buffer:', this.buffer.size,
+                  'atBottom:', atBottom, 'stable:', stableRounds);
+
+      if (atBottom) {
+        await new Promise(r => setTimeout(r, stepDelay));
+        this.captureAllVisible();
+        console.log('[LISA Sweep] hit bottom at step', sweepStep,
+                    '— final buffer:', this.buffer.size);
+        break;
       }
 
-      // Stop if we hit the bottom
-      if (scroller.scrollTop >= scroller.scrollHeight - scroller.clientHeight - 10) {
-        this.captureAllVisible();
-        console.log('[LISA Sweep] hit bottom at step', sweepStep, '— final buffer:', this.buffer.size);
-        break;
+      if (this.buffer.size > lastBufferSize) {
+        stableRounds = 0;
+        lastBufferSize = this.buffer.size;
+      } else {
+        stableRounds++;
       }
     }
 
-    if (stableRounds >= 3) console.log('[LISA Sweep] exited: stable for 3 rounds at step', sweepStep, '— buffer:', this.buffer.size);
+    if (stableRounds >= 4) console.log('[LISA Sweep] stable exit at step', sweepStep, '— buffer:', this.buffer.size);
 
-    // Return to bottom — user expects to be at end of conversation
+    // Return to bottom
     scrollTo(scroller.scrollHeight);
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 250));
+    this.captureAllVisible();
   }
 
   pause() {

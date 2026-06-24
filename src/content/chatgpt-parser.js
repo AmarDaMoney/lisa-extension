@@ -69,15 +69,26 @@ class ChatGPTParser {
     const bufferMatchesConv = !this.conversationId || !bufferConvId || bufferConvId.endsWith(this.conversationId);
     const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;
     if (!bufferReady) {
-      // Find the largest scrollable container (class-name-agnostic)
-      const scrollables = [...document.querySelectorAll('div, main')].filter(el => {
-        const s = getComputedStyle(el);
-        return (s.overflowY === 'auto' || s.overflowY === 'scroll')
-               && el.scrollHeight > el.clientHeight + 200;
-      });
-      const scroller = scrollables.sort((a, b) => b.scrollHeight - a.scrollHeight)[0]
-                       || document.querySelector('main');
-      console.log('[LISA] scroller picked — scrollH:', scroller?.scrollHeight, 'clientH:', scroller?.clientHeight, 'candidates:', scrollables.length);
+      // Find the largest scrollable container — poll until ChatGPT hydrates
+      let scroller = null;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const scrollables = [...document.querySelectorAll('div, main')].filter(el => {
+          const s = getComputedStyle(el);
+          return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+                 && el.scrollHeight > el.clientHeight + 200;
+        });
+        scroller = scrollables.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
+        if (scroller) {
+          console.log('[LISA] scroller found on attempt', attempt, '— scrollH:', scroller.scrollHeight, 'clientH:', scroller.clientHeight);
+          break;
+        }
+        console.log('[LISA] no scrollable container yet, waiting... attempt', attempt);
+        await new Promise(r => setTimeout(r, 500));
+      }
+      if (!scroller) {
+        scroller = document.querySelector('main');
+        console.log('[LISA] fallback to main — scrollH:', scroller?.scrollHeight);
+      }
       if (scroller && window.lisaProgressive) {
         await window.lisaProgressive.performScrollSweep(scroller);
       } else if (scroller) {

@@ -325,7 +325,23 @@ class LisaVParser {
     const bufferMatchesConv = !currentConvId || !bufferConvId || bufferConvId.endsWith(currentConvId);
     const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;
     if (!bufferReady) {
-      const scroller = document.querySelector('div[class*="overflow-y-auto"]') || document.querySelector('main');
+      // Poll for scrollable container — ChatGPT hydrates lazily
+      let scroller = null;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const scrollables = [...document.querySelectorAll('div, main')].filter(el => {
+          const s = getComputedStyle(el);
+          return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+                 && el.scrollHeight > el.clientHeight + 200;
+        });
+        scroller = scrollables.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
+        if (scroller) {
+          console.log('[LISA] scroller found on attempt', attempt, '— scrollH:', scroller.scrollHeight, 'clientH:', scroller.clientHeight);
+          break;
+        }
+        console.log('[LISA] no scrollable container yet, attempt', attempt);
+        await new Promise(r => setTimeout(r, 500));
+      }
+      if (!scroller) scroller = document.querySelector('main');
       if (scroller && window.lisaProgressive) {
         await window.lisaProgressive.performScrollSweep(scroller);
       } else if (scroller) {

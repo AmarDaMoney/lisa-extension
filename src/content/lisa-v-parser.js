@@ -335,10 +335,10 @@ class LisaVParser {
         });
         scroller = scrollables.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
         if (scroller) {
-          console.log('[LISA] scroller found on attempt', attempt, '— scrollH:', scroller.scrollHeight, 'clientH:', scroller.clientHeight);
+          console.debug('[LISA] scroller found on attempt', attempt, '— scrollH:', scroller.scrollHeight, 'clientH:', scroller.clientHeight);
           break;
         }
-        console.log('[LISA] no scrollable container yet, attempt', attempt);
+        console.debug('[LISA] no scrollable container yet, attempt', attempt);
         await new Promise(r => setTimeout(r, 500));
       }
       if (!scroller) scroller = document.querySelector('main');

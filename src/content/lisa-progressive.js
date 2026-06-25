@@ -270,7 +270,7 @@ class LisaProgressiveCapture {
     this.captureAllVisible();
     await new Promise(r => setTimeout(r, 250));
     this.captureAllVisible();
-    console.log('[LISA Sweep] start — buffer:', this.buffer.size,
+    console.debug('[LISA Sweep] start — buffer:', this.buffer.size,
                 'dom:', domCount(), 'scrollH:', scroller.scrollHeight,
                 'clientH:', scroller.clientHeight);
 
@@ -295,7 +295,7 @@ class LisaProgressiveCapture {
       const atBottom = scroller.scrollTop >=
                        scroller.scrollHeight - scroller.clientHeight - 10;
 
-      console.log('[LISA Sweep] step', sweepStep,
+      console.debug('[LISA Sweep] step', sweepStep,
                   '— scrollTop:', scroller.scrollTop,
                   'dom:', dom, 'buffer:', this.buffer.size,
                   'atBottom:', atBottom, 'stable:', stableRounds);
@@ -303,7 +303,7 @@ class LisaProgressiveCapture {
       if (atBottom) {
         await new Promise(r => setTimeout(r, stepDelay));
         this.captureAllVisible();
-        console.log('[LISA Sweep] hit bottom at step', sweepStep,
+        console.debug('[LISA Sweep] hit bottom at step', sweepStep,
                     '— final buffer:', this.buffer.size);
         break;
       }
@@ -319,7 +319,7 @@ class LisaProgressiveCapture {
       }
     }
 
-    if (stableRounds >= 4) console.log('[LISA Sweep] stable exit at step', sweepStep, '— buffer:', this.buffer.size);
+    if (stableRounds >= 4) console.debug('[LISA Sweep] stable exit at step', sweepStep, '— buffer:', this.buffer.size);
 
     // Return to bottom
     scrollTo(scroller.scrollHeight);

@@ -256,6 +256,13 @@ class LisaProgressiveCapture {
   async performScrollSweep(scroller, stepDelay = 600) {
     if (!scroller) return;
 
+    // Abort any previously running sweep
+    if (this._sweepAbort) {
+      this._sweepAbort.aborted = true;
+      console.debug('[LISA Sweep] aborted previous sweep');
+    }
+    const abort = this._sweepAbort = { aborted: false };
+
     const scrollTo = (top) => {
       scroller.scrollTo({ top, behavior: 'instant' });
       scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
@@ -282,6 +289,7 @@ class LisaProgressiveCapture {
     let sweepStep = 0;
 
     while (stableRounds < 4) {
+      if (abort.aborted) { console.debug('[LISA Sweep] aborted at step', sweepStep); break; }
       sweepStep++;
       scrollTo(scroller.scrollTop + step);
 
@@ -325,6 +333,7 @@ class LisaProgressiveCapture {
     scrollTo(scroller.scrollHeight);
     await new Promise(r => setTimeout(r, 250));
     this.captureAllVisible();
+    if (this._sweepAbort === abort) this._sweepAbort = null;
   }
 
   pause() {

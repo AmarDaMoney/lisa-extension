@@ -9,6 +9,7 @@ class LISACompressor {
 
   // Semantic tokenization - identifies key concepts and structures
   tokenize(text) {
+    if (!text) text = '';
     const tokens = {
       entities: this.extractEntities(text),
       concepts: this.extractConcepts(text),
@@ -122,14 +123,15 @@ class LISACompressor {
     };
 
     conversation.messages.forEach(message => {
-      const tokens = this.tokenize(message.content);
+      const content = message.content || message.v || '';
+      const tokens = this.tokenize(content);
       
       compressed.semanticTokens.push({
         role: message.role,
         index: message.index,
         tokens: tokens,
-        summary: this.summarize(message.content),
-        originalLength: message.content.length
+        summary: this.summarize(content),
+        originalLength: content.length
       });
     });
 
@@ -143,6 +145,7 @@ class LISACompressor {
   }
 
   summarize(text) {
+    if (!text) return '';
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
     
     if (sentences.length <= 2) {

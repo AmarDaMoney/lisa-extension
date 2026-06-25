@@ -449,6 +449,34 @@ class LisaVParser {
 
   async extractGrokMessages() {
     const messages = [];
+    // Scroll sweep for virtualised Grok conversations
+    const progressive = window.lisaProgressive;
+    const domCount = document.querySelectorAll('.relative.group.flex.flex-col.justify-center.w-full').length;
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount;
+    if (!bufferReady) {
+      let scroller = null;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const scrollables = [...document.querySelectorAll('div, main')].filter(el => {
+          const s = getComputedStyle(el);
+          return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+                 && el.scrollHeight > el.clientHeight + 200;
+        });
+        scroller = scrollables.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
+        if (scroller) {
+          console.debug('[LISA] Grok scroller found on attempt', attempt, '— scrollH:', scroller.scrollHeight);
+          break;
+        }
+        console.debug('[LISA] Grok no scrollable container yet, attempt', attempt);
+        await new Promise(r => setTimeout(r, 500));
+      }
+      if (!scroller) scroller = document.querySelector('main');
+      if (scroller && progressive) {
+        await progressive.performScrollSweep(scroller);
+      } else if (scroller) {
+        scroller.scrollTop = 0;
+        await new Promise(r => setTimeout(r, 700));
+      }
+    }
     const messageWrappers = document.querySelectorAll('.relative.group.flex.flex-col.justify-center.w-full');
     
     for (const wrapper of messageWrappers) {

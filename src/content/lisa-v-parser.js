@@ -689,7 +689,7 @@ class LisaVParser {
       const re = new RegExp(regex.source, regex.flags);
       let match;
       while ((match = re.exec(allText)) !== null) {
-        const rawAction = match[1].trim().replace(/[.,;:]+$/, "");
+        const rawAction = (match[1] || '').trim().replace(/[.,;:]+$/, "");
         const action = rawAction.length > 200
           ? rawAction.substring(0, rawAction.lastIndexOf(" ", 200)).trim() || rawAction.substring(0, 200)
           : rawAction;

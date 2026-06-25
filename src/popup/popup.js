@@ -755,7 +755,7 @@ class LISAPopup {
   }
 
   async extractConversation() {
-    this.showLoading('Extracting conversation...');
+    this.showLoading('Extracting conversation (scrolling through messages — may take a minute)...');
 
     try {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -770,7 +770,8 @@ class LISAPopup {
         throw new Error('Cannot access Chrome internal pages');
       }
 
-      const response = await this.sendMessageToTab(tab.id, { action: 'extractViaLisaV' });
+      // Sweep can take 60-90s on long ChatGPT conversations (virtualized scrolling)
+      const response = await this.sendMessageToTab(tab.id, { action: 'extractViaLisaV' }, 120000, 0);
 
       if (response.success && response.data) {
         this.currentConversation = response.data;

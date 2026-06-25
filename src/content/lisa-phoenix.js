@@ -460,6 +460,16 @@
       document.addEventListener('lisa-message-captured', (e) => {
         this.onMessageCaptured(e.detail);
       });
+      // Reset gauge when progressive detects a conversation switch (SPA navigation)
+      document.addEventListener('lisa-conversation-changed', () => {
+        this.estimatedTokens = 0;
+        this.messageCount = 0;
+        this.state = STATES.GREEN;
+        this._updateGauge();
+        // Re-scan the new conversation's buffer after progressive loads it
+        setTimeout(() => this._scanExistingBuffer(), 300);
+        setTimeout(() => this._loadPersistedState(), 500);
+      });
 
       if (document.body) {
         this._createGauge();

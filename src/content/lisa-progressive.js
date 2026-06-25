@@ -356,6 +356,9 @@ class LisaProgressiveCapture {
     const newId = this.getConversationId();
     if (newId === this.conversationId) return;
     console.log(`[LISA Progressive] New conversation: ${newId}`);
+    document.dispatchEvent(new CustomEvent('lisa-conversation-changed', {
+      detail: { oldId: this.conversationId, newId }
+    }));
     await this.saveBuffer();
     this.conversationId = newId;
     this.buffer.clear();

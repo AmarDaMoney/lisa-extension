@@ -308,10 +308,13 @@ class LisaProgressiveCapture {
         break;
       }
 
+      // Only count stable rounds after scrolling past 80% — avoids premature
+      // bail when buffer already has pre-captured messages from live observation
+      const scrollProgress = scroller.scrollTop / (scroller.scrollHeight - scroller.clientHeight);
       if (this.buffer.size > lastBufferSize) {
         stableRounds = 0;
         lastBufferSize = this.buffer.size;
-      } else {
+      } else if (scrollProgress > 0.8) {
         stableRounds++;
       }
     }

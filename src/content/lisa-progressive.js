@@ -271,6 +271,12 @@ class LisaProgressiveCapture {
     const sel = this.getMessageSelector();
     const domCount = () => document.querySelectorAll(sel).length;
 
+    // Clear stale buffer — sweep only runs when buffer isn't useful (!bufferReady),
+    // so existing entries are just the last few visible messages from page load.
+    // Keeping them causes wrong ordering (low seq but chronologically last).
+    this.buffer.clear();
+    this._captureSeq = 0;
+
     // Start at top, double capture (let virtualizer settle, then grab)
     scrollTo(0);
     await new Promise(r => setTimeout(r, stepDelay));

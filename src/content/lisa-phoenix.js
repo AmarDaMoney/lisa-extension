@@ -6,7 +6,7 @@
  * maintains a running token estimate, and displays a pressure gauge.
  * States (GREEN → AMBER → RED) never downgrade within a session.
  *
- * v0.51.2 — LISA Core / SAT-CHAIN LLC
+ * v0.51.3 — LISA Core / SAT-CHAIN LLC
  */
 (function () {
   'use strict';

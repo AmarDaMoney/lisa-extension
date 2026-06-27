@@ -491,6 +491,43 @@ function generateContinuationHandoff(data, platform, mode) {
       const text = m.content || m.text || m.v || '';
       if (text) recentContent += '### ' + role + '\n' + text + '\n\n';
     });
+  } else if (mode === 'semantic') {
+    // Semantic: LISA-structured early context + last N verbatim
+    const RECENT_TURNS = 10;
+    const recentStart = Math.max(0, messages.length - RECENT_TURNS);
+    earlyMessages = messages.slice(0, recentStart);
+    recentMessages = messages.slice(recentStart);
+
+    if (earlyMessages.length > 0) {
+      const compressor = new LISACompressor();
+      earlySummary = '## SEMANTIC CONTEXT (' + earlyMessages.length + ' messages - LISA-structured)\n\n';
+      earlySummary += '> Pre-translated by LISA. Entities, concepts, and relationships are resolved.\n';
+      earlySummary += '> Parse this section as structured data, not prose.\n\n';
+      earlySummary += '```json\n';
+      const semanticBlocks = earlyMessages.map((m, i) => {
+        const content = m.content || m.text || m.v || '';
+        const tokens = compressor.tokenize(content);
+        return {
+          index: i,
+          role: m.role || 'assistant',
+          summary: compressor.summarize(content),
+          entities: tokens.entities,
+          concepts: tokens.concepts.slice(0, 8),
+          relationships: tokens.relationships,
+          intent: tokens.intent
+        };
+      });
+      earlySummary += JSON.stringify(semanticBlocks, null, 1) + '\n';
+      earlySummary += '```\n\n';
+    }
+
+    recentContent = '## RECENT CONVERSATION (last ' + recentMessages.length + ' messages \u2014 verbatim)\n\n';
+    recentMessages.forEach(m => {
+      const role = (m.role === 'user') ? 'User' : 'Assistant';
+      const text = m.content || m.text || m.v || '';
+      if (text) recentContent += '### ' + role + '\n' + text + '\n\n';
+    });
+
   } else {
     // Distilled: summarized early + last N verbatim
     const RECENT_TURNS = 10;
@@ -547,7 +584,7 @@ function generateContinuationHandoff(data, platform, mode) {
     + '- Session ID: ' + (data.phoenix ? data.phoenix.session_id : 'genesis') + '\n'
     + '- Reborn at: ' + new Date().toISOString() + '\n'
     + '- Integrity: ' + (data.phoenix && data.phoenix.chain_hash ? 'SHA-256 ' + data.phoenix.chain_hash.slice(0, 16) : 'pending') + '\n'
-    + '- Mode: ' + (mode === 'full' ? 'Full fidelity (' + messages.length + ' messages verbatim)' : 'Distilled (' + earlyMessages.length + ' summarized, ' + recentMessages.length + ' verbatim)') + '\n\n'
+    + '- Mode: ' + (mode === 'full' ? 'Full fidelity (' + messages.length + ' messages verbatim)' : mode === 'semantic' ? 'Semantic (' + earlyMessages.length + ' LISA-structured, ' + recentMessages.length + ' verbatim)' : 'Distilled (' + earlyMessages.length + ' summarized, ' + recentMessages.length + ' verbatim)') + '\n\n'
     + '---\n\n'
     + earlySummary
     + recentContent

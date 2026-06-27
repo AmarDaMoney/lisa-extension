@@ -157,6 +157,11 @@
             cursor:pointer;background:transparent;color:rgba(226,232,240,0.6);
             font-size:11px;font-weight:500;transition:all 0.2s;
           ">📜 Full fidelity</button>
+          <button id="lisa-phoenix-mode-semantic" class="lisa-phoenix-mode" style="
+            flex:1;padding:6px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:6px;
+            cursor:pointer;background:transparent;color:rgba(226,232,240,0.6);
+            font-size:11px;font-weight:500;transition:all 0.2s;
+          ">🧠 Semantic</button>
         </div>
         <div id="lisa-phoenix-mode-desc" style="margin-bottom:12px;font-size:11px;color:rgba(226,232,240,0.5);line-height:1.4;">
           Summarized context + last 10 messages verbatim. Lighter, faster.
@@ -194,28 +199,38 @@
       let rebirthMode = 'distilled';
       const modeDistilled = document.getElementById('lisa-phoenix-mode-distilled');
       const modeFull = document.getElementById('lisa-phoenix-mode-full');
+      const modeSemantic = document.getElementById('lisa-phoenix-mode-semantic');
       const modeDesc = document.getElementById('lisa-phoenix-mode-desc');
-
+      const resetModes = () => {
+        [modeDistilled, modeFull, modeSemantic].forEach(btn => {
+          btn.style.background = 'transparent';
+          btn.style.borderColor = 'rgba(255,255,255,0.15)';
+          btn.style.color = 'rgba(226,232,240,0.6)';
+        });
+      };
       modeDistilled.addEventListener('click', () => {
         rebirthMode = 'distilled';
+        resetModes();
         modeDistilled.style.background = 'rgba(74,222,128,0.15)';
         modeDistilled.style.borderColor = 'rgba(74,222,128,0.4)';
         modeDistilled.style.color = '#4ade80';
-        modeFull.style.background = 'transparent';
-        modeFull.style.borderColor = 'rgba(255,255,255,0.15)';
-        modeFull.style.color = 'rgba(226,232,240,0.6)';
         modeDesc.textContent = 'Summarized context + last 10 messages verbatim. Lighter, faster.';
       });
-
       modeFull.addEventListener('click', () => {
         rebirthMode = 'full';
+        resetModes();
         modeFull.style.background = 'rgba(251,191,36,0.15)';
         modeFull.style.borderColor = 'rgba(251,191,36,0.4)';
         modeFull.style.color = '#fbbf24';
-        modeDistilled.style.background = 'transparent';
-        modeDistilled.style.borderColor = 'rgba(255,255,255,0.15)';
-        modeDistilled.style.color = 'rgba(226,232,240,0.6)';
         modeDesc.textContent = 'Every message verbatim. Best for debugging or review by another model.';
+      });
+      modeSemantic.addEventListener('click', () => {
+        rebirthMode = 'semantic';
+        resetModes();
+        modeSemantic.style.background = 'rgba(147,51,234,0.15)';
+        modeSemantic.style.borderColor = 'rgba(147,51,234,0.4)';
+        modeSemantic.style.color = '#a78bfa';
+        modeDesc.textContent = 'LISA-translated structured data + last 10 verbatim. Maximum AI accuracy, minimum tokens.';
       });
 
       // ── Button handlers ──

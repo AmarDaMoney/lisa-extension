@@ -1608,7 +1608,7 @@ class LISAPopup {
 
       // Convert all selected to markdown and combine
       const markdownFiles = snapshots.map(snap => {
-        const md = this.convertSnapshotToMarkdown(snap);
+        const md = snap.rebirthHandoff || this.convertSnapshotToMarkdown(snap);
         const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
         return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.md', content: md };
       });
@@ -1832,7 +1832,8 @@ class LISAPopup {
         return;
       }
 
-      const markdown = this.convertSnapshotToMarkdown(snapshot);
+      // Use stored rebirth handoff if available (preserves the exact MD that was generated)
+      const markdown = snapshot.rebirthHandoff || this.convertSnapshotToMarkdown(snapshot);
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
       const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + (snapshot.format || 'lisa-v') + '.md';
 

@@ -1514,7 +1514,8 @@ class LISAPopup {
     if (this._libFilter === 'rebirths') {
       this.renderSnapshots(snaps.filter(s => s.phoenix || s.source === 'phoenix-rebirth'));
     } else {
-      this.renderSnapshots(snaps);
+      // All tab: regular saves only (exclude rebirths)
+      this.renderSnapshots(snaps.filter(s => !s.phoenix && s.source !== 'phoenix-rebirth'));
     }
   }
 

@@ -922,7 +922,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           reborn_at: new Date().toISOString(),
           trigger: request.trigger || 'manual'
         };
-        const snapshot = await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
+        // (snapshot saved below after hash computation)
 
         // 3. Generate continuation handoff
         const mdContent = generateContinuationHandoff(data, data.platform, request.mode || 'distilled');
@@ -937,7 +937,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         data.phoenix.handoff_hash = handoffHash;
         data.phoenix.chain_hash = chainHash;
 
-        // Update snapshot with hashes
+        // Save once with complete data (hashes + handoff content)
+        data.rebirthHandoff = mdContent;
+        data.rebirthMode = request.mode || 'distilled';
         await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
 
         const filename = 'LISA_REBIRTH_' + data.platform + '_' + Date.now() + '.md';

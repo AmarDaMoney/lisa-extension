@@ -414,6 +414,27 @@ class LISAPopup {
     document.getElementById('saveToLibraryBtn').addEventListener('click', () => {
       this.saveToLibrary();
     });
+    // Library filter tabs
+    document.getElementById('libTabAll').addEventListener('click', () => {
+      this._libFilter = 'all';
+      document.getElementById('libTabAll').style.background = 'rgba(74,222,128,0.15)';
+      document.getElementById('libTabAll').style.borderColor = 'rgba(74,222,128,0.4)';
+      document.getElementById('libTabAll').style.color = '#4ade80';
+      document.getElementById('libTabRebirths').style.background = 'transparent';
+      document.getElementById('libTabRebirths').style.borderColor = 'rgba(255,255,255,0.15)';
+      document.getElementById('libTabRebirths').style.color = 'rgba(226,232,240,0.6)';
+      this.applyLibFilter();
+    });
+    document.getElementById('libTabRebirths').addEventListener('click', () => {
+      this._libFilter = 'rebirths';
+      document.getElementById('libTabRebirths').style.background = 'rgba(239,68,68,0.15)';
+      document.getElementById('libTabRebirths').style.borderColor = 'rgba(239,68,68,0.4)';
+      document.getElementById('libTabRebirths').style.color = '#ef4444';
+      document.getElementById('libTabAll').style.background = 'transparent';
+      document.getElementById('libTabAll').style.borderColor = 'rgba(255,255,255,0.15)';
+      document.getElementById('libTabAll').style.color = 'rgba(226,232,240,0.6)';
+      this.applyLibFilter();
+    });
 
     // Download
     document.getElementById('downloadBtn').addEventListener('click', () => {
@@ -1480,10 +1501,20 @@ class LISAPopup {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
       if (response.success) {
-        this.renderSnapshots(response.snapshots);
+        this._allSnapshots = response.snapshots || [];
+        this._libFilter = this._libFilter || 'all';
+        this.applyLibFilter();
       }
     } catch (error) {
       console.error('[LISA] Failed to load snapshots:', error);
+    }
+  }
+  applyLibFilter() {
+    const snaps = this._allSnapshots || [];
+    if (this._libFilter === 'rebirths') {
+      this.renderSnapshots(snaps.filter(s => s.phoenix || s.source === 'phoenix-rebirth'));
+    } else {
+      this.renderSnapshots(snaps);
     }
   }
 

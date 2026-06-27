@@ -54,11 +54,13 @@ class LISACompressor {
     const stopWords = new Set(['the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
       'in', 'with', 'to', 'for', 'of', 'as', 'by', 'from', 'this', 'that', 'then', 'than',
       'what', 'when', 'where', 'will', 'would', 'could', 'should', 'have', 'been', 'were',
-      'here', 'there', 'just', 'also', 'very', 'some', 'more', 'into']);
+      'here', 'there', 'just', 'also', 'very', 'some', 'more', 'into',
+      'const', 'function', 'return', 'await', 'async', 'true', 'false', 'null', 'undefined',
+      'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof']);
     const wordFreq = {};
     words.forEach(word => {
       word = word.replace(/[^\w]/g, '');
-      if (word.length > 3 && word.length <= 25 && !stopWords.has(word)
+      if (word.length > 3 && word.length <= 18 && !stopWords.has(word)
           && !/\d{3,}/.test(word)
           && !/[A-Z]/.test(word.slice(1))
           && !word.includes('_')) {
@@ -162,8 +164,10 @@ class LISACompressor {
   summarize(text) {
     if (!text) return '';
     // Strip code blocks to prevent code pollution in summaries
-    text = text.replace(/```[\s\S]*?```/g, '[code block]');
+    text = text.replace(/```(?:bash|python3?|javascript|js|json|css|html)?[\s\S]*?```/g, '[code block]');
     text = text.replace(/`[^`]+`/g, '[code]');
+    // Strip orphaned language identifiers left after code block removal
+    text = text.replace(/\b(bash|python3?|javascript|js|json)(grep|sed|cat|node|git|head|tail)/gi, '$2');
     // Strip console/log output noise
     text = text.replace(/^\s*(matches:|replaced|aborted|syntax|\$|>|\d+[:|]|\[LISA).*/gm, '');
     // Strip bash/command lines

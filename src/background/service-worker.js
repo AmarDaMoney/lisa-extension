@@ -172,7 +172,10 @@ class LISACompressor {
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
     
     if (sentences.length <= 2) {
-      return text.substring(0, 300);
+      // End at sentence boundary, not mid-word
+      const cut = text.substring(0, 300);
+      const lastPeriod = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '));
+      return lastPeriod > 50 ? cut.substring(0, lastPeriod + 1) : cut;
     }
     
     // Score sentences by keyword density (concepts, technical terms, actions)
@@ -530,15 +533,17 @@ function generateContinuationHandoff(data, platform, mode) {
       const semanticBlocks = earlyMessages.map((m, i) => {
         const content = m.content || m.text || m.v || '';
         const tokens = compressor.tokenize(content);
-        return {
+        const block = {
           index: i,
           role: m.role || 'assistant',
           summary: compressor.summarize(content),
-          entities: tokens.entities,
-          concepts: tokens.concepts.slice(0, 8),
-          relationships: tokens.relationships,
           intent: tokens.intent
         };
+        // Only include non-empty arrays to reduce token cost
+        if (tokens.entities && tokens.entities.length > 0) block.entities = tokens.entities;
+        if (tokens.concepts && tokens.concepts.length > 0) block.concepts = tokens.concepts.slice(0, 8);
+        if (tokens.relationships && tokens.relationships.length > 0) block.relationships = tokens.relationships.slice(0, 5);
+        return block;
       });
       earlySummary += JSON.stringify(semanticBlocks, null, 1) + '\n';
       earlySummary += '```\n\n';

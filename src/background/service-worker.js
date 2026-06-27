@@ -22,42 +22,52 @@ class LISACompressor {
 
   extractEntities(text) {
     const entities = [];
-    
+    // Common uppercase words that aren't real acronyms
+    const acronymNoise = new Set(['OK','NO','IF','OR','ON','IN','AT','IS','IT','DO','SO','UP',
+      'AM','PM','GET','SET','PUT','RUN','END','ADD','FIX','LOG','THE','AND','BUT','FOR','NOT',
+      'ALL','HAS','HAD','LET','NEW','TRY','USE','VAR','WAS','GOT','DID','MAY','SAY','NOW',
+      'TOP','KEY','MAP','MAX','MIN','DOM','DIV','CSS','TAB','ROW','COL','ERR','MSG','BTN',
+      'SRC','OBJ','REF','OUT','RAW','OLD','RED','HIT','BAD','BIG','LOW','DONE','FOUND',
+      'TRUE','FALSE','NULL','VOID','ELSE','THEN','FROM','WITH','THIS','THAT','NEXT','LAST',
+      'FILE','LINE','NODE','NAME','TYPE','DATA','EACH','PUSH','PULL','STEP','TEST','WAIT']);
     const patterns = {
       urls: /https?:\/\/[^\s]+/g,
       emails: /[\w.-]+@[\w.-]+\.\w+/g,
       mentions: /@\w+/g,
       hashtags: /#\w+/g,
       technicalTerms: /\b[A-Z][A-Za-z0-9]+(?:[A-Z][a-z]+)+\b/g,
-      acronyms: /\b[A-Z]{2,}\b/g
+      acronyms: /\b[A-Z]{3,}\b/g
     };
-
     for (const [type, pattern] of Object.entries(patterns)) {
-      const matches = text.match(pattern) || [];
+      let matches = [...new Set(text.match(pattern) || [])];
+      if (type === 'acronyms') matches = matches.filter(m => !acronymNoise.has(m) && m.length >= 3);
+      if (type === 'technicalTerms') matches = matches.filter(m => m.length <= 40);
       if (matches.length > 0) {
-        entities.push({ type, values: [...new Set(matches)] });
+        entities.push({ type, values: matches.slice(0, 15) });
       }
     }
-
     return entities;
   }
 
   extractConcepts(text) {
     const words = text.toLowerCase().split(/\s+/);
-    const stopWords = new Set(['the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but', 'in', 'with', 'to', 'for', 'of', 'as', 'by', 'from']);
-    
+    const stopWords = new Set(['the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
+      'in', 'with', 'to', 'for', 'of', 'as', 'by', 'from', 'this', 'that', 'then', 'than',
+      'what', 'when', 'where', 'will', 'would', 'could', 'should', 'have', 'been', 'were',
+      'here', 'there', 'just', 'also', 'very', 'some', 'more', 'into']);
     const wordFreq = {};
     words.forEach(word => {
       word = word.replace(/[^\w]/g, '');
-      if (word.length > 3 && !stopWords.has(word)) {
+      if (word.length > 3 && word.length <= 25 && !stopWords.has(word)
+          && !/\d{3,}/.test(word)
+          && !/[A-Z]/.test(word.slice(1))
+          && !word.includes('_')) {
         wordFreq[word] = (wordFreq[word] || 0) + 1;
       }
     });
-
     const sorted = Object.entries(wordFreq)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
-
     return sorted.map(([word, freq]) => ({ term: word, weight: freq }));
   }
 
@@ -73,6 +83,11 @@ class LISACompressor {
     relationPatterns.forEach(({ pattern, type }) => {
       const matches = [...text.matchAll(pattern)];
       matches.forEach(match => {
+        const subj = (match[1] || '').toLowerCase();
+        const obj = (match[2] || '').toLowerCase();
+        if (subj.length < 3 || obj.length < 3) return;
+        const noise = new Set(['the','this','that','then','here','now','not','all','its','has','was','are','had','can','may','been','done','true','false','null','just','also','very','some','more']);
+        if (noise.has(subj) || noise.has(obj)) return;
         relationships.push({
           type,
           subject: match[1],
@@ -146,6 +161,14 @@ class LISACompressor {
 
   summarize(text) {
     if (!text) return '';
+    // Strip code blocks to prevent code pollution in summaries
+    text = text.replace(/```[\s\S]*?```/g, '[code block]');
+    text = text.replace(/`[^`]+`/g, '[code]');
+    // Strip console/log output noise
+    text = text.replace(/^\s*(matches:|replaced|aborted|syntax|\$|>|\d+[:|]|\[LISA).*/gm, '');
+    // Strip bash/command lines
+    text = text.replace(/^\s*(sed|grep|python3|node|git|cat|head|tail|wc|cd|bash)\s.*/gm, '');
+    text = text.trim();
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
     
     if (sentences.length <= 2) {

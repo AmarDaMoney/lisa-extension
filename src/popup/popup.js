@@ -1756,11 +1756,28 @@ class LISAPopup {
     const merkleRoot = manifestBlock.merkleRoot || snapshot.hash || 'N/A';
     const hash = merkleRoot !== 'N/A' && merkleRoot.length > 12 ? merkleRoot.substring(0, 12) + '...' : merkleRoot;
 
-    // Anchor data for reconstruction fingerprint
+    // Compute reconstruction fingerprint from actual block content
     const anchorData = anchorBlock.v || snapshot.anchor || {};
-    const entityCount = (anchorData.key_entities || []).length;
-    const openCount = (anchorData.open_tasks || []).length;
-    const decisionCount = nextBlocks.filter(b => b.resolved).length;
+    // Count entities from all blocks
+    let entityCount = 0;
+    const entitySet = new Set();
+    blocks.forEach(b => {
+      if (b.tokens?.entities) b.tokens.entities.forEach(e => (e.values || []).forEach(v => entitySet.add(v)));
+    });
+    entityCount = entitySet.size || (anchorData.key_entities || []).length;
+    // Count open items from next blocks
+    const openCount = nextBlocks.filter(b => !b.resolved).length || (anchorData.open_tasks || []).length;
+    // Count decisions (resolved items + blocks containing decision language)
+    const resolvedCount = nextBlocks.filter(b => b.resolved).length;
+    let decisionCount = resolvedCount;
+    if (decisionCount === 0) {
+      // Scan conversation for decision language
+      const decisionPatterns = /\b(decided|decision|agreed|chose|confirmed|resolved|settled|committed|established|concluded)\b/gi;
+      blocks.forEach(b => {
+        if (b.v && decisionPatterns.test(b.v)) decisionCount++;
+        decisionPatterns.lastIndex = 0;
+      });
+    }
 
     // ── Layer 1: Prompt Header ──
     let md = '# LISA Semantic Handoff\n';

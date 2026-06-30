@@ -257,6 +257,7 @@ class LISACompressor {
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
       generated_by:      'LISA v0.51.3',
+      key_entities:    Object.keys(freq).length > 0 ? Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 12).map(([w]) => w) : [],
       note:              'Lightweight anchor — raw verbatim format'
     };
   }
@@ -299,7 +300,7 @@ class LISACompressor {
       key_entities:      [...entitySet].slice(0, 12),
       session_intent:    sessionIntent,
       session_register:  register,
-      open_tasks:        [],
+      open_tasks:        tokens.filter(t => t.tokens?.intent === 'question' || t.tokens?.intent === 'request').slice(-5).map(t => (t.summary || '').substring(0, 100)),
       generated_by:      'LISA v0.51.3'
     };
   }

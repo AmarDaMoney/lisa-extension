@@ -103,12 +103,20 @@
           <ul style="margin: 0 0 12px 16px; padding: 0; font-size: 12px; color: #ccc;">
             <li>Click <strong>"Export Conversation"</strong> above</li>
             <li>Or use the <strong>floating LISA button</strong> on any AI chat:<br>
-              <span style="font-size: 11px;">• <strong style="color: #f59e0b;">LISA Raw</strong> <span style="color: #aaa;">— uncompressed JSON for archiving &amp; app reports</span><br>
-              • <strong style="color: #3b82f6;">LISA-V</strong> <span style="color: #aaa;">(Verbatim) — block-level JSONL with hashes for AI handoffs</span></span></li>
-            <li>Or right-click selected text → "Export to LISA"</li>
+              <span style="font-size: 11px;">• <strong style="color: #f59e0b;">LISA Raw</strong> <span style="color: #aaa;">— uncompressed JSON for archiving</span><br>
+              • <strong style="color: #3b82f6;">LISA-V</strong> <span style="color: #aaa;">— block-level JSONL with SHA-256 hashes for AI handoffs</span></span></li>
+            <li>Or right-click selected text &rarr; "Export to LISA"</li>
           </ul>
           
-          <p style="margin: 0 0 8px; font-size: 13px; color: #4ade80;"><strong>🚀 Use</strong> — Upload to any AI, then try:</p>
+          <p style="margin: 0 0 6px; font-size: 13px; color: #ef4444;"><strong>🔥 Rebirth</strong></p>
+          <ul style="margin: 0 0 12px 16px; padding: 0; font-size: 12px; color: #ccc;">
+            <li>Watch the <strong>pressure gauge</strong> &mdash; it tracks your context usage</li>
+            <li>When context runs low, click <strong>Rebirth</strong> to continue in a fresh session</li>
+            <li>Three modes: <strong style="color: #4ade80;">Distilled</strong>, <strong style="color: #fbbf24;">Full Fidelity</strong>, or <strong style="color: #a78bfa;">Semantic</strong></li>
+            <li>Same platform or <strong>cross-platform</strong> &mdash; start on ChatGPT, continue on Claude</li>
+          </ul>
+          
+          <p style="margin: 0 0 8px; font-size: 13px; color: #4ade80;"><strong>🚀 Use</strong> &mdash; Upload to any AI, then try:</p>
           
           <div class="prompt-box" style="margin-bottom: 8px;">
             <code id="suggestedPrompt">"Read this and continue our conversation"</code>
@@ -120,18 +128,20 @@
             <button class="btn-copy copy-alt" title="Copy">📋</button>
           </div>
           
-          <div class="prompt-box" style="margin-bottom: 8px;">
+          <div class="prompt-box" style="margin-bottom: 12px;">
             <code>"Summarize the key points"</code>
             <button class="btn-copy copy-alt" title="Copy">📋</button>
           </div>
           
-          <div class="prompt-box" style="margin-bottom: 12px;">
-            <code>"Reconstruct and expand this conversation"</code>
-            <button class="btn-copy copy-alt" title="Copy">📋</button>
-          </div>
+          <p style="margin: 0 0 6px; font-size: 13px; color: #3b82f6;"><strong>📚 Library</strong></p>
+          <ul style="margin: 0 0 12px 16px; padding: 0; font-size: 12px; color: #ccc;">
+            <li><strong>💾 Saves</strong> &mdash; your exported conversations (LISA-V, Raw, Compressed)</li>
+            <li><strong>🔥 Rebirths</strong> &mdash; your Phoenix rebirth handoffs, ready to re-inject</li>
+            <li>Click 📎 on any entry to inject it into your current AI chat</li>
+          </ul>
           
           <div class="value-highlight">
-            <p>✨ ~80% fewer tokens. Language auto-detected. Merkle root verifies integrity.</p>
+            <p>✨ 9 platforms supported. Language auto-detected. SHA-256 integrity verification.</p>
           </div>
           
         </div>
@@ -209,60 +219,41 @@
       
       <div class="modal-body">
         <section class="help-section">
-          <h3>🎯 What is LISA Core?</h3>
-          <p>LISA (Linguistic Intelligence Semantic Anchors) compresses AI conversations into semantic tokens, saving up to 80% of tokens while preserving full meaning.</p>
-          <div class="example-box">
-            <p><strong>Example:</strong></p>
-            <p>📊 Original conversation: 10,000 tokens</p>
-            <p>🗜️ LISA compressed: 2,000 tokens</p>
-            <p>✨ Savings: 8,000 tokens (80%!)</p>
-          </div>
+          <h3>What is LISA Core?</h3>
+          <p>LISA translates your AI conversations into structured, portable data &mdash; so you never lose context, never start over, and never get locked into one platform.</p>
+          <p>Capture from 9 AI platforms. Continue anywhere. Your data stays yours.</p>
         </section>
         
         <section class="help-section">
-          <h3>📤 How to Export</h3>
-          <p><strong>Method 1 - Full Conversation:</strong></p>
+          <h3>Export &amp; Capture</h3>
+          <p><strong>Extension popup:</strong> Click "Export Conversation" to extract and compress.</p>
+          <p><strong>Floating button:</strong> On any AI chat, click LISA then choose LISA Raw (archiving) or LISA-V (AI handoffs with SHA-256 integrity).</p>
+          <p><strong>Selection:</strong> Right-click selected text then "Export to LISA".</p>
+        </section>
+        
+        <section class="help-section">
+          <h3>Phoenix Rebirth</h3>
+          <p>The pressure gauge tracks your context usage in real time. When it runs low:</p>
           <ol>
-            <li>Open any AI conversation</li>
-            <li>Click LISA icon → "Export Conversation"</li>
-            <li>Compress and download</li>
+            <li>Click <strong>Rebirth</strong> on the gauge</li>
+            <li>Choose a mode: <strong style="color:#4ade80;">Distilled</strong>, <strong style="color:#fbbf24;">Full</strong>, or <strong style="color:#a78bfa;">Semantic</strong></li>
+            <li>LISA opens a fresh session with your full context carried over</li>
           </ol>
-            <p><strong>Method 2 - Quick save with Floating Button:</strong></p>
-            <p>Click the floating LISA button on any conversation page. Choose "Export to LISA Raw" for archiving or "Export to LISA-V" for AI handoffs. You can compress from the extension library menu or forward to the LISA Core App for enterprise-grade compression.</p>
+          <p>Works same-platform or cross-platform &mdash; start on ChatGPT, continue on Claude.</p>
         </section>
         
         <section class="help-section">
-          <h3>📥 How to Import & Use</h3>
-          <p><strong>The Smart Way (Token Savings!):</strong></p>
-          <ol>
-            <li>Open your AI chat (Claude, ChatGPT, Gemini)</li>
-            <li>Click the file upload button (📎)</li>
-            <li>Upload the LISA JSON file</li>
-            <li>Tell the AI: <code>"Read this LISA JSON and continue our conversation"</code></li>
-          </ol>
-          <p class="highlight-box">💡 <strong>Key Benefit:</strong> The AI understands the full context using only the compressed semantic tokens - saving you 80% on tokens!</p>
+          <h3>Library</h3>
+          <p><strong>Saves tab:</strong> Your exported conversations (LISA-V, Raw, Compressed).</p>
+          <p><strong>Rebirths tab:</strong> Your Phoenix rebirth handoffs.</p>
+          <p>Click the inject button on any entry to inject it into your current AI chat as a .md handoff.</p>
         </section>
         
         <section class="help-section">
-          <h3>💰 Why This Matters</h3>
-          <table class="comparison-table">
-            <tr>
-              <th>Without LISA</th>
-              <th>With LISA</th>
-            </tr>
-            <tr>
-              <td>10,000 tokens used</td>
-              <td>2,000 tokens used</td>
-            </tr>
-            <tr>
-              <td>Higher costs</td>
-              <td>80% cost savings</td>
-            </tr>
-            <tr>
-              <td>Limited context window</td>
-              <td>5x more context!</td>
-            </tr>
-          </table>
+          <h3>Continue Anywhere</h3>
+          <p>Upload any LISA file to a new AI and say:</p>
+          <p><code>"Read this and continue our conversation"</code></p>
+          <p>The AI picks up exactly where you left off &mdash; decisions, code, open tasks, all of it.</p>
         </section>
         
         <section class="help-section">

@@ -1758,15 +1758,32 @@ class LISAPopup {
 
     // Compute reconstruction fingerprint from actual block content
     const anchorData = anchorBlock.v || snapshot.anchor || {};
-    // Count entities from all blocks
-    let entityCount = 0;
+    // Count entities from block tokens, anchor, or text extraction
     const entitySet = new Set();
     blocks.forEach(b => {
       if (b.tokens?.entities) b.tokens.entities.forEach(e => (e.values || []).forEach(v => entitySet.add(v)));
     });
-    entityCount = entitySet.size || (anchorData.key_entities || []).length;
-    // Count open items from next blocks
-    const openCount = nextBlocks.filter(b => !b.resolved).length || (anchorData.open_tasks || []).length;
+    if (entitySet.size === 0) {
+      // Fallback: extract entities from anchor or scan block text for capitalized terms
+      (anchorData.key_entities || []).forEach(e => entitySet.add(e));
+    }
+    if (entitySet.size === 0) {
+      // Last resort: scan conversation text for proper nouns / technical terms
+      const allText = blocks.filter(b => b.v || b.content).map(b => b.v || b.content || '').join(' ');
+      const techTerms = allText.match(/\b[A-Z][a-zA-Z0-9]+(?:[A-Z][a-z]+)+\b/g) || [];
+      const acronyms = allText.match(/\b[A-Z]{3,}\b/g) || [];
+      [...new Set([...techTerms, ...acronyms])].slice(0, 20).forEach(e => entitySet.add(e));
+    }
+    const entityCount = entitySet.size;
+    // Count open items from next blocks or scan for question marks / action language
+    let openCount = nextBlocks.filter(b => !b.resolved).length || (anchorData.open_tasks || []).length;
+    if (openCount === 0) {
+      const lastBlocks = blocks.filter(b => (b.t === 'u' || b.role === 'user')).slice(-5);
+      lastBlocks.forEach(b => {
+        const text = b.v || b.content || '';
+        if (text.includes('?') && text.length > 15) openCount++;
+      });
+    }
     // Count decisions (resolved items + blocks containing decision language)
     const resolvedCount = nextBlocks.filter(b => b.resolved).length;
     let decisionCount = resolvedCount;

@@ -50,6 +50,7 @@ class DeepSeekParser {
     this.conversationId = this.extractConversationId();
     const progressive = window.lisaProgressive;
     const domCount = document.querySelectorAll('.ds-message, [data-message-role]').length;
+    console.log('[LISA DeepSeek] extract start — progressive:', !!progressive, 'domCount:', domCount);
     const bufferConvId = progressive?.conversationId || '';
     const bufferMatchesConv = !this.conversationId || !bufferConvId || bufferConvId.endsWith(this.conversationId);
     const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;

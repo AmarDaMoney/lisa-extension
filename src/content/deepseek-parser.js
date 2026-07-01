@@ -1,5 +1,7 @@
 // DeepSeek Conversation Parser
 // Extracts conversation data from chat.deepseek.com
+if (window.__lisaDeepSeekParserLoaded) { /* SPA re-inject — skip */ } else {
+window.__lisaDeepSeekParserLoaded = true;
 
 class DeepSeekParser {
   constructor() {
@@ -113,3 +115,4 @@ chrome.runtime.sendMessage({
   action: 'parserReady', 
   platform: 'DeepSeek' 
 });
+}

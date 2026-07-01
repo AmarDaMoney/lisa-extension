@@ -524,6 +524,34 @@ class LisaVParser {
 
   async extractDeepSeekMessages() {
     const messages = [];
+    // Scroll sweep for virtualised DeepSeek conversations
+    const progressive = window.lisaProgressive;
+    const domCount = document.querySelectorAll('.ds-message').length;
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount;
+    if (!bufferReady) {
+      let scroller = null;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const scrollables = [...document.querySelectorAll('div, main')].filter(el => {
+          const s = getComputedStyle(el);
+          return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+                 && el.scrollHeight > el.clientHeight + 200;
+        });
+        scroller = scrollables.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
+        if (scroller) {
+          console.debug('[LISA] DeepSeek scroller found on attempt', attempt, '— scrollH:', scroller.scrollHeight);
+          break;
+        }
+        console.debug('[LISA] DeepSeek no scrollable container yet, attempt', attempt);
+        await new Promise(r => setTimeout(r, 500));
+      }
+      if (!scroller) scroller = document.querySelector('.ds-scroll-area, main');
+      if (scroller && progressive) {
+        await progressive.performScrollSweep(scroller);
+      } else if (scroller) {
+        scroller.scrollTop = 0;
+        await new Promise(r => setTimeout(r, 700));
+      }
+    }
     const messageContainers = document.querySelectorAll('.ds-message');
 
     for (const container of messageContainers) {
@@ -534,6 +562,17 @@ class LisaVParser {
       if (blocks.length > 0) {
         messages.push(blocks);
       }
+    }
+    // Prepend virtualised messages from progressive buffer
+    if (window.lisaProgressive && window.lisaProgressive.buffer.size > 0) {
+      const domHashes = new Set(
+        messages.flatMap(mb => mb.map(b => window.lisaProgressive.simpleHash(b.v || '')))
+      );
+      const missing = Array.from(window.lisaProgressive.buffer.values())
+        .filter(b => !domHashes.has(b.hash))
+        .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
+        .map(b => [{ t: b.t, role: b.role, v: b.v }]);
+      if (missing.length > 0) messages.unshift(...missing);
     }
 
     return messages;

@@ -792,7 +792,7 @@ class LISAPopup {
       }
 
       // Sweep can take 60-90s on long ChatGPT conversations (virtualized scrolling)
-      const response = await this.sendMessageToTab(tab.id, { action: 'extractViaLisaV' }, 120000, 0);
+      const response = await this.sendMessageToTab(tab.id, { action: 'extractViaLisaV' }, 300000, 0);
 
       if (response.success && response.data) {
         this.currentConversation = response.data;

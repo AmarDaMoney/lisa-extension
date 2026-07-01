@@ -54,7 +54,7 @@ class DeepSeekParser {
     const bufferMatchesConv = !this.conversationId || !bufferConvId || bufferConvId.endsWith(this.conversationId);
     const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;
     if (!bufferReady) {
-      const scroller = document.querySelector('.ds-conversation-wrapper, main');
+      const scroller = document.querySelector('.ds-scroll-area, .ds-conversation-wrapper, main');
       if (scroller && window.lisaProgressive) {
         await window.lisaProgressive.performScrollSweep(scroller);
       } else if (scroller) {

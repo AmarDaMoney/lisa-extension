@@ -75,7 +75,7 @@
       // Re-show modal after snooze threshold passed
       if (this.state === STATES.RED && this.snoozeUntil && this.estimatedTokens >= this.snoozeUntil) {
         this.snoozeUntil = null;
-        this._showRebirthModal();
+        // Rebirth modal is manually triggered only — gauge click opens it
       }
     }
 
@@ -109,7 +109,7 @@
         }
       }));
       console.log(`[LISA Phoenix] State → ${this.state.toUpperCase()} (~${Math.round(this.estimatedTokens / 1000)}K tokens, ${this.messageCount} msgs)`);
-      if (this.state === STATES.RED) this._showRebirthModal();
+      // Rebirth modal is manually triggered only — no auto-popup at RED
     }
 
     // ── Rebirth Modal (spec §7.2 — non-blocking) ──

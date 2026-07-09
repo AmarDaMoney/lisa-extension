@@ -44,35 +44,52 @@
         <p><strong>Platform:</strong> <span id="detectedPlatform">-</span></p>
       </div>
 
-      <button id="compressBtn" class="btn btn-secondary" style="display: none;">
-        <span class="icon">🗜️</span>
-        Compress to LISA JSON
-      </button>
-      <button id="aiCompressBtn" class="btn btn-primary" style="display: none; margin-top: 6px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none;">
-        <span class="icon">🧠</span>
-        AI Compress
-      </button>
-      <div id="aiCompressOptions" style="display: none; margin-top: 8px; padding: 10px; background: rgba(99,102,241,0.1); border-radius: 8px; border: 1px solid rgba(99,102,241,0.3);">
-        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-          <label style="font-size: 11px; color: #a5b4fc; white-space: nowrap;">AI Provider</label>
-          <select id="aiProviderSelect" style="flex:1; padding: 4px 8px; border-radius: 6px; background: #1e1b4b; color: #e0e7ff; border: 1px solid rgba(99,102,241,0.4); font-size: 11px;">
-            <option value="claude">Claude (Anthropic)</option>
-            <option value="gemini">Gemini (Google)</option>
-            <option value="deepseek">DeepSeek</option>
-          </select>
+      <!-- Compress Mode Tabs -->
+      <div id="compressSection" style="display: none;">
+        <div id="compressTabs" style="display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 8px;">
+          <button id="tabLocal" class="compress-tab active" style="flex: 1; padding: 8px 0; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: rgba(255,255,255,0.1); color: #fff; transition: all 0.2s;">
+            🗜️ Local
+          </button>
+          <button id="tabAI" class="compress-tab" style="flex: 1; padding: 8px 0; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: transparent; color: rgba(255,255,255,0.5); transition: all 0.2s;">
+            🧠 AI <span style="font-size: 9px; background: linear-gradient(135deg, #6366f1, #8b5cf6); padding: 1px 5px; border-radius: 4px; color: #fff; margin-left: 3px;">PRO</span>
+          </button>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <label style="font-size: 11px; color: #a5b4fc; white-space: nowrap;">Anchors</label>
-          <select id="aiAnchorSelect" style="flex:1; padding: 4px 8px; border-radius: 6px; background: #1e1b4b; color: #e0e7ff; border: 1px solid rgba(99,102,241,0.4); font-size: 11px;">
-            <option value="4">4 — Brief</option>
-            <option value="6" selected>6 — Standard</option>
-            <option value="8">8 — Detailed</option>
-            <option value="10">10 — Comprehensive</option>
-          </select>
+
+        <!-- Local Compress Panel -->
+        <div id="panelLocal" style="display: block;">
+          <button id="compressBtn" class="btn btn-secondary" style="width: 100%;">
+            <span class="icon">🗜️</span>
+            Compress to LISA JSON
+          </button>
+          <p style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: center; margin: 4px 0 0;">Free — rule-based semantic extraction</p>
         </div>
-        <button id="aiCompressGoBtn" class="btn" style="width: 100%; margin-top: 8px; padding: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
-          🚀 Compress with AI
-        </button>
+
+        <!-- AI Compress Panel -->
+        <div id="panelAI" style="display: none;">
+          <div style="padding: 10px; background: rgba(99,102,241,0.08); border-radius: 8px; border: 1px solid rgba(99,102,241,0.2);">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <label style="font-size: 11px; color: #a5b4fc; white-space: nowrap; min-width: 55px;">Provider</label>
+              <select id="aiProviderSelect" style="flex:1; padding: 5px 8px; border-radius: 6px; background: #1e1b4b; color: #e0e7ff; border: 1px solid rgba(99,102,241,0.3); font-size: 11px;">
+                <option value="claude">Claude (Anthropic)</option>
+                <option value="gemini">Gemini (Google)</option>
+                <option value="deepseek">DeepSeek</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
+              <label style="font-size: 11px; color: #a5b4fc; white-space: nowrap; min-width: 55px;">Anchors</label>
+              <select id="aiAnchorSelect" style="flex:1; padding: 5px 8px; border-radius: 6px; background: #1e1b4b; color: #e0e7ff; border: 1px solid rgba(99,102,241,0.3); font-size: 11px;">
+                <option value="4">4 — Brief</option>
+                <option value="6" selected>6 — Standard</option>
+                <option value="8">8 — Detailed</option>
+                <option value="10">10 — Comprehensive</option>
+              </select>
+            </div>
+            <button id="aiCompressGoBtn" class="btn" style="width: 100%; padding: 9px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 12px;">
+              🚀 Compress with AI
+            </button>
+            <p style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: center; margin: 4px 0 0;">5 credits per compression</p>
+          </div>
+        </div>
       </div>
 
       <div id="compressionInfo" class="info-box success" style="display: none;">

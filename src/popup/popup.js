@@ -404,10 +404,26 @@ class LISAPopup {
     document.getElementById('compressBtn').addEventListener('click', () => {
       this.compressConversation();
     });
-    // AI Compress toggle
-    document.getElementById('aiCompressBtn').addEventListener('click', () => {
-      const opts = document.getElementById('aiCompressOptions');
-      opts.style.display = opts.style.display === 'none' ? 'block' : 'none';
+    // Compress tab switching
+    document.getElementById('tabLocal').addEventListener('click', () => {
+      document.getElementById('tabLocal').style.background = 'rgba(255,255,255,0.1)';
+      document.getElementById('tabLocal').style.color = '#fff';
+      document.getElementById('tabAI').style.background = 'transparent';
+      document.getElementById('tabAI').style.color = 'rgba(255,255,255,0.5)';
+      document.getElementById('panelLocal').style.display = 'block';
+      document.getElementById('panelAI').style.display = 'none';
+    });
+    document.getElementById('tabAI').addEventListener('click', () => {
+      if (this.userTier !== 'premium') {
+        this.openUpgradeModal();
+        return;
+      }
+      document.getElementById('tabAI').style.background = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+      document.getElementById('tabAI').style.color = '#fff';
+      document.getElementById('tabLocal').style.background = 'transparent';
+      document.getElementById('tabLocal').style.color = 'rgba(255,255,255,0.5)';
+      document.getElementById('panelAI').style.display = 'block';
+      document.getElementById('panelLocal').style.display = 'none';
     });
     document.getElementById('aiCompressGoBtn').addEventListener('click', () => {
       this.aiCompressConversation();
@@ -814,11 +830,7 @@ class LISAPopup {
         document.getElementById('messageCount').textContent = response.data.messageCount || 0;
         document.getElementById('detectedPlatform').textContent = response.data.platform || 'Unknown';
         document.getElementById('extractedInfo').style.display = 'block';
-        document.getElementById('compressBtn').style.display = 'block';
-        // Show AI Compress for premium/PAYG users
-        if (this.userTier === 'premium') {
-          document.getElementById('aiCompressBtn').style.display = 'block';
-        }
+        document.getElementById('compressSection').style.display = 'block';
 
         // Detect language from extracted content
         const sampleText = (response.data.messages || []).map(m => m.content || '').join(' ').substring(0, 500);

@@ -1032,6 +1032,8 @@ class LISAPopup {
         const saved = Math.max(0, rawTokens - enrichedTokens);
         document.getElementById('tokensSaved').textContent = '~' + saved.toLocaleString() + ' tokens (' + Math.round(saved / rawTokens * 100) + '%)';
         document.getElementById('compressionInfo').style.display = 'block';
+        document.getElementById('downloadSection').style.display = 'block';
+        document.getElementById('hashingSection').style.display = 'block';
         document.getElementById('aiCompressOptions').style.display = 'none';
         this.hideLoading();
         this.updatePlatformStatus('AI compression complete (' + provider + ')', true);

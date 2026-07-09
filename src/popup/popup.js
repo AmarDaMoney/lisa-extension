@@ -852,25 +852,39 @@ class LISAPopup {
       this.showError('Please extract a conversation first');
       return;
     }
-    // PAYG credit check
-    if (!this.isPremium) {
+    // PAYG credit check and deduct
+    if (this.userTier !== 'premium') {
       try {
-        const token = await new Promise((resolve) => {
-          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
-        });
-        if (token) {
-          const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token })
+        let identifier = '';
+        const headers = { 'Content-Type': 'application/json' };
+        try {
+          const token = await new Promise((resolve) => {
+            chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
           });
+          if (token) {
+            const r = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+            if (r.ok) {
+              const d = await r.json();
+              if (d.sub) identifier = `goog_${d.sub}`;
+            }
+          }
+        } catch (e) {}
+        if (!identifier) {
+          const stored = await chrome.storage.sync.get('creditIdentifier');
+          identifier = stored.creditIdentifier || '';
+        }
+        if (identifier) {
+          if (identifier.startsWith('goog_')) headers['X-Google-Id'] = identifier;
+          else if (identifier.startsWith('email_')) headers['X-Identifier'] = identifier;
+          else headers['X-License-Key'] = identifier;
+          const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', { headers });
           if (balResp.ok) {
             const balData = await balResp.json();
             if (balData.balance > 0) {
               await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token, source: 'extension' })
+                headers,
+                body: JSON.stringify({ source: 'extension' })
               });
             }
           }
@@ -1178,6 +1192,8 @@ class LISAPopup {
       });
       const data = await response.json();
       if (data.checkout_url) {
+        // Store identifier so credit balance can be checked later
+        chrome.storage.sync.set({ creditIdentifier: identifier });
         this.closeUpgradeModal();
         chrome.tabs.create({ url: data.checkout_url });
       } else {
@@ -1211,12 +1227,23 @@ class LISAPopup {
       }
 
       if (!identifier) {
+        const stored = await chrome.storage.sync.get('creditIdentifier');
         const licenseKey = this.licenseKey || '';
-        if (!licenseKey) return;
-        identifier = licenseKey;
-        headers['X-License-Key'] = licenseKey;
-      } else {
+        if (stored.creditIdentifier) {
+          identifier = stored.creditIdentifier;
+        } else if (licenseKey) {
+          identifier = licenseKey;
+          headers['X-License-Key'] = licenseKey;
+        } else {
+          return;
+        }
+      }
+      if (identifier.startsWith('goog_')) {
         headers['X-Google-Id'] = identifier;
+      } else if (identifier.startsWith('email_')) {
+        headers['X-Identifier'] = identifier;
+      } else {
+        headers['X-License-Key'] = identifier;
       }
 
       const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {

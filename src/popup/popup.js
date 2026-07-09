@@ -1092,6 +1092,7 @@ class LISAPopup {
           progressBar.style.width = '0%';
           this.hideLoading();
           this.updatePlatformStatus('AI compression complete (' + provider + ')', true);
+          this.loadCreditBalance();
         }, 500);
       } else {
         clearInterval(progressInterval);
@@ -1368,8 +1369,8 @@ class LISAPopup {
       }
 
       if (!identifier) {
-        const stored = await chrome.storage.sync.get('creditIdentifier');
-        const licenseKey = this.licenseKey || '';
+        const stored = await chrome.storage.sync.get(['creditIdentifier', 'licenseKey']);
+        const licenseKey = stored.licenseKey || '';
         if (stored.creditIdentifier) {
           identifier = stored.creditIdentifier;
         } else if (licenseKey) {

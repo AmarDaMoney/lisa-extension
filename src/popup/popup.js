@@ -996,10 +996,9 @@ class LISAPopup {
           'X-License-Key': licenseKey
         },
         body: JSON.stringify({
-          text: conversationText,
+          conversation: conversationText,
           provider: provider,
-          num_anchors: numAnchors,
-          focus_areas: []
+          num_anchors: numAnchors
         })
       });
 

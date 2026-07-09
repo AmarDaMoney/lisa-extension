@@ -1091,7 +1091,16 @@ class LISAPopup {
           document.getElementById('loadingProgress').style.display = 'none';
           progressBar.style.width = '0%';
           this.hideLoading();
-          this.updatePlatformStatus('AI compression complete (' + provider + ')', true);
+          // Show usage info
+          const usage = data.usage || {};
+          let statusMsg = 'AI compression complete (' + provider + ')';
+          if (usage.today != null && usage.limit) {
+            statusMsg += ' — ' + (usage.limit - usage.today) + '/' + usage.limit + ' remaining today';
+          }
+          if (usage.credit_balance != null) {
+            statusMsg += ' — ' + usage.credit_balance + ' credits left';
+          }
+          this.updatePlatformStatus(statusMsg, true);
           this.loadCreditBalance();
         }, 500);
       } else {

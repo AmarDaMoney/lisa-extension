@@ -1040,14 +1040,22 @@ class LISAPopup {
         };
         aiToken.semanticTokens = aiToken.semanticTokens || [];
         this.compressedData = aiToken;
-        // Show compression results
-        const stats = data.stats || {};
-        document.getElementById('analyzedCount').textContent = stats.message_count || messages.length;
-        document.getElementById('entityCount').textContent = stats.entity_count || '-';
-        document.getElementById('conceptCount').textContent = stats.concept_count || '-';
-        document.getElementById('relationshipCount').textContent = stats.relationship_count || '-';
-        const rawTokens = stats.original_tokens || Math.round(conversationText.length / 3.5);
-        const enrichedTokens = stats.compressed_tokens || Math.round(JSON.stringify(aiToken).length / 3.5);
+        // Show compression results from AI token metadata
+        const meta = aiToken.session_metadata || {};
+        const anchors = aiToken.semantic_anchors || {};
+        const actions = aiToken.action_vectors || {};
+        const anchorCount = Object.keys(anchors).length;
+        const actionCount = Object.keys(actions).length;
+        const wordCountOrig = meta.word_count_original || Math.round(conversationText.length / 5);
+        const wordCountCompressed = Math.round(JSON.stringify(aiToken).length / 5);
+        const ratio = meta.compression_ratio || (wordCountOrig / Math.max(wordCountCompressed, 1)).toFixed(1) + ':1';
+
+        document.getElementById('analyzedCount').textContent = messages.length + ' messages';
+        document.getElementById('entityCount').textContent = anchorCount + ' anchors';
+        document.getElementById('conceptCount').textContent = actionCount + ' action items';
+        document.getElementById('relationshipCount').textContent = ratio + ' compression';
+        const rawTokens = Math.round(conversationText.length / 3.5);
+        const enrichedTokens = Math.round(JSON.stringify(aiToken).length / 3.5);
         document.getElementById('rawTokens').textContent = '~' + rawTokens.toLocaleString();
         document.getElementById('enrichedTokens').textContent = '~' + enrichedTokens.toLocaleString();
         const saved = Math.max(0, rawTokens - enrichedTokens);

@@ -978,7 +978,23 @@ class LISAPopup {
     }
     const provider = document.getElementById('aiProviderSelect').value;
     const numAnchors = parseInt(document.getElementById('aiAnchorSelect').value);
-    this.showLoading('AI compressing with ' + provider.charAt(0).toUpperCase() + provider.slice(1) + '...');
+    this.showLoading('AI compressing with ' + provider.charAt(0).toUpperCase() + provider.slice(1) + ' — may take a minute...');
+    // Show simulated progress bar
+    document.getElementById('loadingProgress').style.display = 'block';
+    const progressBar = document.getElementById('loadingProgressBar');
+    const progressText = document.getElementById('loadingProgressText');
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+      if (progress < 90) {
+        progress += Math.random() * 8 + 2;
+        if (progress > 90) progress = 90;
+        progressBar.style.width = Math.round(progress) + '%';
+        progressText.textContent = Math.round(progress) + '%';
+        if (progress > 30) document.getElementById('loadingText').textContent = 'Analyzing semantic structure...';
+        if (progress > 60) document.getElementById('loadingText').textContent = 'Extracting anchors & action items...';
+        if (progress > 80) document.getElementById('loadingText').textContent = 'Finalizing compression...';
+      }
+    }, 800);
 
     try {
       // Build the conversation text from extracted messages
@@ -1019,8 +1035,12 @@ class LISAPopup {
         if (err.detail?.error_code === 'LICENSE_REQUIRED') {
           this.showError('Valid license key required for AI Compress.');
         } else if (err.detail?.error_code === 'DAILY_LIMIT_EXCEEDED') {
+          clearInterval(progressInterval);
+          document.getElementById('loadingProgress').style.display = 'none';
           this.showError('Daily compression limit reached. Try again tomorrow.');
         } else {
+          clearInterval(progressInterval);
+          document.getElementById('loadingProgress').style.display = 'none';
           this.showError(err.detail?.error || err.detail || 'AI compression failed');
         }
         return;
@@ -1064,12 +1084,23 @@ class LISAPopup {
         document.getElementById('downloadSection').style.display = 'block';
         document.getElementById('hashingSection').style.display = 'block';
         document.getElementById('aiCompressOptions').style.display = 'none';
-        this.hideLoading();
-        this.updatePlatformStatus('AI compression complete (' + provider + ')', true);
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        progressText.textContent = '100%';
+        setTimeout(() => {
+          document.getElementById('loadingProgress').style.display = 'none';
+          progressBar.style.width = '0%';
+          this.hideLoading();
+          this.updatePlatformStatus('AI compression complete (' + provider + ')', true);
+        }, 500);
       } else {
+        clearInterval(progressInterval);
+        document.getElementById('loadingProgress').style.display = 'none';
         this.showError(data.error || 'AI compression failed');
       }
     } catch (error) {
+      clearInterval(progressInterval);
+      document.getElementById('loadingProgress').style.display = 'none';
       console.error('[LISA] AI compression error:', error);
       this.showError('AI compression failed: ' + (error.message || 'Network error'));
     }

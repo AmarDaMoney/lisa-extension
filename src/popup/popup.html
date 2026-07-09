@@ -502,6 +502,12 @@
   <div id="loadingOverlay" class="overlay" style="display: none;">
     <div class="spinner"></div>
     <p id="loadingText">Processing...</p>
+    <div id="loadingProgress" style="display: none; width: 200px; margin-top: 10px;">
+      <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 6px; overflow: hidden;">
+        <div id="loadingProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 4px; transition: width 0.5s ease;"></div>
+      </div>
+      <p id="loadingProgressText" style="font-size: 10px; color: rgba(255,255,255,0.5); text-align: center; margin-top: 4px;">0%</p>
+    </div>
   </div>
 
   <!-- Stripe integration scripts -->

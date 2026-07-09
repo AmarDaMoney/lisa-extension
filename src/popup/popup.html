@@ -48,6 +48,32 @@
         <span class="icon">🗜️</span>
         Compress to LISA JSON
       </button>
+      <button id="aiCompressBtn" class="btn btn-primary" style="display: none; margin-top: 6px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none;">
+        <span class="icon">🧠</span>
+        AI Compress
+      </button>
+      <div id="aiCompressOptions" style="display: none; margin-top: 8px; padding: 10px; background: rgba(99,102,241,0.1); border-radius: 8px; border: 1px solid rgba(99,102,241,0.3);">
+        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+          <label style="font-size: 11px; color: #a5b4fc; white-space: nowrap;">AI Provider</label>
+          <select id="aiProviderSelect" style="flex:1; padding: 4px 8px; border-radius: 6px; background: #1e1b4b; color: #e0e7ff; border: 1px solid rgba(99,102,241,0.4); font-size: 11px;">
+            <option value="claude">Claude (Anthropic)</option>
+            <option value="gemini">Gemini (Google)</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <label style="font-size: 11px; color: #a5b4fc; white-space: nowrap;">Anchors</label>
+          <select id="aiAnchorSelect" style="flex:1; padding: 4px 8px; border-radius: 6px; background: #1e1b4b; color: #e0e7ff; border: 1px solid rgba(99,102,241,0.4); font-size: 11px;">
+            <option value="4">4 — Brief</option>
+            <option value="6" selected>6 — Standard</option>
+            <option value="8">8 — Detailed</option>
+            <option value="10">10 — Comprehensive</option>
+          </select>
+        </div>
+        <button id="aiCompressGoBtn" class="btn" style="width: 100%; margin-top: 8px; padding: 8px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+          🚀 Compress with AI
+        </button>
+      </div>
 
       <div id="compressionInfo" class="info-box success" style="display: none;">
         <p><strong>Messages analyzed:</strong> <span id="analyzedCount">-</span></p>

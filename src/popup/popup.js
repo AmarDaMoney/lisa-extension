@@ -39,6 +39,9 @@ class LISAPopup {
         document.getElementById('detectedPlatform').textContent = data.platform || 'Unknown';
         document.getElementById('extractedInfo').style.display = 'block';
         document.getElementById('compressBtn').style.display = 'block';
+        if (this.userTier === 'premium') {
+          document.getElementById('aiCompressBtn').style.display = 'block';
+        }
         const sampleText = (data.messages || []).map(m => m.content || '').join(' ').substring(0, 500);
         this.showLanguageIndicator(this.detectLanguage(sampleText));
         console.debug('[LISA] Recovered pending extraction:', data.messageCount, 'messages');
@@ -420,6 +423,14 @@ class LISAPopup {
     // Compress
     document.getElementById('compressBtn').addEventListener('click', () => {
       this.compressConversation();
+    });
+    // AI Compress toggle
+    document.getElementById('aiCompressBtn').addEventListener('click', () => {
+      const opts = document.getElementById('aiCompressOptions');
+      opts.style.display = opts.style.display === 'none' ? 'block' : 'none';
+    });
+    document.getElementById('aiCompressGoBtn').addEventListener('click', () => {
+      this.aiCompressConversation();
     });
 
     // Generate hash (premium)
@@ -825,6 +836,10 @@ class LISAPopup {
         document.getElementById('detectedPlatform').textContent = response.data.platform || 'Unknown';
         document.getElementById('extractedInfo').style.display = 'block';
         document.getElementById('compressBtn').style.display = 'block';
+        // Show AI Compress for premium/PAYG users
+        if (this.userTier === 'premium') {
+          document.getElementById('aiCompressBtn').style.display = 'block';
+        }
 
         // Detect language from extracted content
         const sampleText = (response.data.messages || []).map(m => m.content || '').join(' ').substring(0, 500);
@@ -962,6 +977,91 @@ class LISAPopup {
     } catch (error) {
       console.error('[LISA] Compression error:', error);
       this.showError('Compression failed: ' + error.message);
+    }
+  }
+
+  async aiCompressConversation() {
+    if (!this.currentConversation) {
+      this.showError('Please extract a conversation first');
+      return;
+    }
+    const provider = document.getElementById('aiProviderSelect').value;
+    const numAnchors = parseInt(document.getElementById('aiAnchorSelect').value);
+    this.showLoading('AI compressing with ' + provider.charAt(0).toUpperCase() + provider.slice(1) + '...');
+
+    try {
+      // Build the conversation text from extracted messages
+      const messages = this.currentConversation.messages || [];
+      const conversationText = messages.map(m => {
+        const role = (m.role || 'assistant').charAt(0).toUpperCase() + (m.role || 'assistant').slice(1);
+        return role + ': ' + (m.content || m.v || '');
+      }).join('\n\n');
+
+      if (conversationText.length < 100) {
+        this.showError('Conversation too short for AI compression (min 100 characters)');
+        return;
+      }
+
+      // Get license key
+      const storage = await chrome.storage.sync.get(['licenseKey']);
+      const licenseKey = storage.licenseKey || '';
+      if (!licenseKey) {
+        this.showError('License key required for AI Compress. Enter it in Settings.');
+        return;
+      }
+
+      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/compress', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-License-Key': licenseKey
+        },
+        body: JSON.stringify({
+          text: conversationText,
+          provider: provider,
+          num_anchors: numAnchors,
+          focus_areas: []
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        if (err.detail?.error_code === 'LICENSE_REQUIRED') {
+          this.showError('Valid license key required for AI Compress.');
+        } else if (err.detail?.error_code === 'DAILY_LIMIT_EXCEEDED') {
+          this.showError('Daily compression limit reached. Try again tomorrow.');
+        } else {
+          this.showError(err.detail?.error || err.detail || 'AI compression failed');
+        }
+        return;
+      }
+
+      const data = await response.json();
+      if (data.success && data.token) {
+        this.compressedData = data.token;
+        // Show compression results
+        const token = data.token;
+        const stats = data.stats || {};
+        document.getElementById('analyzedCount').textContent = stats.message_count || messages.length;
+        document.getElementById('entityCount').textContent = stats.entity_count || '-';
+        document.getElementById('conceptCount').textContent = stats.concept_count || '-';
+        document.getElementById('relationshipCount').textContent = stats.relationship_count || '-';
+        const rawTokens = stats.original_tokens || Math.round(conversationText.length / 3.5);
+        const enrichedTokens = stats.compressed_tokens || Math.round(JSON.stringify(token).length / 3.5);
+        document.getElementById('rawTokens').textContent = '~' + rawTokens.toLocaleString();
+        document.getElementById('enrichedTokens').textContent = '~' + enrichedTokens.toLocaleString();
+        const saved = Math.max(0, rawTokens - enrichedTokens);
+        document.getElementById('tokensSaved').textContent = '~' + saved.toLocaleString() + ' tokens (' + Math.round(saved / rawTokens * 100) + '%)';
+        document.getElementById('compressionInfo').style.display = 'block';
+        document.getElementById('aiCompressOptions').style.display = 'none';
+        this.hideLoading();
+        this.updatePlatformStatus('AI compression complete (' + provider + ')', true);
+      } else {
+        this.showError(data.error || 'AI compression failed');
+      }
+    } catch (error) {
+      console.error('[LISA] AI compression error:', error);
+      this.showError('AI compression failed: ' + (error.message || 'Network error'));
     }
   }
 

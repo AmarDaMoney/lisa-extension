@@ -26,30 +26,10 @@ class LISAPopup {
     this.checkWhatsNew();
     this.loadCreditBalance();
     this.showNewsletterIfEligible();
-    this.recoverPendingExtraction();
+
   }
 
-  async recoverPendingExtraction() {
-    try {
-      const result = await chrome.storage.session.get('lisaPendingExtraction');
-      if (result.lisaPendingExtraction) {
-        const data = result.lisaPendingExtraction;
-        this.currentConversation = data;
-        document.getElementById('messageCount').textContent = data.messageCount || 0;
-        document.getElementById('detectedPlatform').textContent = data.platform || 'Unknown';
-        document.getElementById('extractedInfo').style.display = 'block';
-        document.getElementById('compressBtn').style.display = 'block';
-        if (this.userTier === 'premium') {
-          document.getElementById('aiCompressBtn').style.display = 'block';
-        }
-        const sampleText = (data.messages || []).map(m => m.content || '').join(' ').substring(0, 500);
-        this.showLanguageIndicator(this.detectLanguage(sampleText));
-        console.debug('[LISA] Recovered pending extraction:', data.messageCount, 'messages');
-      }
-    } catch (e) {
-      console.debug('[LISA] No pending extraction to recover');
-    }
-  }
+
   
   async checkWhatsNew() {
     try {
@@ -808,7 +788,7 @@ class LISAPopup {
 
   async extractConversation() {
     this.showLoading('Extracting conversation (scrolling through messages — may take a minute)...');
-    chrome.storage.session.remove('lisaPendingExtraction').catch(() => {});
+
 
     try {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -828,8 +808,7 @@ class LISAPopup {
 
       if (response.success && response.data) {
         this.currentConversation = response.data;
-        // Stash extraction so popup can recover it if closed and reopened
-        chrome.storage.session.set({ lisaPendingExtraction: response.data }).catch(() => {});
+
         
         // Update UI
         document.getElementById('messageCount').textContent = response.data.messageCount || 0;

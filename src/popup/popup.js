@@ -1016,16 +1016,26 @@ class LISAPopup {
 
       const data = await response.json();
       if (data.success && data.token) {
-        this.compressedData = data.token;
+        // Map backend token structure to match download expectations
+        const aiToken = data.token;
+        const conv = this.currentConversation || {};
+        aiToken.metadata = aiToken.metadata || {
+          platform: token.session_metadata?.platform || conv.platform || 'Unknown',
+          title: conv.title || token.session_metadata?.session_id || 'AI Compressed Conversation',
+          originalUrl: conv.url || '',
+          url: conv.url || '',
+          messageCount: conv.messageCount || aiToken.session_metadata?.anchor_count || 0
+        };
+        aiToken.semanticTokens = aiToken.semanticTokens || [];
+        this.compressedData = aiToken;
         // Show compression results
-        const token = data.token;
         const stats = data.stats || {};
         document.getElementById('analyzedCount').textContent = stats.message_count || messages.length;
         document.getElementById('entityCount').textContent = stats.entity_count || '-';
         document.getElementById('conceptCount').textContent = stats.concept_count || '-';
         document.getElementById('relationshipCount').textContent = stats.relationship_count || '-';
         const rawTokens = stats.original_tokens || Math.round(conversationText.length / 3.5);
-        const enrichedTokens = stats.compressed_tokens || Math.round(JSON.stringify(token).length / 3.5);
+        const enrichedTokens = stats.compressed_tokens || Math.round(JSON.stringify(aiToken).length / 3.5);
         document.getElementById('rawTokens').textContent = '~' + rawTokens.toLocaleString();
         document.getElementById('enrichedTokens').textContent = '~' + enrichedTokens.toLocaleString();
         const saved = Math.max(0, rawTokens - enrichedTokens);

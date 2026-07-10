@@ -1122,6 +1122,12 @@ class LISAPopup {
             statusMsg += ' — ' + usage.credit_balance + ' credits left';
           }
           this.updatePlatformStatus(statusMsg, true);
+          // Update AI usage counter from response
+          const counter = document.getElementById('aiUsageCounter');
+          if (counter && usage.today != null && usage.limit) {
+            const remaining = usage.limit - usage.today;
+            counter.textContent = remaining + '/' + usage.limit + ' AI compressions remaining today';
+          }
           if (usage.low_balance_warning) {
             setTimeout(() => this.showError(usage.low_balance_warning), 2000);
           }

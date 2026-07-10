@@ -21,7 +21,6 @@ class LISAPopup {
     this.detectPlatform();
     this.setupEventListeners();
     this.loadSnapshots();
-    this.setupAutoSaveToggle();
     this.checkForUpdates();
     this.checkWhatsNew();
     this.loadCreditBalance();
@@ -1891,32 +1890,6 @@ class LISAPopup {
       alert('Could not inject — make sure you are on a supported AI platform');
     }
   }
-
-  async setupAutoSaveToggle() {
-    const toggle = document.getElementById('autoSaveToggle');
-    
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'getAutoSaveEnabled' });
-      if (response.success) {
-        toggle.checked = response.enabled;
-      }
-    } catch (error) {
-      console.error('[LISA] Failed to get auto-save status:', error);
-    }
-
-    toggle.addEventListener('change', async () => {
-      try {
-        await chrome.runtime.sendMessage({ 
-          action: 'setAutoSaveEnabled', 
-          enabled: toggle.checked 
-        });
-        this.trackEvent('auto_save_toggled', { enabled: toggle.checked });
-      } catch (error) {
-        console.error('[LISA] Failed to set auto-save:', error);
-      }
-    });
-  }
-
   async downloadSnapshot(id) {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });

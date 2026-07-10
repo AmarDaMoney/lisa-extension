@@ -184,11 +184,7 @@
             "></div>
           </div>
 
-          <button id="lisa-phoenix-snooze-btn" style="
-            padding:8px 16px;border:none;border-radius:8px;cursor:pointer;
-            background:transparent;color:rgba(226,232,240,0.5);
-            font-size:11px;
-          ">Remind me later</button>
+
         </div>
       `;
 
@@ -302,10 +298,9 @@
         });
       });
 
-      document.getElementById('lisa-phoenix-snooze-btn').addEventListener('click', () => {
-        overlay.remove();
-        // Snooze: re-show after ~10K more tokens
-        this.snoozeUntil = this.estimatedTokens + 10000;
+      // Click overlay background to dismiss
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
       });
     }
 

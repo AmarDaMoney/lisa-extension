@@ -625,7 +625,7 @@ class LISAPopup {
             msg.style.color = 'var(--success-color)';
             document.getElementById('newsletterEmail').value = '';
             setTimeout(() => {
-              document.getElementById('newsletterSection').style.display = 'none';
+              const nlSec = document.getElementById('newsletterSection'); if (nlSec) nlSec.style.display = 'none';
               chrome.storage.local.set({ newsletterSubscribed: true });
             }, 3000);
           } else {
@@ -1120,7 +1120,7 @@ class LISAPopup {
         document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
         document.getElementById('hashingSection').style.display = 'block';
-        document.getElementById('aiCompressOptions').style.display = 'none';
+        const aiOpts = document.getElementById('aiCompressOptions'); if (aiOpts) aiOpts.style.display = 'none';
         clearInterval(progressInterval);
         progressBar.style.width = '100%';
         progressText.textContent = '100%';

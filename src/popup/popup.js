@@ -1038,6 +1038,8 @@ class LISAPopup {
         return;
       }
 
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 240000); // 4 minutes
       const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/compress', {
         method: 'POST',
         headers: {
@@ -1048,8 +1050,10 @@ class LISAPopup {
           conversation: conversationText,
           provider: provider,
           num_anchors: numAnchors
-        })
+        }),
+        signal: controller.signal
       });
+      clearTimeout(fetchTimeout);
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -1142,7 +1146,11 @@ class LISAPopup {
       clearInterval(progressInterval);
       document.getElementById('loadingProgress').style.display = 'none';
       console.error('[LISA] AI compression error:', error);
-      this.showError('AI compression failed: ' + (error.message || 'Network error'));
+      if (error.name === 'AbortError') {
+        this.showError('AI compression timed out — conversation may be too long. Try fewer anchors or a shorter conversation.');
+      } else {
+        this.showError('AI compression failed: ' + (error.message || 'Network error'));
+      }
     }
   }
 

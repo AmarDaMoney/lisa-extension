@@ -444,7 +444,7 @@
         const key = this._getStorageKey();
         const data = await chrome.storage.local.get(key);
         const saved = data[key];
-        if (saved && saved.estimatedTokens > this.estimatedTokens) {
+        if (saved && saved.estimatedTokens > this.estimatedTokens && this.messageCount === 0) {
           this.estimatedTokens = saved.estimatedTokens;
           this.messageCount = saved.messageCount || 0;
           this.state = saved.state || STATES.GREEN;
@@ -477,13 +477,14 @@
       });
       // Reset gauge when progressive detects a conversation switch (SPA navigation)
       document.addEventListener('lisa-conversation-changed', () => {
+        // Clear old persisted state before reset
+        try { chrome.storage.local.remove(this._getStorageKey()); } catch(e) {}
         this.estimatedTokens = 0;
         this.messageCount = 0;
         this.state = STATES.GREEN;
         this._updateGauge();
         // Re-scan the new conversation's buffer after progressive loads it
-        setTimeout(() => this._scanExistingBuffer(), 300);
-        setTimeout(() => this._loadPersistedState(), 500);
+        setTimeout(() => this._scanExistingBuffer(), 500);
       });
 
       if (document.body) {

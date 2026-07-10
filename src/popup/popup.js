@@ -1101,6 +1101,9 @@ class LISAPopup {
             statusMsg += ' — ' + usage.credit_balance + ' credits left';
           }
           this.updatePlatformStatus(statusMsg, true);
+          if (usage.low_balance_warning) {
+            setTimeout(() => this.showError(usage.low_balance_warning), 2000);
+          }
           this.loadCreditBalance();
         }, 500);
       } else {

@@ -1029,6 +1029,19 @@ class LISAPopup {
         this.showError('Conversation too short for AI compression (min 100 characters)');
         return;
       }
+      // Warn about very long conversations
+      const charCount = conversationText.length;
+      const estTokens = Math.round(charCount / 3.5);
+      if (charCount > 500000) {
+        this.showError('Conversation too long for AI compression (' + charCount.toLocaleString() + ' chars, ~' + estTokens.toLocaleString() + ' tokens). Try a shorter conversation.');
+        clearInterval(progressInterval);
+        document.getElementById('loadingProgress').style.display = 'none';
+        this.hideLoading();
+        return;
+      }
+      if (charCount > 200000) {
+        document.getElementById('loadingText').textContent = 'Large conversation (' + Math.round(charCount/1000) + 'k chars) — this may take a few minutes...';
+      }
 
       // Get license key
       const storage = await chrome.storage.sync.get(['licenseKey']);

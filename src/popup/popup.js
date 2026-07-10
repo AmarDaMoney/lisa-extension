@@ -424,6 +424,7 @@ class LISAPopup {
       document.getElementById('tabLocal').style.color = 'rgba(255,255,255,0.5)';
       document.getElementById('panelAI').style.display = 'block';
       document.getElementById('panelLocal').style.display = 'none';
+      this.fetchAIUsage();
     });
     document.getElementById('aiCompressGoBtn').addEventListener('click', () => {
       this.aiCompressConversation();
@@ -968,6 +969,26 @@ class LISAPopup {
     } catch (error) {
       console.error('[LISA] Compression error:', error);
       this.showError('Compression failed: ' + error.message);
+    }
+  }
+
+  async fetchAIUsage() {
+    try {
+      const storage = await chrome.storage.sync.get(['licenseKey']);
+      const licenseKey = storage.licenseKey || '';
+      if (!licenseKey) return;
+      const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/usage', {
+        headers: { 'X-License-Key': licenseKey }
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const counter = document.getElementById('aiUsageCounter');
+      if (counter && data.usage) {
+        const remaining = data.usage.remaining ?? (data.usage.limit - data.usage.today);
+        counter.textContent = remaining + '/' + data.usage.limit + ' AI compressions remaining today';
+      }
+    } catch (e) {
+      console.debug('[LISA] Failed to fetch AI usage:', e);
     }
   }
 

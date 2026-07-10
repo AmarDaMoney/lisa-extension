@@ -66,9 +66,8 @@
 
     // ── Core: called on every progressive capture event ──
     onMessageCaptured(detail) {
-      const tokens = Math.ceil(detail.textLength / this._getTokenRatio());
-      this.estimatedTokens += tokens;
-      this.messageCount++;
+      // Recalculate from buffer instead of incrementing (avoids drift)
+      this._scanExistingBuffer();
       this._evaluatePressure();
       this._updateGauge();
       this._persistState();
@@ -425,12 +424,13 @@
       prog.buffer.forEach((entry) => {
         if (entry.v) totalChars += entry.v.length;
       });
+      // Always recalculate from buffer — single source of truth
+      this.estimatedTokens = totalChars > 0 ? Math.ceil(totalChars / this._getTokenRatio()) : 0;
+      this.messageCount = prog.buffer.size;
+      this._evaluatePressure();
+      this._updateGauge();
       if (totalChars > 0) {
-        this.estimatedTokens = Math.ceil(totalChars / this._getTokenRatio());
-        this.messageCount = prog.buffer.size;
-        this._evaluatePressure();
-        this._updateGauge();
-        console.log('[LISA Phoenix] Scanned existing buffer — ' + this.messageCount + ' msgs, ~' + Math.round(this.estimatedTokens / 1000) + 'K tokens');
+        console.log('[LISA Phoenix] Scanned buffer — ' + this.messageCount + ' msgs, ~' + Math.round(this.estimatedTokens / 1000) + 'K tokens');
       }
     }
 

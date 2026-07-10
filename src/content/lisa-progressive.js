@@ -253,7 +253,7 @@ class LisaProgressiveCapture {
 
   // Sweep scroll top→bottom, capturing messages at each step
   // Stops when buffer count stabilises (no new messages in 2 consecutive steps)
-  async performScrollSweep(scroller, stepDelay = 600) {
+  async performScrollSweep(scroller, stepDelay = 300) {
     if (!scroller) return;
 
     // Abort any previously running sweep
@@ -281,7 +281,7 @@ class LisaProgressiveCapture {
     scrollTo(0);
     await new Promise(r => setTimeout(r, stepDelay));
     this.captureAllVisible();
-    await new Promise(r => setTimeout(r, 250));
+    await new Promise(r => setTimeout(r, 150));
     this.captureAllVisible();
     console.debug('[LISA Sweep] start — buffer:', this.buffer.size,
                 'dom:', domCount(), 'scrollH:', scroller.scrollHeight,
@@ -302,7 +302,7 @@ class LisaProgressiveCapture {
       // Double capture: once after virtualizer mounts, once after it settles
       await new Promise(r => setTimeout(r, stepDelay));
       this.captureAllVisible();
-      await new Promise(r => setTimeout(r, 250));
+      await new Promise(r => setTimeout(r, 150));
       this.captureAllVisible();
 
       const dom = domCount();
@@ -337,7 +337,7 @@ class LisaProgressiveCapture {
 
     // Return to bottom
     scrollTo(scroller.scrollHeight);
-    await new Promise(r => setTimeout(r, 250));
+    await new Promise(r => setTimeout(r, 150));
     this.captureAllVisible();
     if (this._sweepAbort === abort) this._sweepAbort = null;
   }

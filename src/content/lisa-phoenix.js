@@ -124,6 +124,16 @@
         ? 'Responses may degrade. LISA can reincarnate this session — distilled context, fresh window, zero re-explaining.'
         : 'Start a fresh session with full context carried over — distilled, clean, and ready to continue.';
 
+      // Full-screen transparent backdrop for click-away dismiss
+      const backdrop = document.createElement('div');
+      backdrop.id = 'lisa-phoenix-backdrop';
+      Object.assign(backdrop.style, {
+        position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+        zIndex: '99999', background: 'transparent'
+      });
+      backdrop.addEventListener('click', () => { backdrop.remove(); overlay.remove(); });
+      document.body.appendChild(backdrop);
+
       const overlay = document.createElement('div');
       overlay.id = 'lisa-phoenix-modal';
       Object.assign(overlay.style, {
@@ -242,6 +252,7 @@
           }
           chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform, mode: rebirthMode });
           overlay.remove();
+          const bd = document.getElementById('lisa-phoenix-backdrop'); if (bd) bd.remove();
         } else {
           // Free tier limit reached
           const btn = document.getElementById('lisa-phoenix-rebirth-btn');
@@ -291,6 +302,7 @@
               }
               chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: target, mode: rebirthMode });
               overlay.remove();
+              const bd = document.getElementById('lisa-phoenix-backdrop'); if (bd) bd.remove();
             } else {
               alert('Daily rebirth limit reached (5/5). Upgrade to Premium for unlimited.');
             }
@@ -298,10 +310,7 @@
         });
       });
 
-      // Click overlay background to dismiss
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.remove();
-      });
+
     }
 
     // ── Gauge UI ──

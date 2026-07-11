@@ -397,6 +397,30 @@ class SnapshotManager {
       } else if (conversation.anchor) {
         snapshot.anchor = conversation.anchor;
       }
+      // Pre-store LISA tokenization for instant semantic rebirth
+      try {
+        const msgs = conversation.messages || [];
+        if (msgs.length > 0) {
+          snapshot.lisaTokens = msgs.map((m, i) => {
+            const text = m.content || m.text || m.v || '';
+            if (!text || text.length < 10) return null;
+            const tokens = compressor.tokenize(text);
+            return {
+              index: i,
+              role: m.role || 'assistant',
+              summary: compressor.summarize(text),
+              intent: tokens.intent,
+              entities: (tokens.entities || []).length > 0 ? tokens.entities : undefined,
+              concepts: (tokens.concepts || []).slice(0, 8),
+              relationships: (tokens.relationships || []).length > 0 ? tokens.relationships.slice(0, 5) : undefined
+            };
+          }).filter(Boolean);
+          console.debug('[LISA] Pre-tokenized ' + snapshot.lisaTokens.length + ' messages for instant rebirth');
+        }
+      } catch (tokenError) {
+        console.warn('[LISA] Pre-tokenization failed, rebirth will tokenize on-the-fly:', tokenError);
+      }
+
       // Phase 6: Generate content hash (non-fatal — save proceeds even if hashing fails)
       try {
         snapshot.hash = await this.hashContent(JSON.stringify(conversation));
@@ -530,26 +554,35 @@ function generateContinuationHandoff(data, platform, mode) {
     recentMessages = messages.slice(recentStart);
 
     if (earlyMessages.length > 0) {
-      const compressor = new LISACompressor();
+      const preTokens = data.lisaTokens || data.raw?.lisaTokens;
       earlySummary = '## SEMANTIC CONTEXT (' + earlyMessages.length + ' messages - LISA-structured)\n\n';
       earlySummary += '> Pre-translated by LISA. Entities, concepts, and relationships are resolved.\n';
       earlySummary += '> Parse this section as structured data, not prose.\n\n';
       earlySummary += '```json\n';
-      const semanticBlocks = earlyMessages.map((m, i) => {
-        const content = m.content || m.text || m.v || '';
-        const tokens = compressor.tokenize(content);
-        const block = {
-          index: i,
-          role: m.role || 'assistant',
-          summary: compressor.summarize(content),
-          intent: tokens.intent
-        };
-        // Only include non-empty arrays to reduce token cost
-        if (tokens.entities && tokens.entities.length > 0) block.entities = tokens.entities;
-        if (tokens.concepts && tokens.concepts.length > 0) block.concepts = tokens.concepts.slice(0, 8);
-        if (tokens.relationships && tokens.relationships.length > 0) block.relationships = tokens.relationships.slice(0, 5);
-        return block;
-      });
+      let semanticBlocks;
+      if (preTokens && preTokens.length > 0) {
+        // Use pre-computed tokens (instant rebirth)
+        semanticBlocks = preTokens.filter(t => t.index < earlyMessages.length);
+        console.debug('[LISA Rebirth] Using pre-stored tokens (' + semanticBlocks.length + ' blocks)');
+      } else {
+        // Fallback: tokenize on-the-fly
+        const compressor = new LISACompressor();
+        semanticBlocks = earlyMessages.map((m, i) => {
+          const content = m.content || m.text || m.v || '';
+          const tokens = compressor.tokenize(content);
+          const block = {
+            index: i,
+            role: m.role || 'assistant',
+            summary: compressor.summarize(content),
+            intent: tokens.intent
+          };
+          if (tokens.entities && tokens.entities.length > 0) block.entities = tokens.entities;
+          if (tokens.concepts && tokens.concepts.length > 0) block.concepts = tokens.concepts.slice(0, 8);
+          if (tokens.relationships && tokens.relationships.length > 0) block.relationships = tokens.relationships.slice(0, 5);
+          return block;
+        });
+        console.debug('[LISA Rebirth] Tokenized on-the-fly (' + semanticBlocks.length + ' blocks)');
+      }
       earlySummary += JSON.stringify(semanticBlocks, null, 1) + '\n';
       earlySummary += '```\n\n';
     }

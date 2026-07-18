@@ -1089,7 +1089,7 @@ class LISAPopup {
         const aiToken = data.token;
         const conv = this.currentConversation || {};
         aiToken.metadata = aiToken.metadata || {
-          platform: aiToken.session_metadata?.platform || conv.platform || 'Unknown',
+          platform: conv.platform || aiToken.session_metadata?.platform || 'Unknown',
           title: conv.title || aiToken.session_metadata?.session_id || 'AI Compressed Conversation',
           originalUrl: conv.url || '',
           url: conv.url || '',

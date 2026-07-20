@@ -441,9 +441,23 @@ class LisaVParser {
       }
       if (scroller && progressive) {
         await progressive.performScrollSweep(scroller);
-      } else if (scroller) {
-        scroller.scrollTop = 0;
-        await new Promise(r => setTimeout(r, 700));
+      } else {
+        // Gemini scrolls via window — scroll UP to lazy-load older messages
+        const step = Math.floor(window.innerHeight / 2);
+        let lastH = 0;
+        let stableCount = 0;
+        for (let i = 0; i < 200; i++) {
+          window.scrollBy(0, -step);
+          await new Promise(r => setTimeout(r, 200));
+          if (window.scrollY <= 0) { stableCount++; if (stableCount >= 3) break; }
+          const curH = document.documentElement.scrollHeight;
+          if (curH === lastH && window.scrollY <= 0) break;
+          else { lastH = curH; }
+        }
+        // Scroll back to bottom
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        await new Promise(r => setTimeout(r, 300));
+        console.debug('[LISA] Gemini window scroll sweep complete');
       }
     }
     const turns = document.querySelectorAll('.conversation-container');

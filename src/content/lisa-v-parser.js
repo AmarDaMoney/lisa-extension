@@ -1218,7 +1218,7 @@ class LisaVParser {
       url: window.location.href,
       title: document.title,
       extractedAt: new Date().toISOString(),
-      messageCount: this.blocks.filter(b => b.t === 'u' || b.t === 'a_text').length,
+      messageCount: messages.length,
       messages: messages
     };
   }

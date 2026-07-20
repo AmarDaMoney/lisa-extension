@@ -986,6 +986,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const newTab = await chrome.tabs.create({ url: newChatUrl });
 
         // 5. Store pending injection — handshake completes on TAB_READY
+        // Clean stale entries (older than 60s) to prevent blocking
+        const now = Date.now();
+        for (const [tid, p] of pendingRebirths) {
+          if (now - p.timestamp > 60000) pendingRebirths.delete(tid);
+        }
         pendingRebirths.set(newTab.id, {
           mdContent,
           filename,
@@ -1009,29 +1014,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const pending = pendingRebirths.get(tabId);
     if (pending) {
       (async () => {
-        try {
-          const result = await sendMessageWithTimeout(tabId, {
-            action: 'injectFileAttachment',
-            filename: pending.filename,
-            content: pending.mdContent,
-            mimeType: 'text/markdown'
-          }, 10000);
-
-          pendingRebirths.delete(tabId);
-          console.log('[LISA Phoenix] Handoff injected into tab ' + tabId);
-
-          // Notify source tab that rebirth is complete
+        // Retry injection up to 3 times with increasing delay
+        let result = null;
+        let lastErr = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            result = await sendMessageWithTimeout(tabId, {
+              action: 'injectFileAttachment',
+              filename: pending.filename,
+              content: pending.mdContent,
+              mimeType: 'text/markdown'
+            }, 15000);
+            console.log('[LISA Phoenix] Handoff injected into tab ' + tabId + ' (attempt ' + attempt + ')');
+            break;
+          } catch (err) {
+            lastErr = err;
+            console.warn('[LISA Phoenix] Injection attempt ' + attempt + ' failed:', err.message);
+            if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
+          }
+        }
+        pendingRebirths.delete(tabId);
+        if (result) {
           try {
             chrome.tabs.sendMessage(pending.sourceTabId, {
               type: 'PHOENIX_REBIRTH_COMPLETE',
               newTabId: tabId
             });
           } catch (e) { /* source tab may have closed */ }
-
           sendResponse({ success: true, injected: result });
-        } catch (err) {
-          console.error('[LISA Phoenix] Injection failed:', err);
-          sendResponse({ success: false, error: err.message });
+        } else {
+          console.error('[LISA Phoenix] All injection attempts failed:', lastErr?.message);
+          sendResponse({ success: false, error: lastErr?.message || 'Injection failed' });
         }
       })();
       return true;

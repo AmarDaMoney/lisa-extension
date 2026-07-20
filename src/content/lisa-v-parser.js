@@ -416,6 +416,36 @@ class LisaVParser {
   // Gemini-specific extraction
   async extractGeminiMessages() {
     const messages = [];
+    // Scroll sweep for virtualised Gemini conversations
+    const progressive = window.lisaProgressive;
+    const domCount = document.querySelectorAll('.conversation-container').length;
+    const currentConvId = window.location.pathname.match(/\/app\/([a-zA-Z0-9-]+)/)?.[1] || '';
+    const bufferConvId = progressive?.conversationId || '';
+    const bufferMatchesConv = !currentConvId || !bufferConvId || bufferConvId.endsWith(currentConvId);
+    const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;
+    if (!bufferReady) {
+      let scroller = null;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const scrollables = [...document.querySelectorAll('div, main')].filter(el => {
+          const s = getComputedStyle(el);
+          return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+                 && el.scrollHeight > el.clientHeight + 200;
+        });
+        scroller = scrollables.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
+        if (scroller) {
+          console.debug('[LISA] Gemini scroller found on attempt', attempt, '— scrollH:', scroller.scrollHeight);
+          break;
+        }
+        console.debug('[LISA] Gemini no scrollable container yet, attempt', attempt);
+        await new Promise(r => setTimeout(r, 500));
+      }
+      if (scroller && progressive) {
+        await progressive.performScrollSweep(scroller);
+      } else if (scroller) {
+        scroller.scrollTop = 0;
+        await new Promise(r => setTimeout(r, 700));
+      }
+    }
     const turns = document.querySelectorAll('.conversation-container');
 
     // Gemini UI prefixes to strip (multilingual)

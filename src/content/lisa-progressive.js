@@ -253,7 +253,7 @@ class LisaProgressiveCapture {
 
   // Sweep scroll top→bottom, capturing messages at each step
   // Stops when buffer count stabilises (no new messages in 2 consecutive steps)
-  async performScrollSweep(scroller, stepDelay = 300) {
+  async performScrollSweep(scroller, stepDelay = 200) {
     if (!scroller) return;
 
     // Abort any previously running sweep

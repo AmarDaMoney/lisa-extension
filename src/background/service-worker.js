@@ -349,15 +349,9 @@ class SnapshotManager {
     this.SETTINGS_KEY = 'lisaAutoSaveSettings';
   }
 
-  async isAutoSaveEnabled() {
-    const data = await chrome.storage.sync.get(this.SETTINGS_KEY);
-    const settings = data[this.SETTINGS_KEY] || { enabled: false };
-    return settings.enabled;
-  }
 
-  async setAutoSaveEnabled(enabled) {
-    await chrome.storage.sync.set({ [this.SETTINGS_KEY]: { enabled } });
-  }
+
+
 
   async saveSnapshot(conversation, source = 'auto') {
     try {
@@ -885,25 +879,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   }
-
-  if (request.action === 'getAutoSaveEnabled') {
-    snapshotManager.isAutoSaveEnabled().then(enabled => {
-      sendResponse({ success: true, enabled });
-    }).catch(error => {
-      sendResponse({ success: false, error: error.message });
-    });
-    return true;
-  }
-
-  if (request.action === 'setAutoSaveEnabled') {
-    snapshotManager.setAutoSaveEnabled(request.enabled).then(() => {
-      sendResponse({ success: true });
-    }).catch(error => {
-      sendResponse({ success: false, error: error.message });
-    });
-    return true;
-  }
-  
 
   // Handle analytics tracking
   if (request.action === 'trackEvent') {

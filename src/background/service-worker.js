@@ -926,13 +926,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return;
         }
 
-        // 1. Extract conversation from source tab
+        // 1. Extract conversation from source tab (use extractViaLisaV for scroll sweep)
         let extractResponse;
         try {
-          extractResponse = await chrome.tabs.sendMessage(sourceTab.id, { action: 'extractConversation' });
+          extractResponse = await chrome.tabs.sendMessage(sourceTab.id, { action: 'extractViaLisaV' });
         } catch (err) {
-          sendResponse({ success: false, error: 'Could not extract conversation: ' + err.message });
-          return;
+          // Fallback to legacy extraction if LISA-V not available
+          try {
+            extractResponse = await chrome.tabs.sendMessage(sourceTab.id, { action: 'extractConversation' });
+          } catch (err2) {
+            sendResponse({ success: false, error: 'Could not extract conversation: ' + err2.message });
+            return;
+          }
         }
 
         // 2. Save snapshot (source = phoenix-rebirth for lineage tracking)

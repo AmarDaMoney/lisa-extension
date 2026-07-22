@@ -955,17 +955,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         const filename = 'LISA_REBIRTH_' + data.platform + '_' + Date.now() + '.md';
 
-        // 4. Open new tab
-        // Use request.platform (from phoenix detector, matches URL map keys)
-        const newChatUrl = NEW_CHAT_URLS[request.platform] || NEW_CHAT_URLS[data.platform] || NEW_CHAT_URLS['claude'];
-        const newTab = await chrome.tabs.create({ url: newChatUrl });
-
-        // 5. Store pending injection — handshake completes on TAB_READY
-        // Clean stale entries (older than 60s) to prevent blocking
+        // 4. Clean stale entries before opening new tab
         const now = Date.now();
         for (const [tid, p] of pendingRebirths) {
           if (now - p.timestamp > 60000) pendingRebirths.delete(tid);
         }
+        // 5. Open new tab + store pending IMMEDIATELY (race: TAB_READY can fire before set)
+        const newChatUrl = NEW_CHAT_URLS[request.platform] || NEW_CHAT_URLS[data.platform] || NEW_CHAT_URLS['claude'];
+        const newTab = await chrome.tabs.create({ url: newChatUrl });
         pendingRebirths.set(newTab.id, {
           mdContent,
           filename,

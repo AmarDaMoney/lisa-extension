@@ -597,22 +597,20 @@ function generateContinuationHandoff(data, platform, mode) {
 
     // Build early context summary (topics covered, not full text)
     if (earlyMessages.length > 0) {
+      const compressor = new LISACompressor();
       earlySummary = '## EARLIER CONTEXT (' + earlyMessages.length + ' messages summarized)\n\n';
-      const topics = [];
+      const summaries = [];
       earlyMessages.forEach(m => {
-        if (m.role !== 'user') {
-          const text = m.content || m.text || m.v || '';
-          const firstLine = text.split('\n')[0].substring(0, 120).trim();
-          if (firstLine.length > 30
-              && !/^(Command|command|bash|python|grep|sed|cat |node |git )/i.test(firstLine)
-              && !/^[\`\$#>|{]/.test(firstLine)
-              && !/matches?:|replaced|aborted|syntax/i.test(firstLine)) {
-            topics.push('- ' + firstLine);
-          }
+        const text = m.content || m.text || m.v || '';
+        if (text.length < 30) return;
+        const summary = compressor.summarize(text);
+        if (summary && summary.length > 20) {
+          const role = m.role === 'user' ? '**User**' : '**Assistant**';
+          summaries.push('- ' + role + ': ' + summary);
         }
       });
-      if (topics.length > 0) {
-        earlySummary += 'Key points covered:\n' + topics.slice(-15).join('\n') + '\n\n';
+      if (summaries.length > 0) {
+        earlySummary += summaries.slice(-20).join('\n') + '\n\n';
       }
     }
 

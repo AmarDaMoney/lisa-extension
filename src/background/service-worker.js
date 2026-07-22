@@ -1014,6 +1014,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           sendResponse({ success: true, injected: result });
         } else {
           console.error('[LISA Phoenix] All injection attempts failed:', lastErr?.message);
+          // Show fallback toast on the new tab
+          try {
+            chrome.scripting.executeScript({
+              target: { tabId: tabId },
+              func: () => {
+                const toast = document.createElement('div');
+                Object.assign(toast.style, {
+                  position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)',
+                  zIndex: '999999', background: 'rgba(15,15,20,0.95)', color: '#e2e8f0',
+                  padding: '14px 24px', borderRadius: '12px', fontSize: '13px', lineHeight: '1.5',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)', border: '1px solid rgba(251,191,36,0.4)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', maxWidth: '400px',
+                  textAlign: 'center'
+                });
+                toast.innerHTML = '\xf0\x9f\x93\x8e <b>Auto-injection didn\'t go through</b> \u2014 open the LISA extension, go to Library > Rebirths, and tap the inject button to carry your handoff forward.';
+                document.body.appendChild(toast);
+                setTimeout(() => { toast.style.transition = 'opacity 0.5s'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 15000);
+              }
+            });
+          } catch (e) { /* scripting may not be available */ }
           sendResponse({ success: false, error: lastErr?.message || 'Injection failed' });
         }
       })();

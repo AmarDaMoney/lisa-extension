@@ -1,4 +1,4 @@
-// LISA Progressive Capture — v0.51.6
+// LISA Progressive Capture — v0.51.7
 // Buffers messages as they render, solving virtualisation on ChatGPT and others.
 // Modes: 'off' | 'auto' | 'on'
 //   off  — no observation, standard on-demand capture only

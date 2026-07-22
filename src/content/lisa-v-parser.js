@@ -274,7 +274,7 @@ class LisaVParser {
       const blocks = await this.parseMessageContent(container, role);
       const cleaned = stripClaudePrefixes(blocks);
       if (cleaned.length > 0) {
-        const key = cleaned.map(b => b.v || "").join("").substring(0, 80);
+        const key = cleaned.map(b => (b.v || "").replace(/\s+/g, " ")).join("").substring(0, 200);
         if (!seen.has(key)) {
           seen.add(key);
           messages.push(cleaned);

@@ -57,10 +57,6 @@ class LisaProgressiveCapture {
         this.clearBuffer().then(() => sendResponse({ success: true }));
         return true;
       }
-      if (msg.action === 'injectFileAttachment') {
-        this.injectFiles(msg).then(r => sendResponse(r)).catch(e => sendResponse({ success: false, error: e.message }));
-        return true;
-      }
     });
   }
 

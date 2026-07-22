@@ -283,11 +283,14 @@ class LisaVParser {
     }
     // Prepend virtualised messages from progressive buffer
     if (window.lisaProgressive && window.lisaProgressive.buffer.size > 0) {
-      const domHashes = new Set(
-        messages.flatMap(mb => mb.map(b => window.lisaProgressive.simpleHash(b.v || '')))
+      const domKeys = new Set(
+        messages.flatMap(mb => mb.map(b => (b.v || '').replace(/\s+/g, ' ').substring(0, 200)))
       );
       const missing = Array.from(window.lisaProgressive.buffer.values())
-        .filter(b => !domHashes.has(b.hash))
+        .filter(b => {
+          const key = (b.v || '').replace(/\s+/g, ' ').substring(0, 200);
+          return !domKeys.has(key);
+        })
         .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
         .map(b => [{ t: b.t, role: b.role, v: b.v }]);
       if (missing.length > 0) messages.unshift(...missing);
@@ -401,11 +404,14 @@ class LisaVParser {
     }
     // Prepend virtualised messages from progressive buffer
     if (window.lisaProgressive && window.lisaProgressive.buffer.size > 0) {
-      const domHashes = new Set(
-        messages.flatMap(mb => mb.map(b => window.lisaProgressive.simpleHash(b.v || '')))
+      const domKeys = new Set(
+        messages.flatMap(mb => mb.map(b => (b.v || '').replace(/\s+/g, ' ').substring(0, 200)))
       );
       const missing = Array.from(window.lisaProgressive.buffer.values())
-        .filter(b => !domHashes.has(b.hash))
+        .filter(b => {
+          const key = (b.v || '').replace(/\s+/g, ' ').substring(0, 200);
+          return !domKeys.has(key);
+        })
         .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
         .map(b => [{ t: b.t, role: b.role, v: b.v }]);
       if (missing.length > 0) messages.unshift(...missing);
@@ -658,11 +664,14 @@ class LisaVParser {
     }
     // Prepend virtualised messages from progressive buffer
     if (window.lisaProgressive && window.lisaProgressive.buffer.size > 0) {
-      const domHashes = new Set(
-        messages.flatMap(mb => mb.map(b => window.lisaProgressive.simpleHash(b.v || '')))
+      const domKeys = new Set(
+        messages.flatMap(mb => mb.map(b => (b.v || '').replace(/\s+/g, ' ').substring(0, 200)))
       );
       const missing = Array.from(window.lisaProgressive.buffer.values())
-        .filter(b => !domHashes.has(b.hash))
+        .filter(b => {
+          const key = (b.v || '').replace(/\s+/g, ' ').substring(0, 200);
+          return !domKeys.has(key);
+        })
         .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
         .map(b => [{ t: b.t, role: b.role, v: b.v }]);
       if (missing.length > 0) messages.unshift(...missing);

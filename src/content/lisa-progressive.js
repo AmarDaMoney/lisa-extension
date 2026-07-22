@@ -492,3 +492,46 @@ class LisaProgressiveCapture {
 }
 
 window.lisaProgressive = new LisaProgressiveCapture();
+
+// Standalone injection handler — survives SPA context resets
+if (!window.__lisaInjectionRegistered) {
+  window.__lisaInjectionRegistered = true;
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.action === 'injectFileAttachment') {
+      const prog = window.lisaProgressive || window.__lisaProgressive;
+      if (prog) {
+        prog.injectFiles(msg).then(r => sendResponse(r)).catch(e => sendResponse({ success: false, error: e.message }));
+      } else {
+        // Fallback: inline injection without progressive
+        try {
+          const blob = new Blob([msg.content], { type: msg.mimeType || 'text/markdown' });
+          const file = new File([blob], msg.filename, { type: msg.mimeType || 'text/markdown', lastModified: Date.now() });
+          const fileInput = document.querySelector('input[type="file"]');
+          if (fileInput) {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            sendResponse({ success: true, method: 'standalone-fileInput' });
+          } else {
+            const dropTargets = ['div[contenteditable="true"]', 'textarea', '#prompt-textarea', '[class*="composer"]', 'main'];
+            let target = null;
+            for (const sel of dropTargets) { target = document.querySelector(sel); if (target) break; }
+            if (target) {
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+              target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+              sendResponse({ success: true, method: 'standalone-dragDrop' });
+            } else {
+              sendResponse({ success: false, error: 'No injection target found' });
+            }
+          }
+        } catch (e) {
+          sendResponse({ success: false, error: e.message });
+        }
+      }
+      return true;
+    }
+  });
+}

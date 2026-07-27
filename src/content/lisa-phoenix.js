@@ -480,9 +480,15 @@
         this.onMessageCaptured(e.detail);
       });
       // Reset gauge when progressive detects a conversation switch (SPA navigation)
-      document.addEventListener('lisa-conversation-changed', () => {
-        // Clear old persisted state before reset
-        try { chrome.storage.local.remove(this._getStorageKey()); } catch(e) {}
+      document.addEventListener('lisa-conversation-changed', (e) => {
+        // Build the OLD conversation's storage key and remove it
+        const oldId = e.detail && e.detail.oldId;
+        if (oldId) {
+          const oldKey = 'phoenix:' + location.hostname + '/chat/' + oldId;
+          try { chrome.storage.local.remove(oldKey); } catch(ex) {}
+        }
+        // Also clear any state persisted under the NEW key (fresh start)
+        try { chrome.storage.local.remove(this._getStorageKey()); } catch(ex) {}
         this.estimatedTokens = 0;
         this.messageCount = 0;
         this.state = STATES.GREEN;

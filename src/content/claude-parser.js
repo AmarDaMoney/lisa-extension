@@ -71,6 +71,23 @@ class ClaudeParser {
   }
 
   async extractConversation() {
+    // ---- API-FIRST CAPTURE (instant, complete, structured) ----
+    if (window.__LISA_CLAUDE_API_CAPTURE) {
+      try {
+        const isShared = window.location.pathname.startsWith('/share/');
+        const apiResult = isShared
+          ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
+          : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
+        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+          console.log('[LISA] API capture success:', apiResult.messageCount, 'messages');
+          return apiResult;
+        }
+      } catch (e) {
+        console.warn('[LISA] API capture failed, falling back to DOM:', e.message);
+      }
+    }
+
+    // ---- DOM FALLBACK (existing logic, unchanged) ----
     this.conversationId = this.extractConversationId();
     const messages = this.extractMessages();
     
@@ -85,7 +102,8 @@ class ClaudeParser {
       title: document.title,
       extractedAt: new Date().toISOString(),
       messageCount: messages.length,
-      messages: messages
+      messages: messages,
+      _captureMethod: 'dom'
     };
   }
 

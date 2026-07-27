@@ -56,6 +56,7 @@
         "https://claude.ai/*"
       ],
       "js": [
+        "src/content/claude-api-capture.js",
         "src/content/claude-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-phoenix.js",

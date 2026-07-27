@@ -59,6 +59,23 @@ class ChatGPTParser {
   }
 
   async extractConversation() {
+    // ---- API-FIRST CAPTURE (instant, complete, no scroll sweep) ----
+    if (window.__LISA_CHATGPT_API_CAPTURE) {
+      try {
+        const isShared = window.location.pathname.startsWith('/share/');
+        const apiResult = isShared
+          ? await window.__LISA_CHATGPT_API_CAPTURE.extractSharedViaAPI()
+          : await window.__LISA_CHATGPT_API_CAPTURE.extractViaAPI();
+        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+          console.log('[LISA] ChatGPT API capture success:', apiResult.messageCount, 'messages');
+          return apiResult;
+        }
+      } catch (e) {
+        console.warn('[LISA] ChatGPT API capture failed, falling back to DOM:', e.message);
+      }
+    }
+
+    // ---- DOM FALLBACK (existing scroll sweep logic) ----
     // Refresh conversationId — may be stale after SPA navigation
     this.conversationId = this.extractConversationId();
 

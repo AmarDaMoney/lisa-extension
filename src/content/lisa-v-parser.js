@@ -232,6 +232,29 @@ class LisaVParser {
       messages = await this.extractClaudeMessages();
     } else if (platform === 'Claude') {
       messages = await this.extractClaudeMessages();
+    } else if (platform === 'ChatGPT' && window.__LISA_CHATGPT_API_CAPTURE) {
+      // ---- API-FIRST CAPTURE for ChatGPT ----
+      try {
+        const isShared = window.location.pathname.startsWith('/share/');
+        const apiResult = isShared
+          ? await window.__LISA_CHATGPT_API_CAPTURE.extractSharedViaAPI()
+          : await window.__LISA_CHATGPT_API_CAPTURE.extractViaAPI();
+        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+          console.log('[LISA] LISA-V using ChatGPT API capture:', apiResult.messageCount, 'messages');
+          for (const msg of apiResult.messages) {
+            const msgBlocks = await this._apiMessageToBlocks(msg);
+            messages.push(msgBlocks);
+          }
+          for (const msg of messages) {
+            this.blocks.push(...msg);
+          }
+          return this.blocks;
+        }
+      } catch (apiErr) {
+        console.warn('[LISA] ChatGPT API capture failed, falling back to DOM:', apiErr.message);
+        messages = [];
+      }
+      messages = await this.extractChatGPTMessages();
     } else if (platform === 'ChatGPT' || platform === 'Mistral AI') {
       messages = await this.extractChatGPTMessages();
     } else if (platform === 'Gemini') {

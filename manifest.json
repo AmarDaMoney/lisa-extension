@@ -70,6 +70,7 @@
         "https://chatgpt.com/*"
       ],
       "js": [
+        "src/content/chatgpt-api-capture.js",
         "src/content/chatgpt-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-phoenix.js",

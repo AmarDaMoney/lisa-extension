@@ -210,48 +210,182 @@ const SemanticAnalyzer = {
     return 'general';
   },
 
+  // ── URL / Link extraction ──
+  urlPattern: /https?:\/\/[^\s<>"'\)\]]+/g,
+
+  extractUrls(text) {
+    const matches = text.match(this.urlPattern) || [];
+    return [...new Set(matches)].slice(0, 50);
+  },
+
+  // ── Conversation flow metrics ──
+  computeFlowMetrics(messages) {
+    let userTurns = 0, assistantTurns = 0;
+    let userChars = 0, assistantChars = 0;
+    let codeBlocks = 0, questions = 0;
+    const models = new Set();
+    const artifacts = [];
+    const attachedFiles = [];
+
+    for (const msg of messages) {
+      const content = msg.content || '';
+      if (msg.role === 'user') {
+        userTurns++;
+        userChars += content.length;
+        questions += (content.match(/\?/g) || []).length;
+      } else {
+        assistantTurns++;
+        assistantChars += content.length;
+      }
+      // Count code fences
+      const fences = content.match(/```/g);
+      if (fences) codeBlocks += Math.floor(fences.length / 2);
+
+      // API-exclusive fields
+      if (msg.model) models.add(msg.model);
+      if (msg.artifacts) {
+        for (const art of msg.artifacts) {
+          artifacts.push({ type: art.type, name: art.name || null });
+        }
+      }
+      if (msg.files && msg.files.length > 0) {
+        for (const f of msg.files) {
+          attachedFiles.push(typeof f === 'string' ? f : (f.file_name || f.name || 'unknown'));
+        }
+      }
+      if (msg.attachments && msg.attachments.length > 0) {
+        for (const a of msg.attachments) {
+          attachedFiles.push(typeof a === 'string' ? a : (a.file_name || a.name || 'unknown'));
+        }
+      }
+    }
+
+    const totalChars = userChars + assistantChars;
+    return {
+      userTurns,
+      assistantTurns,
+      turnRatio: assistantTurns > 0 ? +(userTurns / assistantTurns).toFixed(2) : 0,
+      userChars,
+      assistantChars,
+      avgUserLength: userTurns > 0 ? Math.round(userChars / userTurns) : 0,
+      avgAssistantLength: assistantTurns > 0 ? Math.round(assistantChars / assistantTurns) : 0,
+      codeDensity: totalChars > 0 ? +(codeBlocks / (messages.length || 1)).toFixed(2) : 0,
+      codeBlocks,
+      questions,
+      models: [...models],
+      modelSwitches: models.size > 1,
+      artifacts: artifacts.length > 0 ? artifacts : undefined,
+      attachedFiles: [...new Set(attachedFiles)]
+    };
+  },
+
+  // ── Enhanced anchor selection ──
+  scoreMessage(msg, idx, totalMessages) {
+    let score = 0;
+    const content = msg.content || '';
+
+    // Severity markers
+    const severities = this.extractSeverities(content);
+    if (severities.length > 0) score += 30;
+
+    // File paths mentioned
+    const files = this.extractFilePaths(content);
+    if (files.length > 0) score += 20;
+
+    // Action items
+    const actions = this.extractActions(content);
+    if (actions.length > 0) score += 25;
+
+    // Decision language
+    if (/\b(decided?|chose|agreed|confirmed|approved|let'?s go with|ship it|merge it)\b/i.test(content)) score += 30;
+
+    // Problem/solution markers
+    if (/\b(root cause|the issue was|the fix is|the problem is|solution|resolved|the bug)\b/i.test(content)) score += 25;
+
+    // Error/stack traces
+    if (/\b(Error|Exception|Traceback|FAILED|TypeError|SyntaxError|ReferenceError)\b/.test(content)) score += 15;
+
+    // Architecture/design markers
+    if (/\b(architect|design|pattern|approach|strategy|schema|structure|migration)\b/i.test(content)) score += 15;
+
+    // Lengthy substantive text (not just code)
+    const textWithoutCode = content.replace(/```[\s\S]*?```/g, '');
+    if (textWithoutCode.length > 500) score += 10;
+
+    // Positional boost: first and last messages are often key
+    if (idx === 0 || idx === totalMessages - 1) score += 10;
+
+    // Contains URLs (references, documentation)
+    if (this.urlPattern.test(content)) score += 5;
+
+    // API-exclusive: has artifacts or tool use
+    if (msg.artifacts && msg.artifacts.length > 0) score += 15;
+
+    return { score, severities, files, actions };
+  },
+
   analyze(rawExtraction) {
     try {
       if (!rawExtraction || !rawExtraction.messages || rawExtraction.messages.length === 0) {
         return rawExtraction;
       }
 
-      const allText = rawExtraction.messages.map(m => m.content).join('\n');
+      const messages = rawExtraction.messages;
+      const allText = messages.map(m => m.content || '').join('\n');
       const allFiles = this.extractFilePaths(allText);
       const allGitRefs = this.extractGitRefs(allText);
       const allSeverities = this.extractSeverities(allText);
+      const allUrls = this.extractUrls(allText);
 
+      // ── Flow metrics (leverages API-exclusive fields) ──
+      const flow = this.computeFlowMetrics(messages);
+
+      // ── Enhanced semantic anchors (scored, ranked) ──
       const semanticAnchors = {};
       let anchorIndex = 1;
+      const scored = [];
 
-      rawExtraction.messages.forEach((msg, idx) => {
-        if (msg.content.length < 30) return;
-
-        const severities = this.extractSeverities(msg.content);
-        const files = this.extractFilePaths(msg.content);
-        const actions = this.extractActions(msg.content);
-        const topic = this.detectTopic(msg.content);
-
-        if (severities.length > 0 || files.length > 0 || actions.length > 0 || (msg.content.length > 500 && !msg.content.includes("```"))) {
-          const id = `SA${String(anchorIndex).padStart(3, '0')}`;
-          semanticAnchors[id] = {
-            topic,
-            role: msg.role,
-            content: msg.content,
-            severity: severities.length > 0 ? severities[0].level : null,
-            files: files,
-            tags: severities.map(s => s.tag)
-          };
-          anchorIndex++;
+      messages.forEach((msg, idx) => {
+        const content = msg.content || '';
+        if (content.length < 30) return;
+        const { score, severities, files, actions } = this.scoreMessage(msg, idx, messages.length);
+        if (score >= 15) {
+          scored.push({ msg, idx, score, severities, files, actions });
         }
       });
 
+      // Sort by score, take top anchors (cap at 30 for sanity)
+      scored.sort((a, b) => b.score - a.score);
+      const topAnchors = scored.slice(0, 30);
+
+      // Re-sort by conversation order for sequential reading
+      topAnchors.sort((a, b) => a.idx - b.idx);
+
+      for (const { msg, idx, score, severities, files, actions } of topAnchors) {
+        const id = 'SA' + String(anchorIndex).padStart(3, '0');
+        semanticAnchors[id] = {
+          topic: this.detectTopic(msg.content || ''),
+          role: msg.role,
+          turnIndex: idx,
+          score,
+          content: msg.content || '',
+          severity: severities.length > 0 ? severities[0].level : null,
+          files,
+          tags: severities.map(s => s.tag),
+          actions: actions.length > 0 ? actions.slice(0, 5) : undefined,
+          messageId: msg.messageId || undefined,
+          model: msg.model || undefined
+        };
+        anchorIndex++;
+      }
+
+      // ── Action vectors ──
       const actionVectors = {};
       let actionIndex = 1;
       const allActions = this.extractActions(allText);
 
       allActions.slice(0, 20).forEach(action => {
-        const id = `AV${String(actionIndex).padStart(3, '0')}`;
+        const id = 'AV' + String(actionIndex).padStart(3, '0');
         actionVectors[id] = {
           action: action.command,
           type: action.type,
@@ -261,21 +395,24 @@ const SemanticAnalyzer = {
         actionIndex++;
       });
 
+      // ── Reconstruction protocol ──
       const topics = [...new Set(Object.values(semanticAnchors).map(a => a.topic))];
       const reconstructionProtocol = {
         method: 'semantic_anchoring',
+        captureMethod: rawExtraction._captureMethod || 'unknown',
         anchor_count: Object.keys(semanticAnchors).length,
         action_count: Object.keys(actionVectors).length,
         key_themes: topics,
         files_touched: allFiles,
         git_refs: allGitRefs,
+        urls_referenced: allUrls.slice(0, 20),
         severities_found: [...new Set(allSeverities.map(s => s.level))]
       };
 
-      // Detect primary language of conversation
+      // ── Language detection ──
       const detectedLanguage = this.detectLanguage(allText);
       const isRTL = this.isRTL(detectedLanguage);
-      
+
       return {
         ...rawExtraction,
         session_metadata: {
@@ -285,8 +422,10 @@ const SemanticAnalyzer = {
           messageCount: rawExtraction.messageCount,
           enriched: true,
           language: detectedLanguage,
-          rtl: isRTL
+          rtl: isRTL,
+          captureMethod: rawExtraction._captureMethod || 'unknown'
         },
+        flow_metrics: flow,
         semantic_anchors: semanticAnchors,
         action_vectors: actionVectors,
         reconstruction_protocol: reconstructionProtocol

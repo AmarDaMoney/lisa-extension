@@ -134,6 +134,56 @@ class LisaVParser {
     return consolidated;
   }
 
+  // Convert an API-captured message into LISA-V blocks
+  async _apiMessageToBlocks(msg) {
+    const blocks = [];
+    const role = msg.role === 'user' ? 'user' : 'assistant';
+    const blockType = role === 'user' ? 'u' : 'a_text';
+    const content = msg.content || '';
+
+    // Split content by code fences
+    const fenceRe = new RegExp('(' + ``` + '[\\s\\S]*?' + ``` + ')', 'g');
+    const parts = content.split(fenceRe);
+
+    for (const part of parts) {
+      const codeRe = new RegExp('^' + ``` + '(\\w*)\\n?([\\s\\S]*?)' + ``` + '$');
+      const codeMatch = part.match(codeRe);
+      if (codeMatch) {
+        const codeContent = codeMatch[2].trim();
+        if (codeContent && codeContent.length >= 25) {
+          blocks.push({
+            t: 'code',
+            lang: codeMatch[1] || 'text',
+            file: null,
+            hash: await this.sha256(codeContent),
+            v: codeContent
+          });
+        }
+      } else {
+        const text = part.trim();
+        if (text) {
+          blocks.push({
+            t: blockType,
+            role: role,
+            v: text
+          });
+        }
+      }
+    }
+
+    // Consolidate consecutive same-type text blocks
+    const consolidated = [];
+    for (const block of blocks) {
+      const last = consolidated[consolidated.length - 1];
+      if (last && last.t === block.t && (block.t === 'u' || block.t === 'a_text')) {
+        last.v += '\n' + block.v;
+      } else {
+        consolidated.push({...block});
+      }
+    }
+
+    return consolidated;
+  }
   // Main extraction method - platform agnostic
   async extractConversation() {
     try {
@@ -155,6 +205,31 @@ class LisaVParser {
     
     if (platform === 'Claude Code') {
       messages = await this.extractClaudeCodeMessages();
+    } else if (platform === 'Claude' && window.__LISA_CLAUDE_API_CAPTURE) {
+      // ---- API-FIRST CAPTURE (instant, complete, no scroll sweep) ----
+      try {
+        const isShared = window.location.pathname.startsWith('/share/');
+        const apiResult = isShared
+          ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
+          : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
+        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+          console.log('[LISA] LISA-V using API capture:', apiResult.messageCount, 'messages');
+          for (const msg of apiResult.messages) {
+            const msgBlocks = await this._apiMessageToBlocks(msg);
+            messages.push(msgBlocks);
+          }
+          // Add all message blocks and return early — skip DOM path
+          for (const msg of messages) {
+            this.blocks.push(...msg);
+          }
+          return this.blocks;
+        }
+      } catch (apiErr) {
+        console.warn('[LISA] API capture failed for LISA-V, falling back to DOM:', apiErr.message);
+        messages = [];
+      }
+      // DOM fallback
+      messages = await this.extractClaudeMessages();
     } else if (platform === 'Claude') {
       messages = await this.extractClaudeMessages();
     } else if (platform === 'ChatGPT' || platform === 'Mistral AI') {
@@ -1275,24 +1350,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractViaLisaV') {
     (async () => {
       try {
-        // ---- API-FIRST CAPTURE (instant, complete, no scroll sweep) ----
-        if (window.__LISA_CLAUDE_API_CAPTURE) {
-          try {
-            const isShared = window.location.pathname.startsWith('/share/');
-            const apiResult = isShared
-              ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
-              : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
-            if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-              console.log('[LISA] API capture success (skipping scroll sweep):', apiResult.messageCount, 'messages');
-              sendResponse({ success: true, data: apiResult });
-              return;
-            }
-          } catch (apiErr) {
-            console.warn('[LISA] API capture failed, falling back to scroll sweep:', apiErr.message);
-          }
-        }
-
-        // ---- DOM FALLBACK (existing scroll sweep logic) ----
         const parser = new LisaVParser();
         await parser.extractConversation();
         await parser.finalize();

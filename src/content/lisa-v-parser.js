@@ -142,11 +142,12 @@ class LisaVParser {
     const content = msg.content || '';
 
     // Split content by code fences
-    const fenceRe = new RegExp('(' + ``` + '[\\s\\S]*?' + ``` + ')', 'g');
+    const fence = String.fromCharCode(96, 96, 96);
+    const fenceRe = new RegExp('(' + fence + '[\\s\\S]*?' + fence + ')', 'g');
     const parts = content.split(fenceRe);
 
     for (const part of parts) {
-      const codeRe = new RegExp('^' + ``` + '(\\w*)\\n?([\\s\\S]*?)' + ``` + '$');
+      const codeRe = new RegExp('^' + fence + '(\\w*)\\n?([\\s\\S]*?)' + fence + '$');
       const codeMatch = part.match(codeRe);
       if (codeMatch) {
         const codeContent = codeMatch[2].trim();

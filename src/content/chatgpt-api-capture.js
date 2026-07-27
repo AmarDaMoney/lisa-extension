@@ -33,13 +33,43 @@
   // API FETCH WRAPPER
   // ========================================================================
 
+  // ========================================================================
+  // AUTH TOKEN
+  // ========================================================================
+
+  var _cachedToken = null;
+  var _tokenExpiry = 0;
+
+  async function getAccessToken() {
+    // Return cached token if still fresh (cache for 5 min)
+    if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
+
+    var resp = await fetch('/api/auth/session', {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!resp.ok) throw new Error('Auth session returned ' + resp.status);
+    var data = await resp.json();
+    if (!data.accessToken) throw new Error('No accessToken in session response');
+    _cachedToken = data.accessToken;
+    _tokenExpiry = Date.now() + 5 * 60 * 1000;
+    return _cachedToken;
+  }
+
+  // ========================================================================
+  // API FETCH WRAPPER
+  // ========================================================================
+
   async function chatgptApiFetch(path) {
+    var token = await getAccessToken();
     var resp = await fetch(path, {
       method: 'GET',
       credentials: 'include',
       headers: {
         'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
       }
     });
     if (!resp.ok) {

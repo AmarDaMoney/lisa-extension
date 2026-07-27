@@ -1275,6 +1275,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractViaLisaV') {
     (async () => {
       try {
+        // ---- API-FIRST CAPTURE (instant, complete, no scroll sweep) ----
+        if (window.__LISA_CLAUDE_API_CAPTURE) {
+          try {
+            const isShared = window.location.pathname.startsWith('/share/');
+            const apiResult = isShared
+              ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
+              : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
+            if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+              console.log('[LISA] API capture success (skipping scroll sweep):', apiResult.messageCount, 'messages');
+              sendResponse({ success: true, data: apiResult });
+              return;
+            }
+          } catch (apiErr) {
+            console.warn('[LISA] API capture failed, falling back to scroll sweep:', apiErr.message);
+          }
+        }
+
+        // ---- DOM FALLBACK (existing scroll sweep logic) ----
         const parser = new LisaVParser();
         await parser.extractConversation();
         await parser.finalize();

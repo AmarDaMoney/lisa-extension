@@ -1948,7 +1948,10 @@ class LISAPopup {
 
     // Parse blocks from content — handle both LISA-V and raw/compressed formats
     const contentData = snapshot.content || snapshot.raw?.content;
-    const messagesData = snapshot.messages || snapshot.raw?.messages || snapshot.raw?.semanticTokens || snapshot.raw?.compressed;
+    const messagesData = (snapshot.messages && snapshot.messages.length > 0 ? snapshot.messages : null)
+      || (snapshot.raw?.messages && snapshot.raw.messages.length > 0 ? snapshot.raw.messages : null)
+      || snapshot.raw?.semanticTokens
+      || snapshot.raw?.compressed;
 
     if (contentData) {
       if (Array.isArray(contentData)) {

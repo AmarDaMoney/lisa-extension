@@ -442,26 +442,30 @@ class LISAPopup {
       this.saveToLibrary();
     });
     // Library filter tabs
-    document.getElementById('libTabAll').addEventListener('click', () => {
-      this._libFilter = 'all';
-      document.getElementById('libTabAll').style.background = 'rgba(74,222,128,0.15)';
-      document.getElementById('libTabAll').style.borderColor = 'rgba(74,222,128,0.4)';
-      document.getElementById('libTabAll').style.color = '#4ade80';
-      document.getElementById('libTabRebirths').style.background = 'transparent';
-      document.getElementById('libTabRebirths').style.borderColor = 'rgba(255,255,255,0.15)';
-      document.getElementById('libTabRebirths').style.color = 'rgba(226,232,240,0.6)';
+    // Library filter tabs — three tabs
+    const libTabs = {
+      all: { el: document.getElementById('libTabAll'), bg: 'rgba(74,222,128,0.15)', border: 'rgba(74,222,128,0.4)', color: '#4ade80' },
+      rebirths: { el: document.getElementById('libTabRebirths'), bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)', color: '#ef4444' },
+      compressed: { el: document.getElementById('libTabCompressed'), bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.4)', color: '#818cf8' }
+    };
+    const activateLibTab = (key) => {
+      this._libFilter = key;
+      for (const [k, t] of Object.entries(libTabs)) {
+        if (k === key) {
+          t.el.style.background = t.bg;
+          t.el.style.borderColor = t.border;
+          t.el.style.color = t.color;
+        } else {
+          t.el.style.background = 'transparent';
+          t.el.style.borderColor = 'rgba(255,255,255,0.15)';
+          t.el.style.color = 'rgba(226,232,240,0.6)';
+        }
+      }
       this.applyLibFilter();
-    });
-    document.getElementById('libTabRebirths').addEventListener('click', () => {
-      this._libFilter = 'rebirths';
-      document.getElementById('libTabRebirths').style.background = 'rgba(239,68,68,0.15)';
-      document.getElementById('libTabRebirths').style.borderColor = 'rgba(239,68,68,0.4)';
-      document.getElementById('libTabRebirths').style.color = '#ef4444';
-      document.getElementById('libTabAll').style.background = 'transparent';
-      document.getElementById('libTabAll').style.borderColor = 'rgba(255,255,255,0.15)';
-      document.getElementById('libTabAll').style.color = 'rgba(226,232,240,0.6)';
-      this.applyLibFilter();
-    });
+    };
+    libTabs.all.el.addEventListener('click', () => activateLibTab('all'));
+    libTabs.rebirths.el.addEventListener('click', () => activateLibTab('rebirths'));
+    libTabs.compressed.el.addEventListener('click', () => activateLibTab('compressed'));
 
     // Download
     document.getElementById('downloadBtn').addEventListener('click', () => {
@@ -1097,6 +1101,7 @@ class LISAPopup {
         };
         aiToken.semanticTokens = aiToken.semanticTokens || [];
         this.compressedData = aiToken;
+        this.compressedData._aiCompressed = true;
         // Show compression results from AI token metadata
         const meta = aiToken.session_metadata || {};
         const anchors = aiToken.semantic_anchors || {};
@@ -1298,7 +1303,7 @@ class LISAPopup {
         title: this.compressedData.metadata?.title || 'Compressed Conversation',
         messageCount: this.compressedData.metadata?.messageCount || 0,
         messages: this.compressedData.semanticTokens || this.compressedData.compressed || [],
-        format: 'compressed',
+        format: this.compressedData._aiCompressed ? 'ai-compressed' : 'compressed',
         raw: this.compressedData
       };
 
@@ -1764,9 +1769,12 @@ class LISAPopup {
     const snaps = this._allSnapshots || [];
     if (this._libFilter === 'rebirths') {
       this.renderSnapshots(snaps.filter(s => s.phoenix || s.source === 'phoenix-rebirth'));
+    } else if (this._libFilter === 'compressed') {
+      // AI compressed tab: backend AI compressions only
+      this.renderSnapshots(snaps.filter(s => s.format === 'ai-compressed'));
     } else {
-      // All tab: regular saves only (exclude rebirths)
-      this.renderSnapshots(snaps.filter(s => !s.phoenix && s.source !== 'phoenix-rebirth'));
+      // Saves tab: regular saves (exclude rebirths and AI compressed)
+      this.renderSnapshots(snaps.filter(s => !s.phoenix && s.source !== 'phoenix-rebirth' && s.format !== 'ai-compressed'));
     }
   }
 
@@ -1783,7 +1791,7 @@ class LISAPopup {
           <input type="checkbox" class="snapshot-checkbox" data-id="${snap.id}" title="Select for injection">
         <div class="snapshot-info">
           <div class="snapshot-title">${this.escapeHtml(snap.title === snap.platform || !snap.title ? 'Untitled Conversation' : snap.title)}</div>
-          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}${snap.phoenix ? ' • 🔥 Gen ' + snap.phoenix.generation : ''}${snap.format === 'lisa-v' ? ' • 📝 LISA-V' : snap.format === 'compressed' ? ' • 🗜️ Comp' : snap.source === 'floating-button' || snap.format === 'raw' ? ' • 📄 Raw' : ''}</div>
+          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}${snap.phoenix ? ' • 🔥 Gen ' + snap.phoenix.generation : ''}${snap.format === 'lisa-v' ? ' • 📝 LISA-V' : snap.format === 'ai-compressed' ? ' • 🤖 AI' : snap.format === 'compressed' ? ' • 🗜️ Comp' : snap.source === 'floating-button' || snap.format === 'raw' ? ' • 📄 Raw' : ''}</div>
         </div>
         <div class="snapshot-actions">
           <button class="snapshot-btn history" data-root-id="${snap.rootId || snap.id}" title="Version History">🕒</button>

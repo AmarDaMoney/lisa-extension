@@ -1789,7 +1789,7 @@ class LISAPopup {
           <button class="snapshot-btn history" data-root-id="${snap.rootId || snap.id}" title="Version History">🕒</button>
           ${snap.phoenix ? '<button class="snapshot-btn lineage" data-session-id="' + snap.phoenix.session_id + '" title="Phoenix Lineage">🔗</button>' : ''}
           <button class="snapshot-btn download" data-id="${snap.id}" title="Download JSON">💾</button>
-            <button class="snapshot-btn inject" data-id="${snap.id}" title="Inject as .md handoff">📎</button>
+            <button class="snapshot-btn inject" data-id="${snap.id}" title="Inject context to active AI tab">📎</button>
           <button class="snapshot-btn send" data-id="${snap.id}" title="Send to App">📤</button>
           <button class="snapshot-btn delete" data-id="${snap.id}" title="Delete">🗑️</button>
         </div>
@@ -1859,7 +1859,7 @@ class LISAPopup {
 
       // Convert all selected to markdown and combine
       const markdownFiles = snapshots.map(snap => {
-        const md = snap.rebirthHandoff || snap.raw?.rebirthHandoff || this.convertSnapshotToMarkdown(snap);
+        const md = snap.rebirthHandoff || snap.raw?.rebirthHandoff || this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
         const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
         return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.md', content: md };
       });
@@ -2095,7 +2095,7 @@ class LISAPopup {
       }
 
       // Use stored rebirth handoff if available (preserves the exact MD that was generated)
-      const markdown = snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff || this.convertSnapshotToMarkdown(snapshot);
+      const markdown = snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff || this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
       const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + (snapshot.format || 'lisa-v') + '.md';
 
@@ -2135,6 +2135,62 @@ class LISAPopup {
       console.error('[LISA] Failed to inject snapshot:', error);
       alert('Could not inject — make sure you are on a supported AI platform');
     }
+  }
+
+
+  wrapRawContentAsMarkdown(snapshot) {
+    const version = (chrome.runtime?.getManifest?.().version) || '1.0';
+    const platform = snapshot.platform || 'unknown';
+    const timestamp = snapshot.savedAt || new Date().toISOString();
+    const format = snapshot.format || 'lisa-v';
+    const title = snapshot.title || 'Untitled';
+    const msgCount = snapshot.messageCount || snapshot.messages?.length
+      || snapshot.raw?.messages?.length || 0;
+
+    // Get the raw structured content
+    let rawContent = '';
+    const contentData = snapshot.content || snapshot.raw?.content;
+
+    if (contentData) {
+      if (Array.isArray(contentData)) {
+        // LISA-V blocks as array — emit as JSONL
+        rawContent = contentData.map(item =>
+          typeof item === 'string' ? item : JSON.stringify(item)
+        ).join('\n');
+      } else if (typeof contentData === 'string') {
+        rawContent = contentData;
+      }
+    } else if (snapshot.raw) {
+      // Raw or compressed — emit the full raw object as JSON
+      rawContent = JSON.stringify(snapshot.raw, null, 2);
+    }
+
+    if (!rawContent) return null;
+
+    const formatLabel = format === 'lisa-v' ? 'LISA-V JSONL'
+      : format === 'compressed' ? 'LISA Compressed JSON'
+      : 'Raw JSON';
+
+    let md = '# LISA Context Injection \u2014 Machine-Readable Format\n\n';
+    md += '> **This file contains structured conversation data captured by LISA Core.**\n';
+    md += '> It is optimized for AI consumption, not human reading.\n';
+    md += '> Parse the data below to reconstruct full conversation context.\n\n';
+    md += '| Field | Value |\n';
+    md += '|-------|-------|\n';
+    md += '| Source | ' + platform + ' |\n';
+    md += '| Title | ' + title + ' |\n';
+    md += '| Messages | ' + msgCount + ' |\n';
+    md += '| Format | ' + formatLabel + ' |\n';
+    md += '| Captured | ' + new Date(timestamp).toISOString() + ' |\n';
+    md += '| LISA Core | v' + version + ' |\n\n';
+    md += '---\n\n';
+    md += '## Structured Data\n\n';
+    md += '```json\n';
+    md += rawContent + '\n';
+    md += '```\n\n';
+    md += '---\n';
+    md += '*LISA Core v' + version + ' \u2022 SAT-CHAIN LLC \u2022 Machine-Readable Context Injection*\n';
+    return md;
   }
 
   async sendSnapshotToApp(id) {

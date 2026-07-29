@@ -9,7 +9,8 @@ class LISAPopup {
     this.usageStats = {
       exportsToday: 0,
       importsToday: 0,
-      lastResetDate: null
+      lastResetDate: null,
+      lifetimeFreePool: 100
     };
     this.init();
   }
@@ -126,6 +127,10 @@ class LISAPopup {
       const result = await chrome.storage.sync.get(['usageStats']);
       if (result.usageStats) {
         this.usageStats = result.usageStats;
+        // Migrate existing users: give them the welcome pool if they don't have it
+        if (this.usageStats.lifetimeFreePool === undefined) {
+          this.usageStats.lifetimeFreePool = 100;
+        }
         
         const now = new Date();
         const lastReset = this.usageStats.lastResetDate ? new Date(this.usageStats.lastResetDate) : null;
@@ -140,7 +145,8 @@ class LISAPopup {
         this.usageStats = {
           exportsToday: 0,
           importsToday: 0,
-          lastResetDate: new Date().toISOString()
+          lastResetDate: new Date().toISOString(),
+          lifetimeFreePool: 100
         };
         await chrome.storage.sync.set({ usageStats: this.usageStats });
       }
@@ -155,7 +161,10 @@ class LISAPopup {
   }
 
   async updateUsageStats(type) {
-    if (type === 'export') {
+    // Decrement welcome pool first, then count daily
+    if (this.usageStats.lifetimeFreePool > 0) {
+      this.usageStats.lifetimeFreePool--;
+    } else if (type === 'export') {
       this.usageStats.exportsToday++;
     } else if (type === 'import') {
       this.usageStats.importsToday++;
@@ -168,21 +177,24 @@ class LISAPopup {
       return { allowed: true };
     }
 
+    // Welcome pool: 100 free compressions, then 5/day
+    const pool = this.usageStats.lifetimeFreePool ?? 0;
+    if (pool > 0) {
+      return { allowed: true, remaining: pool, pool: true };
+    }
     const limits = {
       export: { max: 5, current: this.usageStats.exportsToday },
       import: { max: 5, current: this.usageStats.importsToday }
     };
-
     const limit = limits[type];
     if (limit.current >= limit.max) {
       return {
         allowed: false,
-        message: `You're moving fast today — that's ${limit.current} ${type}s, and the free plan covers ${limit.max} per day. Premium keeps everything uncapped, across every device. Ready to keep your momentum going?`,
+        message: `You've used your 100 welcome compressions and today's ${limit.max} daily. PAYG credits or Premium keeps you going — uncapped, across every device.`,
         current: limit.current,
         max: limit.max
       };
     }
-
     return { allowed: true, remaining: limit.max - limit.current };
   }
 
@@ -240,7 +252,7 @@ class LISAPopup {
       const upgradeDescFree = document.querySelector('#freeUpgradeSection .settings-desc');
       if (upgradeDescFree) upgradeDescFree.textContent = 'Keep every conversation across every device — with nothing capped.';
       // Show remaining exports for free users
-      const remaining = 5 - this.usageStats.exportsToday;
+      const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
       const exportBtn = document.getElementById('exportBtn');
       const saveToLibraryBtn = document.getElementById('saveToLibraryBtn');
       
@@ -1275,7 +1287,7 @@ class LISAPopup {
         
         // Show remaining exports for free users
         if (this.userTier === 'free') {
-          const remaining = 5 - this.usageStats.exportsToday;
+          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
             this.updatePlatformStatus(`${remaining} free exports remaining today`, true);
         }
       }
@@ -1323,7 +1335,7 @@ class LISAPopup {
         
         // Show remaining exports for free users
         if (this.userTier === 'free') {
-          const remaining = 5 - this.usageStats.exportsToday;
+          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
           this.updatePlatformStatus(`✅ Saved! ${remaining} free exports remaining today`, true);
         }
       } else {

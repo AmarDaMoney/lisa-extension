@@ -2145,7 +2145,7 @@ class LISAPopup {
     const format = snapshot.format || 'lisa-v';
     const title = snapshot.title || 'Untitled';
     const msgCount = snapshot.messageCount || snapshot.messages?.length
-      || snapshot.raw?.messages?.length || 0;
+      || snapshot.raw?.messages?.length || snapshot.raw?.blockCount || snapshot.blockCount || 0;
 
     // Get the raw structured content
     let rawContent = '';

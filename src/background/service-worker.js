@@ -29,7 +29,10 @@ class LISACompressor {
       'TOP','KEY','MAP','MAX','MIN','DOM','DIV','CSS','TAB','ROW','COL','ERR','MSG','BTN',
       'SRC','OBJ','REF','OUT','RAW','OLD','RED','HIT','BAD','BIG','LOW','DONE','FOUND',
       'TRUE','FALSE','NULL','VOID','ELSE','THEN','FROM','WITH','THIS','THAT','NEXT','LAST',
-      'FILE','LINE','NODE','NAME','TYPE','DATA','EACH','PUSH','PULL','STEP','TEST','WAIT']);
+      'FILE','LINE','NODE','NAME','TYPE','DATA','EACH','PUSH','PULL','STEP','TEST','WAIT',
+      'QUICK','INDEX','ACTIVE','WORKING','MEMORY','INJECTION','REBIRTH','SMARTER','FULL',
+      'STATE','SNAPSHOT','MODE','ADAPTIVE','CONVERSATION','RECENT','EARLIER','CONTEXT',
+      'OPEN','CLOSE','START','BLOCK','CHECK','BUILD','MATCH','ABORT','REPLACE','UPDATE']);
     const patterns = {
       urls: /https?:\/\/[^\s]+/g,
       emails: /[\w.-]+@[\w.-]+\.\w+/g,
@@ -42,7 +45,7 @@ class LISACompressor {
       let matches = [...new Set(text.match(pattern) || [])];
       if (type === 'acronyms') matches = matches.filter(m => !acronymNoise.has(m) && m.length >= 3);
       if (type === 'technicalTerms') matches = matches.filter(m => m.length <= 40);
-      if (type === 'hashtags') matches = matches.filter(m => !/^#[0-9a-fA-F]{3,8}$/.test(m));
+      if (type === 'hashtags') matches = matches.filter(m => !/^#[0-9a-fA-F]{3,8}$/.test(m) && !/^#\d+$/.test(m));
       if (matches.length > 0) {
         entities.push({ type, values: matches.slice(0, 15) });
       }

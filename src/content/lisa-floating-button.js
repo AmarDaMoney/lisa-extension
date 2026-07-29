@@ -135,7 +135,7 @@ class LISAFloatingButton {
     const button = document.createElement('div');
     button.id = 'lisa-floating-btn';
     button.innerHTML = `
-      <button class="lisa-fab" title="LISA - AI Memory Library">
+      <button class="lisa-fab" title="LISA - AI Chat Exporter / Memory Library">
         <span class="lisa-fab-icon">💾</span>
         <span class="lisa-fab-text">LISA</span>
       </button>

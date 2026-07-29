@@ -160,7 +160,7 @@
             flex:1;padding:6px 8px;border:1px solid rgba(74,222,128,0.4);border-radius:6px;
             cursor:pointer;background:rgba(74,222,128,0.15);color:#4ade80;
             font-size:11px;font-weight:600;transition:all 0.2s;
-          ">✨ Distilled</button>
+          ">✨ Adaptive</button>
           <button id="lisa-phoenix-mode-full" class="lisa-phoenix-mode" style="
             flex:1;padding:6px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:6px;
             cursor:pointer;background:transparent;color:rgba(226,232,240,0.6);
@@ -173,7 +173,7 @@
           ">🧠 Semantic</button>
         </div>
         <div id="lisa-phoenix-mode-desc" style="margin-bottom:12px;font-size:11px;color:rgba(226,232,240,0.5);line-height:1.4;">
-          Summarized context + last 10 messages verbatim. Lighter, faster.
+          Density-scored: high-value turns verbatim, low-density summarized. Smart default.
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <button id="lisa-phoenix-rebirth-btn" style="
@@ -201,7 +201,7 @@
       document.body.appendChild(overlay);
 
       // ── Mode toggle ──
-      let rebirthMode = 'distilled';
+      let rebirthMode = 'adaptive';
       const modeDistilled = document.getElementById('lisa-phoenix-mode-distilled');
       const modeFull = document.getElementById('lisa-phoenix-mode-full');
       const modeSemantic = document.getElementById('lisa-phoenix-mode-semantic');
@@ -214,12 +214,12 @@
         });
       };
       modeDistilled.addEventListener('click', () => {
-        rebirthMode = 'distilled';
+        rebirthMode = 'adaptive';
         resetModes();
         modeDistilled.style.background = 'rgba(74,222,128,0.15)';
         modeDistilled.style.borderColor = 'rgba(74,222,128,0.4)';
         modeDistilled.style.color = '#4ade80';
-        modeDesc.textContent = 'Summarized context + last 10 messages verbatim. Lighter, faster.';
+        modeDesc.textContent = 'Density-scored: high-value turns verbatim, low-density summarized. Smart default.';
       });
       modeFull.addEventListener('click', () => {
         rebirthMode = 'full';

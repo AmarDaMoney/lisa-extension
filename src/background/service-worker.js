@@ -77,9 +77,14 @@ class LISACompressor {
     const relationships = [];
     
     const relationPatterns = [
-      { pattern: /(\w+)\s+is\s+(\w+)/gi, type: 'is-a' },
-      { pattern: /(\w+)\s+(?:relates? to|connected to)\s+(\w+)/gi, type: 'relates-to' },
-      { pattern: /(\w+)\s+(?:causes?|leads? to)\s+(\w+)/gi, type: 'causes' }
+      { pattern: /(\w+)\s+(?:requires?|depends on|needs)\s+(\w+)/gi, type: 'requires' },
+      { pattern: /(\w+)\s+(?:implements?|builds|provides)\s+(\w+)/gi, type: 'implements' },
+      { pattern: /(\w+)\s+(?:excludes?|replaces|overrides)\s+(\w+)/gi, type: 'excludes' },
+      { pattern: /(\w+)\s+(?:references?|calls|uses|imports?)\s+(\w+)/gi, type: 'references' },
+      { pattern: /(\w+)\s+(?:triggers?|causes?|leads? to|fires?)\s+(\w+)/gi, type: 'triggers' },
+      { pattern: /(\w+)\s+(?:supports?|enables?|allows?)\s+(\w+)/gi, type: 'supports' },
+      { pattern: /(\w+)\s+(?:contradicts?|conflicts? with|breaks?)\s+(\w+)/gi, type: 'contradicts' },
+      { pattern: /(\w+)\s+(?:supersedes?|upgrades?|extends?)\s+(\w+)/gi, type: 'supersedes' }
     ];
 
     relationPatterns.forEach(({ pattern, type }) => {
@@ -102,8 +107,11 @@ class LISACompressor {
   }
 
   extractIntent(text) {
+    // Only check first sentence for question markers (prevents misclassifying
+    // long assistant responses that contain rhetorical questions)
+    const firstSentence = (text || '').split(/[.!?\n]/)[0] || '';
     const intents = {
-      question: /\?|^(?:what|how|why|when|where|who|can|could|would|should)/i.test(text),
+      question: /\?$/.test(firstSentence.trim()) || /^(?:what|how|why|when|where|who|can|could|would|should)/i.test(text),
       instruction: /^(?:please|could you|can you|would you|let's|make|create|build)/i.test(text),
       statement: true,
       agreement: /^(?:yes|sure|okay|agreed|right|correct)/i.test(text),
@@ -123,6 +131,36 @@ class LISACompressor {
       length: text.length,
       sentences: text.split(/[.!?]+/).length
     };
+  }
+
+  // Density scorer for adaptive rebirth mode
+  // Returns numeric score: >= 5 means high-density (preserve verbatim)
+  scoreDensity(text) {
+    if (!text || text.length < 10) return 0;
+    let score = 0;
+    // Code blocks (triple backtick)
+    const codeBlocks = (text.match(/```/g) || []).length / 2;
+    score += Math.min(codeBlocks, 3) * 3;
+    // Inline code spans
+    if (/`[^`]+`/.test(text)) score += 1;
+    // LaTeX / math expressions
+    if (/\\[[(]|\$\$.+?\$\$|\.(?:frac|sum|int|max|min)\b/s.test(text)) score += 3;
+    // Numbered or bulleted lists (3+ items)
+    const listItems = (text.match(/(?:^|\n)\s*(?:\d+[.)]\s|-\s|\*\s)/g) || []).length;
+    if (listItems >= 3) score += 2;
+    // Long message (500+ chars = substantive)
+    if (text.length >= 500) score += 1;
+    if (text.length >= 1500) score += 1;
+    if (text.length >= 3000) score += 1;
+    // URLs (reference material)
+    const urls = (text.match(/https?:\/\//g) || []).length;
+    if (urls >= 1) score += 1;
+    // Technical terms (CamelCase or UPPER_CASE identifiers)
+    const techTerms = (text.match(/\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b/g) || []).length;
+    if (techTerms >= 3) score += 1;
+    // File paths
+    if (/(?:src|lib|dist|bin)\/\w+/.test(text)) score += 1;
+    return score;
   }
 
   compress(conversation) {
@@ -177,7 +215,7 @@ class LISACompressor {
     
     if (sentences.length <= 2) {
       // End at sentence boundary, not mid-word
-      const cut = text.substring(0, 300);
+      const cut = text.substring(0, 500);
       const lastPeriod = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '));
       return lastPeriod > 50 ? cut.substring(0, lastPeriod + 1) : cut;
     }
@@ -199,10 +237,10 @@ class LISACompressor {
     });
     
     // Take top 3 sentences by score, maintain original order
-    const top = scored.sort((a, b) => b.score - a.score).slice(0, 3);
+    const top = scored.sort((a, b) => b.score - a.score).slice(0, 4);
     top.sort((a, b) => a.index - b.index);
     
-    return top.map(s => s.text).join('. ').substring(0, 500);
+    return top.map(s => s.text).join('. ').substring(0, 800);
   }
 
   reconstruct(compressed) {
@@ -524,7 +562,7 @@ const pendingRebirths = new Map();
 function generateContinuationHandoff(data, platform, mode) {
   const messages = data.messages || [];
   const title = data.title || 'Untitled';
-  mode = mode || 'distilled';
+  mode = mode || 'adaptive';
 
   let earlySummary = '';
   let recentContent = '';
@@ -534,6 +572,24 @@ function generateContinuationHandoff(data, platform, mode) {
     // Full fidelity: every message verbatim
     earlyMessages = [];
     recentMessages = messages;
+
+    // State snapshot for full fidelity — compass before the wall of text
+    const ffCompressor = new LISACompressor();
+    const ffSnapshots = [];
+    for (let i = messages.length - 1; i >= 0 && ffSnapshots.length < 3; i--) {
+      if (messages[i].role === 'assistant') {
+        const t = messages[i].content || messages[i].text || messages[i].v || '';
+        const s = ffCompressor.summarize(t);
+        if (s && s.length > 20) ffSnapshots.unshift(s);
+      }
+    }
+    if (ffSnapshots.length > 0) {
+      earlySummary = '## STATE SNAPSHOT\n\n';
+      earlySummary += '> Current working state from recent assistant turns:\n\n';
+      ffSnapshots.forEach(s => { earlySummary += '- ' + s + '\n'; });
+      earlySummary += '\n';
+    }
+
     recentContent = '## FULL CONVERSATION (' + messages.length + ' messages \u2014 verbatim)\n\n';
     messages.forEach(m => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
@@ -589,37 +645,78 @@ function generateContinuationHandoff(data, platform, mode) {
     });
 
   } else {
-    // Distilled: summarized early + last N verbatim
-    const RECENT_TURNS = 10;
-    const recentStart = Math.max(0, messages.length - RECENT_TURNS);
-    earlyMessages = messages.slice(0, recentStart);
-    recentMessages = messages.slice(recentStart);
+    // Adaptive: density-scored per-turn fidelity selection
+    const compressor = new LISACompressor();
+    earlyMessages = [];
+    recentMessages = messages;
 
-    // Build early context summary (topics covered, not full text)
-    if (earlyMessages.length > 0) {
-      const compressor = new LISACompressor();
-      earlySummary = '## EARLIER CONTEXT (' + earlyMessages.length + ' messages summarized)\n\n';
-      const summaries = [];
-      earlyMessages.forEach(m => {
-        const text = m.content || m.text || m.v || '';
-        if (text.length < 30) return;
-        const summary = compressor.summarize(text);
-        if (summary && summary.length > 20) {
-          const role = m.role === 'user' ? '**User**' : '**Assistant**';
-          summaries.push('- ' + role + ': ' + summary);
-        }
-      });
-      if (summaries.length > 0) {
-        earlySummary += summaries.slice(-20).join('\n') + '\n\n';
+    // Step 1: Score every turn
+    const densityScores = messages.map(m => {
+      const text = m.content || m.text || m.v || '';
+      return compressor.scoreDensity(text);
+    });
+    const DENSITY_THRESHOLD = 5;
+
+    // Step 2: Mark high/low density
+    const isHighDensity = densityScores.map(s => s >= DENSITY_THRESHOLD);
+
+    // Step 3: Adjacency smoothing — promote low-density turns to verbatim
+    // if both neighbors are high-density (prevent semantic islands)
+    for (let i = 1; i < isHighDensity.length - 1; i++) {
+      if (!isHighDensity[i] && isHighDensity[i - 1] && isHighDensity[i + 1]) {
+        isHighDensity[i] = true;
       }
     }
+    // Last 5 messages always verbatim (active working context)
+    for (let i = Math.max(0, messages.length - 5); i < messages.length; i++) {
+      isHighDensity[i] = true;
+    }
 
-    // Build recent turns verbatim
-    recentContent = '## RECENT CONVERSATION (last ' + recentMessages.length + ' messages — verbatim)\n\n';
-    recentMessages.forEach(m => {
+    // Step 4: Count modes for reporting
+    const verbatimCount = isHighDensity.filter(Boolean).length;
+    const semanticCount = messages.length - verbatimCount;
+
+    // Step 5: State snapshot — extract from last few high-density assistant turns
+    let stateSnapshot = '';
+    const lastHighAssistant = [];
+    for (let i = messages.length - 1; i >= 0 && lastHighAssistant.length < 3; i--) {
+      if (messages[i].role === 'assistant' && isHighDensity[i]) {
+        const text = messages[i].content || messages[i].text || messages[i].v || '';
+        const summary = compressor.summarize(text);
+        if (summary && summary.length > 20) lastHighAssistant.unshift(summary);
+      }
+    }
+    if (lastHighAssistant.length > 0) {
+      stateSnapshot = '## STATE SNAPSHOT\n\n';
+      stateSnapshot += '> Current working state distilled from high-density turns:\n\n';
+      lastHighAssistant.forEach(s => { stateSnapshot += '- ' + s + '\n'; });
+      stateSnapshot += '\n';
+    }
+
+    // Step 6: Build mixed-fidelity conversation body
+    earlySummary = stateSnapshot;
+    recentContent = '## CONVERSATION (' + messages.length + ' messages \u2014 '
+      + verbatimCount + ' verbatim, ' + semanticCount + ' semantic)\n\n';
+
+    messages.forEach((m, i) => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
       const text = m.content || m.text || m.v || '';
-      if (text) recentContent += '### ' + role + '\n' + text + '\n\n';
+      if (!text) return;
+
+      if (isHighDensity[i]) {
+        // Verbatim: full text preserved
+        recentContent += '### ' + role + ' [turn ' + (i + 1) + ', verbatim]\n' + text + '\n\n';
+      } else {
+        // Semantic: summarized with metadata
+        const summary = compressor.summarize(text);
+        const tokens = compressor.tokenize(text);
+        let line = '**[Turn ' + (i + 1) + ', ' + role + ', semantic]** ' + (summary || '(short exchange)');
+        if (tokens.entities && tokens.entities.length > 0) {
+          const allVals = tokens.entities.flatMap(e => e.values || []);
+          if (allVals.length > 0) line += ' _[entities: ' + allVals.slice(0, 5).join(', ') + ']_';
+        }
+        recentContent += line + '\n\n';
+      }
     });
   }
 
@@ -642,7 +739,7 @@ function generateContinuationHandoff(data, platform, mode) {
     + '- Session ID: ' + (data.phoenix ? data.phoenix.session_id : 'genesis') + '\n'
     + '- Reborn at: ' + new Date().toISOString() + '\n'
     + '- Integrity: ' + (data.phoenix && data.phoenix.chain_hash ? 'SHA-256 ' + data.phoenix.chain_hash.slice(0, 16) : 'pending') + '\n'
-    + '- Mode: ' + (mode === 'full' ? 'Full fidelity (' + messages.length + ' messages verbatim)' : mode === 'semantic' ? 'Semantic (' + earlyMessages.length + ' LISA-structured, ' + recentMessages.length + ' verbatim)' : 'Distilled (' + earlyMessages.length + ' summarized, ' + recentMessages.length + ' verbatim)') + '\n\n'
+    + '- Mode: ' + (mode === 'full' ? 'Full fidelity (' + messages.length + ' messages verbatim)' : mode === 'semantic' ? 'Semantic (' + earlyMessages.length + ' LISA-structured, ' + recentMessages.length + ' verbatim)' : 'Adaptive (' + messages.length + ' messages, density-scored)') + '\n\n'
     + '---\n\n'
     + earlySummary
     + recentContent
@@ -934,7 +1031,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // (snapshot saved below after hash computation)
 
         // 3. Generate continuation handoff
-        const mdContent = generateContinuationHandoff(data, data.platform, request.mode || 'distilled');
+        const mdContent = generateContinuationHandoff(data, data.platform, request.mode || 'adaptive');
 
         // Compute handoff hash + chain hash
         const encoder = new TextEncoder();
@@ -948,7 +1045,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         // Save once with complete data (hashes + handoff content)
         data.rebirthHandoff = mdContent;
-        data.rebirthMode = request.mode || 'distilled';
+        data.rebirthMode = request.mode || 'adaptive';
         await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
 
         const filename = 'LISA_REBIRTH_' + data.platform + '_' + Date.now() + '.md';

@@ -1,6 +1,6 @@
 // LISA Core - Semantic Compression Engine
 // Background Service Worker (Manifest V3)
-// v0.51.8 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
+// v0.51.9 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
 
 class LISACompressor {
   constructor() {
@@ -173,7 +173,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.51.8',
+        lisaVersion: '0.51.9',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
@@ -304,7 +304,7 @@ class LISACompressor {
       platform:          conversation.platform || 'unknown',
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
-      generated_by:      'LISA v0.51.8',
+      generated_by:      'LISA v0.51.9',
       key_entities:    Object.keys(freq).length > 0 ? Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 12).map(([w]) => w) : [],
       note:              'Lightweight anchor — raw verbatim format'
     };
@@ -349,7 +349,7 @@ class LISACompressor {
       session_intent:    sessionIntent,
       session_register:  register,
       open_tasks:        tokens.filter(t => t.tokens?.intent === 'question' || t.tokens?.intent === 'request').slice(-5).map(t => (t.summary || '').substring(0, 100)),
-      generated_by:      'LISA v0.51.8'
+      generated_by:      'LISA v0.51.9'
     };
   }
 }
@@ -761,7 +761,7 @@ function generateContinuationHandoff(data, platform, mode) {
     + recentContent
     + '---\n\n'
     + '## ⚖️ SAT-CHAIN Governance Node\n'
-    + '> LISA Core v0.51.8 | Phoenix Generation: ' + (data.phoenix ? data.phoenix.generation : 1) + '\n'
+    + '> LISA Core v0.51.9 | Phoenix Generation: ' + (data.phoenix ? data.phoenix.generation : 1) + '\n'
     + '> Chain Hash: ' + (data.phoenix && data.phoenix.chain_hash ? data.phoenix.chain_hash.slice(0, 16) : 'genesis') + '\n'
     + '> Enforcement: ACTIVE\n\n'
     + '### Reading Protocol\n'
@@ -776,7 +776,7 @@ function generateContinuationHandoff(data, platform, mode) {
     + '4. **CONTINUATION**: This is a reborn session (Generation ' + (data.phoenix ? data.phoenix.generation : 1) + '). '
     + 'Resume work, do not restart.\n\n'
     + '---\n'
-    + '*LISA Core v0.51.8 \u2022 SAT-CHAIN LLC \u2022 Phoenix Session Rebirth*\n';
+    + '*LISA Core v0.51.9 \u2022 SAT-CHAIN LLC \u2022 Phoenix Session Rebirth*\n';
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -1445,4 +1445,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
   aiPlatformTabs.delete(tabId);
 });
-console.debug('[LISA] Core compression engine initialized v0.51.8');
+console.debug('[LISA] Core compression engine initialized v0.51.9');

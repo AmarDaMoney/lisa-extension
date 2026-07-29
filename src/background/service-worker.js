@@ -42,6 +42,7 @@ class LISACompressor {
       let matches = [...new Set(text.match(pattern) || [])];
       if (type === 'acronyms') matches = matches.filter(m => !acronymNoise.has(m) && m.length >= 3);
       if (type === 'technicalTerms') matches = matches.filter(m => m.length <= 40);
+      if (type === 'hashtags') matches = matches.filter(m => !/^#[0-9a-fA-F]{3,8}$/.test(m));
       if (matches.length > 0) {
         entities.push({ type, values: matches.slice(0, 15) });
       }
@@ -160,6 +161,12 @@ class LISACompressor {
     if (techTerms >= 3) score += 1;
     // File paths
     if (/(?:src|lib|dist|bin)\/\w+/.test(text)) score += 1;
+    // Unfenced code: indented blocks or code-like syntax without backticks
+    const indentedLines = (text.match(/(?:^|\n)(?:    |\t)\S.*/g) || []).length;
+    if (indentedLines >= 4) score += 2;
+    // Code syntax patterns (function/const/class/import/if/for without backticks)
+    const codeSyntax = (text.match(/(?:^|\n)\s*(?:function |const |let |var |class |import |export |if \(|for \(|return |=>|\{$|\}$)/gm) || []).length;
+    if (codeSyntax >= 3) score += 3;
     return score;
   }
 
@@ -201,9 +208,12 @@ class LISACompressor {
 
   summarize(text) {
     if (!text) return '';
+    if (typeof text !== 'string') {
+      try { text = JSON.stringify(text); } catch(e) { return ''; }
+    }
     // Strip code blocks to prevent code pollution in summaries
-    text = text.replace(/```(?:bash|python3?|javascript|js|json|css|html)?[\s\S]*?```/g, '[code block]');
-    text = text.replace(/`[^`]+`/g, '[code]');
+    text = text.replace(/```(?:bash|python3?|javascript|js|json|css|html)?[\s\S]*?```/g, ' ');
+    text = text.replace(/`[^`]+`/g, ' ');
     // Strip orphaned language identifiers left after code block removal
     text = text.replace(/\b(bash|python3?|javascript|js|json)(grep|sed|cat|node|git|head|tail)/gi, '$2');
     // Strip console/log output noise
@@ -579,6 +589,9 @@ function generateContinuationHandoff(data, platform, mode) {
     for (let i = messages.length - 1; i >= 0 && ffSnapshots.length < 3; i--) {
       if (messages[i].role === 'assistant') {
         const t = messages[i].content || messages[i].text || messages[i].v || '';
+        // Skip code-heavy turns — they produce garbled snapshots
+        const codeLen = (t.match(/```[\s\S]*?```/g) || []).reduce((a, b) => a + b.length, 0);
+        if (codeLen > t.length * 0.5) continue;
         const s = ffCompressor.summarize(t);
         if (s && s.length > 20) ffSnapshots.unshift(s);
       }
@@ -682,6 +695,9 @@ function generateContinuationHandoff(data, platform, mode) {
     for (let i = messages.length - 1; i >= 0 && lastHighAssistant.length < 3; i--) {
       if (messages[i].role === 'assistant' && isHighDensity[i]) {
         const text = messages[i].content || messages[i].text || messages[i].v || '';
+        // Skip code-heavy turns — they produce garbled snapshots
+        const codeLen = (text.match(/```[\s\S]*?```/g) || []).reduce((a, b) => a + b.length, 0);
+        if (codeLen > text.length * 0.5) continue;
         const summary = compressor.summarize(text);
         if (summary && summary.length > 20) lastHighAssistant.unshift(summary);
       }

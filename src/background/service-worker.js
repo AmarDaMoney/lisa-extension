@@ -404,6 +404,18 @@ class SnapshotManager {
 
 
 
+  async decrementFreePool() {
+    try {
+      const result = await chrome.storage.sync.get(['usageStats']);
+      if (result.usageStats && result.usageStats.lifetimeFreePool > 0) {
+        result.usageStats.lifetimeFreePool--;
+        await chrome.storage.sync.set({ usageStats: result.usageStats });
+      }
+    } catch (e) {
+      console.debug('[LISA] Pool decrement error:', e.message);
+    }
+  }
+
   async saveSnapshot(conversation, source = 'auto') {
     try {
       const data = await chrome.storage.local.get(this.STORAGE_KEY);
@@ -919,6 +931,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           // Save snapshot with appropriate source
           const source = request.data ? 'extension-compressed' : 'floating-button';
           const snapshot = await snapshotManager.saveSnapshot(data, source);
+          await snapshotManager.decrementFreePool();
         sendResponse({ success: true, snapshot });
         
       } catch (error) {
@@ -948,6 +961,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           source: "floating-button"
         };
         await snapshotManager.saveSnapshot(snapshot, "floating-button-lisav");
+        await snapshotManager.decrementFreePool();
         sendResponse({ success: true, snapshot });
       } catch (error) {
         console.error("[LISA] LISA-V save error:", error);
@@ -1066,6 +1080,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         data.rebirthHandoff = mdContent;
         data.rebirthMode = request.mode || 'adaptive';
         await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
+        await snapshotManager.decrementFreePool();
 
         const filename = 'LISA_REBIRTH_' + data.platform + '_' + Date.now() + '.md';
 

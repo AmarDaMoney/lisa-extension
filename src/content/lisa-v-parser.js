@@ -1371,6 +1371,23 @@ window.LisaVParser = LisaVParser;
 
 // Listen for extraction requests via LISA-V
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'copyToClipboard') {
+    navigator.clipboard.writeText(request.text).then(() => {
+      sendResponse({ success: true });
+    }).catch(err => {
+      // Fallback: textarea copy
+      const ta = document.createElement('textarea');
+      ta.value = request.text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      sendResponse({ success: true });
+    });
+    return true;
+  }
   if (request.action === 'extractViaLisaV') {
     (async () => {
       try {

@@ -1180,10 +1180,10 @@ function createContextMenus() {
       }
     });
 
-    // Send selection to another open AI tab
+    // Copy selection as LISA context (MD-wrapped for AI consumption)
     chrome.contextMenus.create({
-      id: 'send-to-ai',
-      title: '🌐 Send Selection to AI Tab',
+      id: 'copy-as-lisa',
+      title: '📋 Copy as LISA Context',
       contexts: ['selection']
     }, () => {
       if (chrome.runtime.lastError) {
@@ -1248,8 +1248,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'export-selection') {
     await handleExportSelection(info, tab);
   }
-  if (info.menuItemId === 'send-to-ai') {
-    await handleSendToAI(info, tab);
+  if (info.menuItemId === 'copy-as-lisa') {
+    await handleCopyAsLisa(info, tab);
   }
 });
 
@@ -1292,44 +1292,15 @@ async function handleExportSelection(info, tab) {
   }
 }
 
-const AI_PLATFORM_PATTERNS = [
-  '*://claude.ai/*',
-  '*://chatgpt.com/*',
-  '*://chat.openai.com/*',
-  '*://gemini.google.com/*',
-  '*://chat.mistral.ai/*',
-  '*://chat.deepseek.com/*',
-  '*://copilot.microsoft.com/*',
-  '*://www.perplexity.ai/*',
-  '*://x.ai/*',
-  '*://grok.com/*'
-];
-
-async function handleSendToAI(info, tab) {
+async function handleCopyAsLisa(info, tab) {
   try {
     const selectedText = info.selectionText;
     if (!selectedText || selectedText.trim().length === 0) {
-      showNotification('LISA Core', '\u274c No text selected');
+      showNotification('LISA Core', '❌ No text selected');
       return;
     }
 
-    // Find open AI platform tabs (excluding the source tab)
-    const allTabs = await chrome.tabs.query({});
-    const aiTabs = allTabs.filter(t => {
-      if (t.id === tab.id) return false;
-      const url = t.url || '';
-      return /claude\.ai|chatgpt\.com|chat\.openai\.com|gemini\.google\.com|chat\.mistral\.ai|chat\.deepseek\.com|copilot\.microsoft\.com|perplexity\.ai|x\.ai|grok\.com/.test(url);
-    });
-
-    if (aiTabs.length === 0) {
-      showNotification('LISA Core', '\u274c No AI tab open. Open Claude, ChatGPT, or another AI platform first.');
-      return;
-    }
-
-    // Pick the best target: most recently accessed, or first match
-    const targetTab = aiTabs.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))[0];
-
-    // Detect source platform from tab URL
+    // Detect source platform
     const sourceUrl = info.pageUrl || '';
     let sourcePlatform = 'unknown';
     if (/claude\.ai/.test(sourceUrl)) sourcePlatform = 'Claude';
@@ -1341,72 +1312,44 @@ async function handleSendToAI(info, tab) {
     else if (/perplexity\.ai/.test(sourceUrl)) sourcePlatform = 'Perplexity';
     else if (/x\.ai|grok\.com/.test(sourceUrl)) sourcePlatform = 'Grok';
 
-    // Detect target platform
-    const targetUrl = targetTab.url || '';
-    let targetPlatform = 'AI';
-    if (/claude\.ai/.test(targetUrl)) targetPlatform = 'Claude';
-    else if (/chatgpt\.com|chat\.openai\.com/.test(targetUrl)) targetPlatform = 'ChatGPT';
-    else if (/gemini\.google/.test(targetUrl)) targetPlatform = 'Gemini';
-    else if (/mistral\.ai/.test(targetUrl)) targetPlatform = 'Mistral';
-    else if (/deepseek\.com/.test(targetUrl)) targetPlatform = 'DeepSeek';
-    else if (/copilot\.microsoft/.test(targetUrl)) targetPlatform = 'Copilot';
-    else if (/perplexity\.ai/.test(targetUrl)) targetPlatform = 'Perplexity';
-    else if (/x\.ai|grok\.com/.test(targetUrl)) targetPlatform = 'Grok';
-
-    // Build the MD wrapper
     const version = chrome.runtime.getManifest().version;
     const timestamp = new Date().toISOString();
-    let md = '# LISA Context Transfer \u2014 Selection\n\n';
-    md += '> Selected text transferred from ' + sourcePlatform + ' via LISA Core.\n';
-    md += '> Read and incorporate this context into the current conversation.\n\n';
-    md += '| Field | Value |\n';
-    md += '|-------|-------|\n';
-    md += '| From | ' + sourcePlatform + ' |\n';
-    md += '| To | ' + targetPlatform + ' |\n';
-    md += '| Chars | ' + selectedText.length + ' |\n';
-    md += '| Transferred | ' + timestamp + ' |\n';
-    md += '| LISA Core | v' + version + ' |\n\n';
+
+    // Build LISA context wrapper
+    let md = '# LISA Context Transfer — Selection\n\n';
+    md += '> Selected from ' + sourcePlatform + ' via LISA Core v' + version + '\n';
+    md += '> Paste into any AI chat to transfer this context.\n\n';
     md += '---\n\n';
-    md += '## Content\n\n';
     md += selectedText + '\n\n';
     md += '---\n';
-    md += '*LISA Core v' + version + ' \u2022 SAT-CHAIN LLC \u2022 Cross-Platform Context Transfer*\n';
+    md += '*LISA Core v' + version + ' • ' + timestamp + '*\n';
 
-    const filename = 'lisa-selection-' + sourcePlatform.toLowerCase() + '-to-' + targetPlatform.toLowerCase() + '.md';
-
-    // Ensure content script is loaded on target tab
-    try {
-      await ensureContentScriptLoaded(targetTab);
-    } catch (e) {
-      console.debug('[LISA] Content script inject attempt:', e.message);
-    }
-
-    // Focus the target tab
-    await chrome.tabs.update(targetTab.id, { active: true });
-    await chrome.windows.update(targetTab.windowId, { focused: true });
-
-    // Small delay for tab focus + script readiness
-    await new Promise(r => setTimeout(r, 500));
-
-    // Inject the selection
-    const result = await chrome.tabs.sendMessage(targetTab.id, {
-      action: 'injectFileAttachment',
-      filename: filename,
-      content: md,
-      mimeType: 'text/markdown'
+    // Copy to clipboard via offscreen or content script
+    await chrome.tabs.sendMessage(tab.id, {
+      action: 'copyToClipboard',
+      text: md
     });
 
-    if (result && result.success) {
-      showNotification('LISA Core', '\u2705 Selection sent to ' + targetPlatform + '! ' + selectedText.length + ' chars transferred.');
-    } else {
-      showNotification('LISA Core', '\u274c Injection failed on ' + targetPlatform + '. Try refreshing the target tab.');
-    }
+    showNotification('LISA Core', '✅ Copied! ' + selectedText.length + ' chars from ' + sourcePlatform + ' — paste into any AI chat.');
 
   } catch (error) {
-    console.error('[LISA] Send to AI error:', error);
-    showNotification('LISA Core', '\u274c Failed: ' + error.message);
+    // Fallback: try writing to clipboard via offscreen document
+    try {
+      const selectedText = info.selectionText || '';
+      await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['CLIPBOARD'],
+        justification: 'Copy LISA context to clipboard'
+      });
+      await chrome.runtime.sendMessage({ action: 'clipboard-write', text: selectedText });
+      showNotification('LISA Core', '✅ Selection copied! Paste into any AI chat.');
+    } catch (e2) {
+      console.error('[LISA] Copy failed:', e2);
+      showNotification('LISA Core', '❌ Copy failed — try selecting text and using Ctrl+C');
+    }
   }
 }
+
 
 // ============================================
 // HELPER FUNCTIONS

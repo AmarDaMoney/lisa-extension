@@ -137,6 +137,86 @@ class LISACompressor {
     };
   }
 
+  // Working Memory Register — extract cognitive state from conversation
+  extractWorkingMemory(messages) {
+    const memory = {
+      objectives: [],
+      resolved: [],
+      blocked: [],
+      next: []
+    };
+    const seen = { objectives: new Set(), resolved: new Set(), blocked: new Set(), next: new Set() };
+
+    // Scan all messages for cognitive state signals
+    for (let i = 0; i < messages.length; i++) {
+      const text = messages[i].content || messages[i].text || messages[i].v || '';
+      if (!text || text.length < 15) continue;
+      const lines = text.split('\n');
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.length < 10) continue;
+
+        // Resolved: checkmarks, "done", "fixed", "shipped", "completed"
+        if (/^(?:[\u2713\u2714\u2705]|\*\*?\[x\]|\-\s*\[x\]|done:|fixed:|shipped:|completed:|resolved:)/i.test(trimmed) ||
+            /\b(?:successfully|shipped|merged|deployed|pushed|committed)\b/i.test(trimmed) && trimmed.length < 120) {
+          const clean = trimmed.replace(/^[\u2713\u2714\u2705\-\*\[x\]\s:]+/i, '').trim();
+          if (clean.length > 8 && clean.length < 120 && !seen.resolved.has(clean.substring(0, 40))) {
+            seen.resolved.add(clean.substring(0, 40));
+            memory.resolved.push(clean);
+          }
+        }
+        // Blocked: "blocked", "stuck", "waiting", "can't", "failing"
+        else if (/\b(?:blocked|stuck|waiting on|can'?t|failing|broken|not working|issue:|bug:)/i.test(trimmed) &&
+                 trimmed.length < 120 && !/\b(?:fixed|resolved|done)\b/i.test(trimmed)) {
+          const clean = trimmed.replace(/^[\-\*\s]+/, '').trim();
+          if (clean.length > 8 && !seen.blocked.has(clean.substring(0, 40))) {
+            seen.blocked.add(clean.substring(0, 40));
+            memory.blocked.push(clean);
+          }
+        }
+        // Next actions: "next:", "todo:", "still need", "for next session", numbered future items
+        else if (/^(?:next:|todo:|\-\s*\[ \]|action:|still need|for next session|on deck|still to do)/i.test(trimmed) ||
+                 /\b(?:next session|next step|still need to|remaining:|upcoming:)\b/i.test(trimmed) && trimmed.length < 120) {
+          const clean = trimmed.replace(/^[\-\*\s\[\]]+(?:next:|todo:|action:)?/i, '').trim();
+          if (clean.length > 8 && clean.length < 120 && !seen.next.has(clean.substring(0, 40))) {
+            seen.next.add(clean.substring(0, 40));
+            memory.next.push(clean);
+          }
+        }
+      }
+    }
+
+    // Extract current objective from last few user messages
+    for (let i = messages.length - 1; i >= Math.max(0, messages.length - 10); i--) {
+      if (messages[i].role !== 'user') continue;
+      const text = messages[i].content || messages[i].text || messages[i].v || '';
+      if (!text || text.length < 15 || text.length > 300) continue;
+      // Skip code outputs and confirmations
+      if (/^(?:done|ok|yes|sure|syntax|match|both|empty|✅)/i.test(text.trim())) continue;
+      if (/\b(?:let'?s|want to|can we|how about|I'?d like|please|build|create|add|fix|implement)\b/i.test(text)) {
+        const clean = text.trim().split('\n')[0].substring(0, 150);
+        if (!seen.objectives.has(clean.substring(0, 40))) {
+          seen.objectives.add(clean.substring(0, 40));
+          memory.objectives.push(clean);
+          if (memory.objectives.length >= 3) break;
+        }
+      }
+    }
+
+    // Deduplicate: remove items from "next" that appear in "resolved"
+    const resolvedLower = new Set(memory.resolved.map(r => r.toLowerCase().substring(0, 30)));
+    memory.next = memory.next.filter(n => !resolvedLower.has(n.toLowerCase().substring(0, 30)));
+
+    // Cap each category
+    memory.objectives = memory.objectives.slice(0, 3);
+    memory.resolved = memory.resolved.slice(-10);
+    memory.blocked = memory.blocked.slice(-5);
+    memory.next = memory.next.slice(0, 8);
+
+    return memory;
+  }
+
   // Density scorer for adaptive rebirth mode
   // Returns numeric score: >= 5 means high-density (preserve verbatim)
   scoreDensity(text) {
@@ -618,6 +698,35 @@ function generateContinuationHandoff(data, platform, mode) {
       earlySummary += '\n';
     }
 
+
+    // Working Memory Register for full fidelity
+    const ffWMR = ffCompressor.extractWorkingMemory(messages);
+    const ffHasWMR = ffWMR.objectives.length > 0 || ffWMR.resolved.length > 0
+      || ffWMR.blocked.length > 0 || ffWMR.next.length > 0;
+    if (ffHasWMR) {
+      earlySummary += '## ACTIVE WORKING MEMORY\n\n';
+      if (ffWMR.objectives.length > 0) {
+        earlySummary += '### Current Objective\n';
+        ffWMR.objectives.forEach(o => { earlySummary += '- ' + o + '\n'; });
+        earlySummary += '\n';
+      }
+      if (ffWMR.resolved.length > 0) {
+        earlySummary += '### Resolved\n';
+        ffWMR.resolved.forEach(r => { earlySummary += '\u2713 ' + r + '\n'; });
+        earlySummary += '\n';
+      }
+      if (ffWMR.blocked.length > 0) {
+        earlySummary += '### Blocked\n';
+        ffWMR.blocked.forEach(b => { earlySummary += '\u26a0 ' + b + '\n'; });
+        earlySummary += '\n';
+      }
+      if (ffWMR.next.length > 0) {
+        earlySummary += '### Next\n';
+        ffWMR.next.forEach(n => { earlySummary += '- ' + n + '\n'; });
+        earlySummary += '\n';
+      }
+    }
+
     recentContent = '## FULL CONVERSATION (' + messages.length + ' messages \u2014 verbatim)\n\n';
     messages.forEach(m => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
@@ -724,8 +833,37 @@ function generateContinuationHandoff(data, platform, mode) {
       stateSnapshot += '\n';
     }
 
-    // Step 6: Build mixed-fidelity conversation body
-    earlySummary = stateSnapshot;
+    // Step 6: Working Memory Register — cognitive state extraction
+    const workingMemory = compressor.extractWorkingMemory(messages);
+    let wmrBlock = '';
+    const hasWMR = workingMemory.objectives.length > 0 || workingMemory.resolved.length > 0
+      || workingMemory.blocked.length > 0 || workingMemory.next.length > 0;
+    if (hasWMR) {
+      wmrBlock = '## ACTIVE WORKING MEMORY\n\n';
+      if (workingMemory.objectives.length > 0) {
+        wmrBlock += '### Current Objective\n';
+        workingMemory.objectives.forEach(o => { wmrBlock += '- ' + o + '\n'; });
+        wmrBlock += '\n';
+      }
+      if (workingMemory.resolved.length > 0) {
+        wmrBlock += '### Resolved\n';
+        workingMemory.resolved.forEach(r => { wmrBlock += '\u2713 ' + r + '\n'; });
+        wmrBlock += '\n';
+      }
+      if (workingMemory.blocked.length > 0) {
+        wmrBlock += '### Blocked\n';
+        workingMemory.blocked.forEach(b => { wmrBlock += '\u26a0 ' + b + '\n'; });
+        wmrBlock += '\n';
+      }
+      if (workingMemory.next.length > 0) {
+        wmrBlock += '### Next\n';
+        workingMemory.next.forEach(n => { wmrBlock += '- ' + n + '\n'; });
+        wmrBlock += '\n';
+      }
+    }
+
+    // Step 7: Build mixed-fidelity conversation body
+    earlySummary = stateSnapshot + wmrBlock;
     recentContent = '## CONVERSATION (' + messages.length + ' messages \u2014 '
       + verbatimCount + ' verbatim, ' + semanticCount + ' semantic)\n\n';
 

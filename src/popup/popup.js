@@ -228,10 +228,14 @@ class LISAPopup {
       if (this.userTier === 'premium') {
         tierBadge.classList.add('premium');
       }
-      // Gate AI tab — premium only
+      // Gate AI tabs — premium only
       const tabAI = document.getElementById('tabAI');
       if (tabAI && this.userTier !== 'premium') {
         tabAI.style.display = 'none';
+      }
+      const libTabAI = document.getElementById('libTabCompressed');
+      if (libTabAI && this.userTier !== 'premium') {
+        libTabAI.style.display = 'none';
       }
     } catch (error) {
       console.error('[LISA] Error loading user tier:', error);

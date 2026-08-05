@@ -523,12 +523,8 @@
         setTimeout(() => this._scanExistingBuffer(), 500);
       });
 
-      // Rebirth button (replaces gauge)
-      if (document.body) {
-        this._createRebirthButton();
-      } else {
-        document.addEventListener('DOMContentLoaded', () => this._createRebirthButton());
-      }
+      // Rebirth modal triggered via floating button's rebirth icon
+      document.addEventListener('lisa-rebirth-click', () => this._showRebirthModal());
 
       this._watchPlatformWarning();
 

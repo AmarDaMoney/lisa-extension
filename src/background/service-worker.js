@@ -143,9 +143,10 @@ class LISACompressor {
       objectives: [],
       resolved: [],
       blocked: [],
-      next: []
+      next: [],
+      decisions: []
     };
-    const seen = { objectives: new Set(), resolved: new Set(), blocked: new Set(), next: new Set() };
+    const seen = { objectives: new Set(), resolved: new Set(), blocked: new Set(), next: new Set(), decisions: new Set() };
 
     // Scan all messages for cognitive state signals
     for (let i = 0; i < messages.length; i++) {
@@ -166,9 +167,28 @@ class LISACompressor {
             memory.resolved.push(clean);
           }
         }
+        // Decisions: "we'll use", "let's replace", "decided", "agreed", "going with"
+        else if (/\b(?:we'?ll use|let'?s (?:replace|use|go with|keep|drop|add|build|make|switch)|decided to|agreed to|going with|the plan is|instead of .+ we)\b/i.test(trimmed) &&
+                 trimmed.length > 15 && trimmed.length < 200) {
+          const clean = trimmed.replace(/^[\-\*\s]+/, '').trim();
+          if (clean.length > 12 && !seen.decisions.has(clean.substring(0, 40))) {
+            seen.decisions.add(clean.substring(0, 40));
+            // Try to extract rationale from next line
+            const lineIdx = lines.indexOf(line);
+            let rationale = '';
+            if (lineIdx < lines.length - 1) {
+              const nextLine = lines[lineIdx + 1].trim();
+              if (/^(?:because|since|the reason|that way|so that|this (?:means|ensures|prevents|avoids))/i.test(nextLine)) {
+                rationale = nextLine;
+              }
+            }
+            memory.decisions.push(rationale ? clean + ' — ' + rationale : clean);
+          }
+        }
         // Blocked: "blocked", "stuck", "waiting", "can't", "failing"
         else if (/\b(?:blocked|stuck|waiting on|can'?t|failing|broken|not working|issue:|bug:)/i.test(trimmed) &&
-                 trimmed.length < 120 && !/\b(?:fixed|resolved|done)\b/i.test(trimmed)) {
+                 trimmed.length < 120 && !/\b(?:fixed|resolved|done)\b/i.test(trimmed) &&
+                 !/^(?:I'd be happy|I can't honestly|I don't have|I would need|I cannot)/i.test(trimmed)) {
           const clean = trimmed.replace(/^[\-\*\s]+/, '').trim();
           if (clean.length > 8 && !seen.blocked.has(clean.substring(0, 40))) {
             seen.blocked.add(clean.substring(0, 40));
@@ -179,7 +199,8 @@ class LISACompressor {
         else if (/^(?:next:|todo:|\-\s*\[ \]|action:|still need|for next session|on deck|still to do)/i.test(trimmed) ||
                  /\b(?:next session|next step|still need to|remaining:|upcoming:)\b/i.test(trimmed) && trimmed.length < 120) {
           const clean = trimmed.replace(/^[\-\*\s\[\]]+(?:next:|todo:|action:)?/i, '').trim();
-          if (clean.length > 8 && clean.length < 120 && !seen.next.has(clean.substring(0, 40))) {
+          if (clean.length > 8 && clean.length < 120 && !seen.next.has(clean.substring(0, 40))
+              && !/^[A-Z][a-z]+(\s+[A-Z][a-z]+){0,4}$/.test(clean)) {
             seen.next.add(clean.substring(0, 40));
             memory.next.push(clean);
           }
@@ -213,6 +234,7 @@ class LISACompressor {
     memory.resolved = memory.resolved.slice(-10);
     memory.blocked = memory.blocked.slice(-5);
     memory.next = memory.next.slice(0, 8);
+    memory.decisions = memory.decisions.slice(-8);
 
     return memory;
   }
@@ -294,6 +316,8 @@ class LISACompressor {
     if (typeof text !== 'string') {
       try { text = JSON.stringify(text); } catch(e) { return ''; }
     }
+    // Strip ChatGPT citation syntax
+    text = text.replace(/filecite\w+/g, '');
     // Strip code blocks to prevent code pollution in summaries
     text = text.replace(/```(?:bash|python3?|javascript|js|json|css|html)?[\s\S]*?```/g, ' ');
     text = text.replace(/`[^`]+`/g, ' ');
@@ -688,7 +712,7 @@ function generateContinuationHandoff(data, platform, mode) {
         const codeLen = (t.match(/```[\s\S]*?```/g) || []).reduce((a, b) => a + b.length, 0);
         if (codeLen > t.length * 0.5) continue;
         const s = ffCompressor.summarize(t);
-        if (s && s.length > 20) ffSnapshots.unshift(s);
+        if (s && s.length > 20 && !/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b/i.test(s)) ffSnapshots.unshift(s);
       }
     }
     if (ffSnapshots.length > 0) {
@@ -702,7 +726,7 @@ function generateContinuationHandoff(data, platform, mode) {
     // Working Memory Register for full fidelity
     const ffWMR = ffCompressor.extractWorkingMemory(messages);
     const ffHasWMR = ffWMR.objectives.length > 0 || ffWMR.resolved.length > 0
-      || ffWMR.blocked.length > 0 || ffWMR.next.length > 0;
+      || ffWMR.blocked.length > 0 || ffWMR.next.length > 0 || ffWMR.decisions.length > 0;
     if (ffHasWMR) {
       earlySummary += '## ACTIVE WORKING MEMORY\n\n';
       if (ffWMR.objectives.length > 0) {
@@ -723,6 +747,11 @@ function generateContinuationHandoff(data, platform, mode) {
       if (ffWMR.next.length > 0) {
         earlySummary += '### Next\n';
         ffWMR.next.forEach(n => { earlySummary += '- ' + n + '\n'; });
+        earlySummary += '\n';
+      }
+      if (ffWMR.decisions.length > 0) {
+        earlySummary += '### Decisions\n';
+        ffWMR.decisions.forEach(d => { earlySummary += '\u2022 ' + d + '\n'; });
         earlySummary += '\n';
       }
     }
@@ -823,7 +852,7 @@ function generateContinuationHandoff(data, platform, mode) {
         const codeLen = (text.match(/```[\s\S]*?```/g) || []).reduce((a, b) => a + b.length, 0);
         if (codeLen > text.length * 0.5) continue;
         const summary = compressor.summarize(text);
-        if (summary && summary.length > 20) lastHighAssistant.unshift(summary);
+        if (summary && summary.length > 20 && !/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b/i.test(summary)) lastHighAssistant.unshift(summary);
       }
     }
     if (lastHighAssistant.length > 0) {
@@ -837,7 +866,7 @@ function generateContinuationHandoff(data, platform, mode) {
     const workingMemory = compressor.extractWorkingMemory(messages);
     let wmrBlock = '';
     const hasWMR = workingMemory.objectives.length > 0 || workingMemory.resolved.length > 0
-      || workingMemory.blocked.length > 0 || workingMemory.next.length > 0;
+      || workingMemory.blocked.length > 0 || workingMemory.next.length > 0 || workingMemory.decisions.length > 0;
     if (hasWMR) {
       wmrBlock = '## ACTIVE WORKING MEMORY\n\n';
       if (workingMemory.objectives.length > 0) {
@@ -858,6 +887,11 @@ function generateContinuationHandoff(data, platform, mode) {
       if (workingMemory.next.length > 0) {
         wmrBlock += '### Next\n';
         workingMemory.next.forEach(n => { wmrBlock += '- ' + n + '\n'; });
+        wmrBlock += '\n';
+      }
+      if (workingMemory.decisions.length > 0) {
+        wmrBlock += '### Decisions\n';
+        workingMemory.decisions.forEach(d => { wmrBlock += '\u2022 ' + d + '\n'; });
         wmrBlock += '\n';
       }
     }
@@ -912,6 +946,14 @@ function generateContinuationHandoff(data, platform, mode) {
     + '---\n\n'
     + earlySummary
     + recentContent
+    + '## Session Metrics\n\n'
+    + '| Metric | Value |\n'
+    + '|--------|-------|\n'
+    + '| Original messages | ' + messages.length + ' |\n'
+    + '| Mode | ' + mode + ' |\n'
+    + '| Estimated original tokens | ~' + Math.round(messages.reduce(function(a, m) { return a + (m.content || m.text || m.v || '').length; }, 0) / 4) + ' |\n'
+    + '| Handoff size | ~' + Math.round((earlySummary.length + recentContent.length) / 4) + ' tokens |\n'
+    + '| Reduction | ~' + Math.round((1 - (earlySummary.length + recentContent.length) / Math.max(messages.reduce(function(a, m) { return a + (m.content || m.text || m.v || '').length; }, 0), 1)) * 100) + '% |\n\n'
     + '---\n\n'
     + '## ⚖️ SAT-CHAIN Governance Node\n'
     + '> LISA Core v0.52.0 | Phoenix Generation: ' + (data.phoenix ? data.phoenix.generation : 1) + '\n'

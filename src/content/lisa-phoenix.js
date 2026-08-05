@@ -314,6 +314,32 @@
     }
 
     // ── Gauge UI ──
+    _createRebirthButton() {
+      if (document.getElementById('lisa-rebirth-btn')) return;
+      const btn = document.createElement('div');
+      btn.id = 'lisa-rebirth-btn';
+      Object.assign(btn.style, {
+        position: 'fixed', bottom: '80px', right: '24px', zIndex: '99999',
+        width: '36px', height: '36px', borderRadius: '50%',
+        background: 'rgba(0,0,0,0.7)', border: '2px solid #f97316',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', transition: 'all 0.3s',
+        fontSize: '16px', color: 'white',
+        boxShadow: '0 2px 8px rgba(249,115,22,0.3)'
+      });
+      btn.title = 'LISA Phoenix — Rebirth';
+      btn.textContent = '🔥';
+      btn.addEventListener('mouseenter', () => {
+        btn.style.transform = 'scale(1.1)';
+        btn.style.boxShadow = '0 2px 12px rgba(249,115,22,0.5)';
+      });
+      btn.addEventListener('mouseleave', () => {
+        btn.style.transform = 'scale(1)';
+        btn.style.boxShadow = '0 2px 8px rgba(249,115,22,0.3)';
+      });
+      btn.addEventListener('click', () => this._showRebirthModal());
+      document.body.appendChild(btn);
+    }
     _createGauge() {
       const g = document.createElement('div');
       g.id = 'lisa-phoenix-gauge';
@@ -497,8 +523,12 @@
         setTimeout(() => this._scanExistingBuffer(), 500);
       });
 
-      // Gauge removed in v0.51.8 — pressure tracking continues internally for rebirth
-      // if (document.body) { this._createGauge(); }
+      // Rebirth button (replaces gauge)
+      if (document.body) {
+        this._createRebirthButton();
+      } else {
+        document.addEventListener('DOMContentLoaded', () => this._createRebirthButton());
+      }
 
       this._watchPlatformWarning();
 

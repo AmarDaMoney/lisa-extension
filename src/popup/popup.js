@@ -412,24 +412,24 @@ class LISAPopup {
     }
 
     // Floating button toggle
-    document.getElementById('toggleFloatBtn').addEventListener('click', async () => {
+    const toggleBtn = document.getElementById('toggleFloatBtn');
+    chrome.storage.sync.get(['hideFloatingButton'], (result) => {
+      toggleBtn.textContent = result.hideFloatingButton
+        ? '💾 Show Floating Button'
+        : '💾 Hide Floating Button';
+    });
+    toggleBtn.addEventListener('click', async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab) {
         try {
-          await chrome.tabs.sendMessage(tab.id, { action: 'showFloatingButton' });
-          document.getElementById('toggleFloatBtn').textContent = '✅ LISA Button Shown';
+          const resp = await chrome.tabs.sendMessage(tab.id, { action: 'toggleFloatingButton' });
+          toggleBtn.textContent = resp.visible
+            ? '💾 Hide Floating Button'
+            : '💾 Show Floating Button';
         } catch (e) {
-          document.getElementById('toggleFloatBtn').textContent = '❌ Refresh page first';
+          toggleBtn.textContent = '❌ Refresh page first';
         }
       }
-    });
-    // Always show floating button checkbox
-    const alwaysShowEl = document.getElementById('alwaysShowFloat');
-    chrome.storage.sync.get(['alwaysShowFloat'], (result) => {
-      alwaysShowEl.checked = !!result.alwaysShowFloat;
-    });
-    alwaysShowEl.addEventListener('change', (e) => {
-      chrome.storage.sync.set({ alwaysShowFloat: e.target.checked });
     });
 
     // Extract conversation

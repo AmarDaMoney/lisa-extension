@@ -16,28 +16,25 @@ class LISAFloatingButton {
 
   async init() {
     try {
-      const result = await chrome.storage.sync.get(['userTier', 'alwaysShowFloat']);
+      const result = await chrome.storage.sync.get(['userTier', 'hideFloatingButton']);
       this.isPremium = result.userTier === 'premium';
       
-      // Only show floating button if "always show" is enabled
-      if (result.alwaysShowFloat) {
+      // Show by default unless user explicitly hid it
+      if (!result.hideFloatingButton) {
         this.createButton();
       }
 
-      // Listen for popup toggle message
+      // Listen for toggle messages from popup
       chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === 'toggleFloatingButton') {
           if (this.button) {
             this.removeButton();
+            chrome.storage.sync.set({ hideFloatingButton: true });
           } else {
             this.createButton();
+            chrome.storage.sync.set({ hideFloatingButton: false });
           }
           sendResponse({ success: true, visible: !!this.button });
-          return true;
-        }
-        if (request.action === 'showFloatingButton') {
-          if (!this.button) this.createButton();
-          sendResponse({ success: true });
           return true;
         }
       });

@@ -38,6 +38,15 @@
         <span class="icon">📤</span>
         Export Conversation
       </button>
+      <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
+        <button id="toggleFloatBtn" class="btn btn-secondary" style="flex: 1; font-size: 11px; padding: 6px 8px;">
+          💾 Show LISA Button
+        </button>
+        <label style="font-size: 11px; color: #aaa; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+          <input type="checkbox" id="alwaysShowFloat" style="cursor: pointer;">
+          Always show
+        </label>
+      </div>
 
       <div id="extractedInfo" class="info-box" style="display: none;">
         <p><strong>Messages:</strong> <span id="messageCount">0</span></p>
@@ -153,8 +162,7 @@
           
           <p style="margin: 0 0 6px; font-size: 13px; color: #ef4444;"><strong>🔥 Rebirth</strong></p>
           <ul style="margin: 0 0 12px 16px; padding: 0; font-size: 12px; color: #ccc;">
-            <li>Watch the <strong>pressure gauge</strong> &mdash; it tracks your context usage</li>
-            <li>When context runs low, click <strong>Rebirth</strong> to continue in a fresh session</li>
+            <li>When a conversation gets long, use <strong>Rebirth</strong> to continue in a fresh session</li>
             <li>Three modes: <strong style="color: #4ade80;">Distilled</strong>, <strong style="color: #fbbf24;">Full Fidelity</strong>, or <strong style="color: #a78bfa;">Semantic</strong></li>
             <li>Same platform or <strong>cross-platform</strong> &mdash; start on ChatGPT, continue on Claude</li>
           </ul>

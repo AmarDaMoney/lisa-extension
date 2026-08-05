@@ -228,6 +228,11 @@ class LISAPopup {
       if (this.userTier === 'premium') {
         tierBadge.classList.add('premium');
       }
+      // Gate AI tab — premium only
+      const tabAI = document.getElementById('tabAI');
+      if (tabAI && this.userTier !== 'premium') {
+        tabAI.style.display = 'none';
+      }
     } catch (error) {
       console.error('[LISA] Error loading user tier:', error);
     }
@@ -405,6 +410,27 @@ class LISAPopup {
         captureContent.classList.toggle('expanded');
       });
     }
+
+    // Floating button toggle
+    document.getElementById('toggleFloatBtn').addEventListener('click', async () => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab) {
+        try {
+          await chrome.tabs.sendMessage(tab.id, { action: 'showFloatingButton' });
+          document.getElementById('toggleFloatBtn').textContent = '✅ LISA Button Shown';
+        } catch (e) {
+          document.getElementById('toggleFloatBtn').textContent = '❌ Refresh page first';
+        }
+      }
+    });
+    // Always show floating button checkbox
+    const alwaysShowEl = document.getElementById('alwaysShowFloat');
+    chrome.storage.sync.get(['alwaysShowFloat'], (result) => {
+      alwaysShowEl.checked = !!result.alwaysShowFloat;
+    });
+    alwaysShowEl.addEventListener('change', (e) => {
+      chrome.storage.sync.set({ alwaysShowFloat: e.target.checked });
+    });
 
     // Extract conversation
     document.getElementById('extractBtn').addEventListener('click', () => {

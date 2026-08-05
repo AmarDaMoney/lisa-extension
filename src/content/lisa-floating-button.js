@@ -16,11 +16,31 @@ class LISAFloatingButton {
 
   async init() {
     try {
-      const result = await chrome.storage.sync.get(['userTier']);
+      const result = await chrome.storage.sync.get(['userTier', 'alwaysShowFloat']);
       this.isPremium = result.userTier === 'premium';
       
-        // Floating button for all users (free gets 5/day limits)
-      this.createButton();  
+      // Only show floating button if "always show" is enabled
+      if (result.alwaysShowFloat) {
+        this.createButton();
+      }
+
+      // Listen for popup toggle message
+      chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.action === 'toggleFloatingButton') {
+          if (this.button) {
+            this.removeButton();
+          } else {
+            this.createButton();
+          }
+          sendResponse({ success: true, visible: !!this.button });
+          return true;
+        }
+        if (request.action === 'showFloatingButton') {
+          if (!this.button) this.createButton();
+          sendResponse({ success: true });
+          return true;
+        }
+      });
       
     } catch (error) {
       console.debug('[LISA] Could not check premium status');
@@ -292,7 +312,14 @@ class LISAFloatingButton {
     this.button = button;
     console.debug('[LISA] Floating button ready');
   }
-
+  removeButton() {
+    const el = document.getElementById('lisa-floating-btn');
+    if (el) el.remove();
+    this.button = null;
+    const menu = document.querySelector('.lisa-action-menu');
+    if (menu) menu.remove();
+    console.debug('[LISA] Floating button removed');
+  }
 
   showActionMenu() {
     // Remove existing menu if any

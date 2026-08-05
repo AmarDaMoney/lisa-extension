@@ -497,11 +497,8 @@
         setTimeout(() => this._scanExistingBuffer(), 500);
       });
 
-      if (document.body) {
-        this._createGauge();
-      } else {
-        document.addEventListener('DOMContentLoaded', () => this._createGauge());
-      }
+      // Gauge removed in v0.51.8 — pressure tracking continues internally for rebirth
+      // if (document.body) { this._createGauge(); }
 
       this._watchPlatformWarning();
 

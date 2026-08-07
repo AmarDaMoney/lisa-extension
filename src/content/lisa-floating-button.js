@@ -456,11 +456,20 @@ class LISAFloatingButton {
         md += `### ${role}\n\n${msg.content || ''}\n\n`;
       }
 
-      // Save to library
+      // Save formatted markdown to library
       const response = await chrome.runtime.sendMessage({
         action: 'extractAndSave',
         format: 'markdown',
-        data: messages
+        data: {
+          platform: platform,
+          conversationId: messages.conversationId || '',
+          url: messages.url || window.location.href,
+          title: title,
+          extractedAt: new Date().toISOString(),
+          messageCount: messages.messages.length,
+          messages: [],
+          markdownContent: md
+        }
       });
 
       if (response && response.success) {

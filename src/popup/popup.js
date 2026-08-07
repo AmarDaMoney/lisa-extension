@@ -1909,7 +1909,7 @@ class LISAPopup {
 
       // Convert all selected to markdown and combine
       const markdownFiles = snapshots.map(snap => {
-        const md = snap.rebirthHandoff || snap.raw?.rebirthHandoff || this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
+        const md = snap.rebirthHandoff || snap.raw?.rebirthHandoff || snap.raw?.markdownContent || this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
         const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
         return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.md', content: md };
       });
@@ -1954,7 +1954,12 @@ class LISAPopup {
       const isLisaV = snapshot.format === 'lisa-v';
       let fileContent, mimeType, extension;
       
-      if (isLisaV) {
+      if (snapshot.format === 'markdown' && snapshot.raw?.markdownContent) {
+        // Markdown: download the clean formatted conversation
+        fileContent = snapshot.raw.markdownContent;
+        mimeType = 'text/markdown';
+        extension = 'md';
+      } else if (isLisaV) {
         // LISA-V: output the raw JSONL content directly
         // Convert array to JSONL string for download
         const contentData = snapshot.content || snapshot.raw?.content;
@@ -2145,7 +2150,7 @@ class LISAPopup {
       }
 
       // Use stored rebirth handoff if available (preserves the exact MD that was generated)
-      const markdown = snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff || this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
+      const markdown = snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff || snapshot.raw?.markdownContent || this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
       const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + (snapshot.format || 'lisa-v') + '.md';
 

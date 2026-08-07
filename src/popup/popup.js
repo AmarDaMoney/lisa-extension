@@ -1959,6 +1959,11 @@ class LISAPopup {
         fileContent = snapshot.raw.markdownContent;
         mimeType = 'text/markdown';
         extension = 'md';
+      } else if (snapshot.raw?.rebirthHandoff || snapshot.rebirthHandoff) {
+        // Rebirth: download the handoff markdown
+        fileContent = snapshot.raw?.rebirthHandoff || snapshot.rebirthHandoff;
+        mimeType = 'text/markdown';
+        extension = 'md';
       } else if (isLisaV) {
         // LISA-V: output the raw JSONL content directly
         // Convert array to JSONL string for download

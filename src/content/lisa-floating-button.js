@@ -351,6 +351,7 @@ class LISAFloatingButton {
     const menu = document.createElement("div");
     menu.className = "lisa-action-menu";
     menu.innerHTML = `
+      <div class="lisa-menu-item" data-action="save-md">📋 Save as Markdown</div>
       <div class="lisa-menu-item" data-action="save-json">📄 Save Raw JSON</div>
       <div class="lisa-menu-item" data-action="save-lisav">📝 Save LISA-Verbatim</div>
       
@@ -377,7 +378,8 @@ class LISAFloatingButton {
     menu.addEventListener("click", async (e) => {
       const action = e.target.dataset?.action;
       menu.remove();
-      if (action === "save-json") this.saveConversation();
+      if (action === "save-md") this.saveAsMarkdown();
+      else if (action === "save-json") this.saveConversation();
       else if (action === "save-lisav") this.saveLisaV();
     });
     
@@ -393,6 +395,89 @@ class LISAFloatingButton {
   }
 
 
+  async saveAsMarkdown() {
+    try {
+      const limitCheck = await this.checkFloatingLimit('md');
+      if (!limitCheck.allowed) {
+        this.showToast(limitCheck.message, true);
+        this.showUpgradePrompt();
+        return;
+      }
+      this.showToast("Exporting as Markdown...");
+
+      // Use API capture if available, else fall back to LisaVParser
+      let messages = null;
+
+      if (window.__LISA_CLAUDE_API_CAPTURE) {
+        try {
+          const isShared = window.location.pathname.startsWith('/share/');
+          const apiResult = isShared
+            ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
+            : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
+          if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+            messages = apiResult;
+          }
+        } catch (e) { /* fall through */ }
+      }
+
+      if (!messages && window.__LISA_CHATGPT_API_CAPTURE) {
+        try {
+          const isShared = window.location.pathname.startsWith('/share/');
+          const apiResult = isShared
+            ? await window.__LISA_CHATGPT_API_CAPTURE.extractSharedViaAPI()
+            : await window.__LISA_CHATGPT_API_CAPTURE.extractViaAPI();
+          if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+            messages = apiResult;
+          }
+        } catch (e) { /* fall through */ }
+      }
+
+      if (!messages) {
+        const parser = new LisaVParser();
+        await parser.extractConversation();
+        await parser.finalize();
+        messages = parser.toMessages();
+      }
+
+      if (!messages || !messages.messages || messages.messages.length === 0) {
+        this.showToast("❌ No messages found", true);
+        return;
+      }
+
+      // Build clean markdown
+      const title = messages.title || document.title || 'Conversation';
+      const platform = messages.platform || 'AI';
+      const date = new Date().toISOString().split('T')[0];
+      let md = `# ${title}\n`;
+      md += `> ${platform} conversation — exported ${date}\n\n---\n\n`;
+
+      for (const msg of messages.messages) {
+        const role = msg.role === 'user' ? 'User' : 'Assistant';
+        md += `### ${role}\n\n${msg.content || ''}\n\n`;
+      }
+
+      // Download as .md file
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const safeName = title.replace(/[^a-zA-Z0-9-_ ]/g, '').substring(0, 60).trim();
+      a.href = url;
+      a.download = `${safeName || 'conversation'}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      this.showToast("✅ Markdown saved!");
+      const remaining = await this.incrementFloatingLimit('md');
+      if (remaining !== undefined && remaining <= 2) {
+        setTimeout(() => this.showToast(`${remaining} Markdown saves remaining today`), 2000);
+      }
+    } catch (error) {
+      console.error('[LISA] Markdown save error:', error);
+      this.showToast('❌ Could not save', true);
+    }
+  }
   async saveLisaV() {
     try {
       // Check free tier limit

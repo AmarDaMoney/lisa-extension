@@ -468,6 +468,15 @@ class LISAFloatingButton {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
+      // Also save to library
+      try {
+        await chrome.runtime.sendMessage({
+          action: 'extractAndSave',
+          format: 'markdown',
+          data: messages
+        });
+      } catch (e) { console.debug('[LISA] Library save skipped:', e.message); }
+
       this.showToast("✅ Markdown saved!");
       const remaining = await this.incrementFloatingLimit('md');
       if (remaining !== undefined && remaining <= 2) {

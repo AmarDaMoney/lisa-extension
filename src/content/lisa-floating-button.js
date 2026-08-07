@@ -47,6 +47,12 @@ class LISAFloatingButton {
   async checkFloatingLimit(type) {
     // Premium users have no limits
     if (this.isPremium) return { allowed: true };
+    // Welcome pool: 100 free operations before daily limits kick in
+    try {
+      const poolResult = await chrome.storage.sync.get(['usageStats']);
+      const pool = poolResult.usageStats?.lifetimeFreePool ?? 0;
+      if (pool > 0) return { allowed: true, remaining: pool, pool: true };
+    } catch (e) { /* fall through to daily limits */ }
     // PAYG credit check
     try {
       const token = await new Promise((resolve) => {
@@ -113,7 +119,8 @@ class LISAFloatingButton {
         await chrome.storage.sync.set({ 
           [dateKey]: today,
           floating_lisav_today: 0,
-          floating_rawjson_today: 0
+          floating_rawjson_today: 0,
+          floating_md_today: 0
         });
         return { allowed: true, remaining: 5 };
       }

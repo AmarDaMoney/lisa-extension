@@ -456,28 +456,19 @@ class LISAFloatingButton {
         md += `### ${role}\n\n${msg.content || ''}\n\n`;
       }
 
-      // Download as .md file
-      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const safeName = title.replace(/[^a-zA-Z0-9-_ ]/g, '').substring(0, 60).trim();
-      a.href = url;
-      a.download = `${safeName || 'conversation'}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Save to library
+      const response = await chrome.runtime.sendMessage({
+        action: 'extractAndSave',
+        format: 'markdown',
+        data: messages
+      });
 
-      // Also save to library
-      try {
-        await chrome.runtime.sendMessage({
-          action: 'extractAndSave',
-          format: 'markdown',
-          data: messages
-        });
-      } catch (e) { console.debug('[LISA] Library save skipped:', e.message); }
-
-      this.showToast("✅ Markdown saved!");
+      if (response && response.success) {
+        this.showToast("✅ Markdown saved to library!");
+      } else {
+        this.showToast('❌ ' + (response?.error || 'Save failed'), true);
+        return;
+      }
       const remaining = await this.incrementFloatingLimit('md');
       if (remaining !== undefined && remaining <= 2) {
         setTimeout(() => this.showToast(`${remaining} Markdown saves remaining today`), 2000);

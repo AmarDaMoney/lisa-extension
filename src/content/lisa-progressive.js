@@ -389,6 +389,43 @@ class LisaProgressiveCapture {
     const files = msg.files || [{ filename: msg.filename, content: msg.content }];
     const mimeType = msg.mimeType || 'text/markdown';
 
+    // ChatGPT: clipboard fallback for non-user-gesture injects (rebirth auto-inject)
+    // Manual library inject has user gesture context and works via file input
+    const isChatGPTHost = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
+    if (isChatGPTHost && msg._autoInject) {
+      const textContent = msg.content || (files[0] && files[0].content) || '';
+      if (textContent) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = textContent;
+          ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+          const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
+          if (editor) editor.focus();
+          const toast = document.createElement('div');
+          toast.id = 'lisa-paste-prompt';
+          Object.assign(toast.style, {
+            position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: '100001', background: 'rgba(15,15,20,0.95)', color: '#fbbf24',
+            padding: '14px 24px', borderRadius: '10px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: '14px', fontWeight: '500',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            border: '1px solid rgba(251,191,36,0.3)'
+          });
+          toast.textContent = '\u{1F4CB} Handoff copied \u2014 press Ctrl+V (Cmd+V) to paste';
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 8000);
+          return { success: true, method: 'clipboard', count: 1 };
+        } catch (e) {
+          console.warn('[LISA] ChatGPT clipboard fallback failed:', e);
+        }
+      }
+    }
+
     // Create File objects
     const fileObjects = files.map(f => {
       const blob = new Blob([f.content], { type: mimeType });

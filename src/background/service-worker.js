@@ -1360,7 +1360,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               action: 'injectFileAttachment',
               filename: pending.filename,
               content: pending.mdContent,
-              mimeType: 'text/markdown'
+              mimeType: 'text/markdown',
+              _autoInject: true
             }, 15000);
             console.log('[LISA Phoenix] Handoff injected into tab ' + tabId + ' (attempt ' + attempt + ')');
             break;

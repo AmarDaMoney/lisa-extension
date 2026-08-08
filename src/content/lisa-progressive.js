@@ -401,16 +401,24 @@ class LisaProgressiveCapture {
     let fileInput = document.querySelector('input[type="file"]');
 
     if (!fileInput && isChatGPT) {
-      // Try to spawn the file input by clicking the attach button
-      const attachBtn = document.querySelector('button[aria-label*="Attach"]')
-        || document.querySelector('button[data-testid="composer-attach-button"]')
-        || document.querySelector('[class*="attach"]')
-        || [...document.querySelectorAll('button')].find(b => b.textContent.includes('📎') || b.querySelector('svg path[d*="M21.44"]'));
-      if (attachBtn) {
-        attachBtn.click();
-        // Wait for the file input to appear
-        await new Promise(r => setTimeout(r, 300));
+      // ChatGPT: click the + button to open menu, then click "Files" to spawn file input
+      const plusBtn = document.querySelector('button[data-testid="composer-plus-btn"]')
+        || document.querySelector('button[aria-label*="Add files"]');
+      if (plusBtn) {
+        plusBtn.click();
+        await new Promise(r => setTimeout(r, 400));
+        // Click the "Files" menu item to activate the file upload input
+        const menuItems = document.querySelectorAll('[role="menuitem"], button');
+        const filesItem = [...menuItems].find(el => el.textContent.trim() === 'Files' || el.textContent.trim() === 'Upload file');
+        if (filesItem) {
+          filesItem.click();
+          await new Promise(r => setTimeout(r, 400));
+        }
         fileInput = document.querySelector('input[type="file"]');
+        // If still no file input, close the menu by pressing Escape
+        if (!fileInput) {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        }
       }
     }
 

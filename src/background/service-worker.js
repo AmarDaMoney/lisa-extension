@@ -239,6 +239,52 @@ class LISACompressor {
     return memory;
   }
 
+  // Artifact classifier — detect code block type from language hint + content
+  classifyArtifact(lang, content) {
+    lang = (lang || '').toLowerCase().trim();
+    const c = (content || '').trim();
+    // Shell commands
+    if (lang === 'bash' || lang === 'sh' || lang === 'shell' || lang === 'zsh') {
+      if (/^(git |npm |pip |cd |mkdir |rm |cp |mv |chmod |curl |wget |docker )/.test(c)) return 'command';
+      if (/^(sed |grep |cat |head |tail |wc |find |awk )/.test(c)) return 'command';
+      if (/^cat\s*>/.test(c) || /<<\s*'?[A-Z]+/.test(c)) return 'script';
+      return 'command';
+    }
+    // Config files
+    if (lang === 'json' || lang === 'yaml' || lang === 'yml' || lang === 'toml' || lang === 'ini' || lang === 'env') return 'config';
+    if (/^{/.test(c) && /"[^"]+"\s*:/.test(c) && !lang) return 'config';
+    // Output/logs
+    if (!lang && (/^(Match count|Syntax OK|✅|❌|Total:|Error:|Warning:)/m.test(c) || /^\s*\d+[\s:]/m.test(c))) return 'output';
+    // Diffs/patches
+    if (lang === 'diff' || lang === 'patch' || /^[-+]{3}\s/.test(c) || /^@@\s/.test(c)) return 'patch';
+    // SQL
+    if (lang === 'sql' || /^(SELECT|INSERT|CREATE|ALTER|DROP|UPDATE)\s/i.test(c)) return 'query';
+    // CSS
+    if (lang === 'css' || lang === 'scss' || lang === 'less') return 'style';
+    // HTML/markup
+    if (lang === 'html' || lang === 'xml' || lang === 'svg') return 'markup';
+    // Code (general)
+    if (lang === 'javascript' || lang === 'js' || lang === 'typescript' || lang === 'ts' ||
+        lang === 'python' || lang === 'py' || lang === 'python3' || lang === 'java' ||
+        lang === 'c' || lang === 'cpp' || lang === 'rust' || lang === 'go') return 'code';
+    // Infer from content if no language tag
+    if (!lang) {
+      if (/^(function |const |let |var |class |import |export |async |def |if \(|for \()/m.test(c)) return 'code';
+      if (/^\$\s/.test(c)) return 'command';
+    }
+    return lang ? 'code' : 'text';
+  }
+
+  // Stable message ID — deterministic short hash from content + index
+  messageId(text, index) {
+    const input = (index || 0) + ':' + (text || '').substring(0, 200);
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+    }
+    return 'msg-' + (hash >>> 0).toString(36).padStart(6, '0');
+  }
+
   // Density scorer for adaptive rebirth mode
   // Returns numeric score: >= 5 means high-density (preserve verbatim)
   scoreDensity(text) {
@@ -908,15 +954,25 @@ function generateContinuationHandoff(data, platform, mode) {
 
       if (isHighDensity[i]) {
         // Verbatim: full text preserved
-        recentContent += '### ' + role + ' [turn ' + (i + 1) + ', verbatim]\n' + text + '\n\n';
+        recentContent += '### ' + role + ' [turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', verbatim]\n' + text + '\n\n';
       } else {
         // Semantic: summarized with metadata
         const summary = compressor.summarize(text);
         const tokens = compressor.tokenize(text);
-        let line = '**[Turn ' + (i + 1) + ', ' + role + ', semantic]** ' + (summary || '(short exchange)');
+        let line = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', semantic]** ' + (summary || '(short exchange)');
         if (tokens.entities && tokens.entities.length > 0) {
           const allVals = tokens.entities.flatMap(e => e.values || []);
           if (allVals.length > 0) line += ' _[entities: ' + allVals.slice(0, 5).join(', ') + ']_';
+        }
+        // Classify any code blocks in this turn
+        const codeBlocks = text.match(/```(\w*)\n([\s\S]*?)```/g) || [];
+        if (codeBlocks.length > 0) {
+          const types = codeBlocks.map(b => {
+            const m = b.match(/```(\w*)\n([\s\S]*?)```/);
+            return compressor.classifyArtifact(m[1] || '', m[2] || '');
+          });
+          const unique = [...new Set(types)];
+          line += ' _[artifacts: ' + unique.join(', ') + ']_';
         }
         recentContent += line + '\n\n';
       }

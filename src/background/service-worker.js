@@ -158,6 +158,19 @@ class LISACompressor {
         const trimmed = line.trim();
         if (!trimmed || trimmed.length < 10) continue;
 
+        // Skip code-like lines (variable assignments, regex, function calls, syntax)
+        if (/^(?:const |let |var |if \(|for \(|else |return |function |async |await |new |import |export |class |try |catch )/.test(trimmed)) continue;
+        if (/^(?:\/\/|\/\*|\*|#!|<!--)/.test(trimmed)) continue;
+        if (/[=!]=|=>|\.(?:test|match|replace|forEach|map|filter|push|slice|join|trim|split)\(/.test(trimmed)) continue;
+        if (/^['"`]|^\{|^\[|^\(|^<[a-z]|^\$\(/.test(trimmed)) continue;
+        if (/(?:getElementById|querySelector|addEventListener|console\.|chrome\.|window\.|document\.)/.test(trimmed)) continue;
+        if (/^(?:old|new|count|path|result|content|data|payload|response)\d?\s*[=+]/.test(trimmed)) continue;
+        if (/^\w+Block\s*\+=|^\w+Content\s*\+=|^\w+Summary\s*\+=/.test(trimmed)) continue;
+        // Skip conversational openers in assistant text
+        if (/^(?:Wait|Actually|Hmm|Oh|Ha|Good|Now|Let me|Here's|Found|Right)[\s—\-,]/.test(trimmed) && trimmed.length < 80) continue;
+        if (/^(?:Command #|sed -n|grep -n|cat >|python3|node -c)/.test(trimmed)) continue;
+        if (/^action:\s*'/.test(trimmed)) continue;
+
         // Resolved: checkmarks, "done", "fixed", "shipped", "completed"
         if (/^(?:[\u2713\u2714\u2705]|\*\*?\[x\]|\-\s*\[x\]|done:|fixed:|shipped:|completed:|resolved:)/i.test(trimmed) ||
             /\b(?:successfully|shipped|merged|deployed|pushed|committed)\b/i.test(trimmed) && trimmed.length < 120) {
@@ -758,7 +771,7 @@ function generateContinuationHandoff(data, platform, mode) {
         const codeLen = (t.match(/```[\s\S]*?```/g) || []).reduce((a, b) => a + b.length, 0);
         if (codeLen > t.length * 0.5) continue;
         const s = ffCompressor.summarize(t);
-        if (s && s.length > 20 && !/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b/i.test(s)) ffSnapshots.unshift(s);
+        if (s && s.length > 20 && !/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b|^(?:Wait|Actually|Hmm|Found it|Let me|Good —|Now |The |Command #)/i.test(s)) ffSnapshots.unshift(s);
       }
     }
     if (ffSnapshots.length > 0) {
@@ -898,7 +911,7 @@ function generateContinuationHandoff(data, platform, mode) {
         const codeLen = (text.match(/```[\s\S]*?```/g) || []).reduce((a, b) => a + b.length, 0);
         if (codeLen > text.length * 0.5) continue;
         const summary = compressor.summarize(text);
-        if (summary && summary.length > 20 && !/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b/i.test(summary)) lastHighAssistant.unshift(summary);
+        if (summary && summary.length > 20 && !/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b|^(?:Wait|Actually|Hmm|Found it|Let me|Good —|Now |The |Command #)/i.test(summary)) lastHighAssistant.unshift(summary);
       }
     }
     if (lastHighAssistant.length > 0) {

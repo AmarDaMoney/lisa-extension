@@ -396,18 +396,37 @@ class LisaProgressiveCapture {
     });
 
     // Strategy 1: Find the platform's file input and set files
-    const fileInput = document.querySelector('input[type="file"]');
+    // ChatGPT creates input[type=file] on-demand — click the attach button first
+    const isChatGPT = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
+    let fileInput = document.querySelector('input[type="file"]');
+
+    if (!fileInput && isChatGPT) {
+      // Try to spawn the file input by clicking the attach button
+      const attachBtn = document.querySelector('button[aria-label*="Attach"]')
+        || document.querySelector('button[data-testid="composer-attach-button"]')
+        || document.querySelector('[class*="attach"]')
+        || [...document.querySelectorAll('button')].find(b => b.textContent.includes('📎') || b.querySelector('svg path[d*="M21.44"]'));
+      if (attachBtn) {
+        attachBtn.click();
+        // Wait for the file input to appear
+        await new Promise(r => setTimeout(r, 300));
+        fileInput = document.querySelector('input[type="file"]');
+      }
+    }
+
     if (fileInput) {
       const dt = new DataTransfer();
       fileObjects.forEach(f => dt.items.add(f));
       fileInput.files = dt.files;
       fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      // ChatGPT may also need an input event
+      fileInput.dispatchEvent(new Event('input', { bubbles: true }));
       return { success: true, method: 'fileInput', count: fileObjects.length };
     }
 
     // Strategy 2: Simulate drag-and-drop on the chat input area
     // Skip on platforms that drop synthetic events (isTrusted guard)
-    const noSyntheticDrop = /gemini\.google/.test(window.location.hostname);
+    const noSyntheticDrop = /gemini\.google|chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
     const dropTargets = [
       'div[contenteditable="true"]',
       'textarea',

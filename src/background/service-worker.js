@@ -388,7 +388,11 @@ class LISACompressor {
     text = text.replace(/filecite\w+/g, '');
     // Strip code blocks to prevent code pollution in summaries
     text = text.replace(/```(?:bash|python3?|javascript|js|json|css|html)?[\s\S]*?```/g, ' ');
-    text = text.replace(/`[^`]+`/g, ' ');
+    // Unwrap inline spans - keep the text, drop the delimiters.
+    // These carry the technical nouns of the sentence (identifiers,
+    // filenames, field names); deleting them left fluent summaries
+    // about nothing.
+    text = text.replace(/`([^`]+)`/g, '$1');
     // Strip orphaned language identifiers left after code block removal
     text = text.replace(/\b(bash|python3?|javascript|js|json)(grep|sed|cat|node|git|head|tail)/gi, '$2');
     // Strip console/log output noise

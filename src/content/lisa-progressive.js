@@ -396,13 +396,22 @@ class LisaProgressiveCapture {
       const textContent = msg.content || (files[0] && files[0].content) || '';
       if (textContent) {
         try {
-          const ta = document.createElement('textarea');
-          ta.value = textContent;
-          ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          ta.remove();
+          // Use navigator.clipboard (reliable) with textarea fallback
+          let copied = false;
+          try {
+            await navigator.clipboard.writeText(textContent);
+            copied = true;
+          } catch (navErr) {
+            const ta = document.createElement('textarea');
+            ta.value = textContent;
+            ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            copied = document.execCommand('copy');
+            ta.remove();
+          }
+          if (!copied) throw new Error('Clipboard write failed');
           const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
           if (editor) editor.focus();
           const toast = document.createElement('div');
@@ -437,34 +446,13 @@ class LisaProgressiveCapture {
     const isChatGPT = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
     let fileInput = document.querySelector('input[type="file"]');
 
-    if (!fileInput && isChatGPT) {
-      // ChatGPT: click the + button to open menu, then click "Files" to spawn file input
-      const plusBtn = document.querySelector('button[data-testid="composer-plus-btn"]')
-        || document.querySelector('button[aria-label*="Add files"]');
-      if (plusBtn) {
-        plusBtn.click();
-        await new Promise(r => setTimeout(r, 400));
-        // Click the "Files" menu item to activate the file upload input
-        const menuItems = document.querySelectorAll('[role="menuitem"], button');
-        const filesItem = [...menuItems].find(el => el.textContent.trim() === 'Files' || el.textContent.trim() === 'Upload file');
-        if (filesItem) {
-          filesItem.click();
-          await new Promise(r => setTimeout(r, 400));
-        }
-        fileInput = document.querySelector('input[type="file"]');
-        // If still no file input, close the menu by pressing Escape
-        if (!fileInput) {
-          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        }
-      }
-    }
-
-    if (fileInput) {
+    if (fileInput && !isChatGPT) {
+      // fileInput.files assignment works on most platforms but NOT ChatGPT
+      // (React ignores synthetic .files changes — silently fails)
       const dt = new DataTransfer();
       fileObjects.forEach(f => dt.items.add(f));
       fileInput.files = dt.files;
       fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-      // ChatGPT may also need an input event
       fileInput.dispatchEvent(new Event('input', { bubbles: true }));
       return { success: true, method: 'fileInput', count: fileObjects.length };
     }
@@ -508,13 +496,21 @@ class LisaProgressiveCapture {
       try {
         // Use textarea trick — navigator.clipboard needs document focus
         // which the popup may steal
-        const ta = document.createElement('textarea');
-        ta.value = textContent;
-        ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        ta.remove();
+        // Try navigator.clipboard first (most reliable), fall back to execCommand
+        let clipOk = false;
+        try {
+          await navigator.clipboard.writeText(textContent);
+          clipOk = true;
+        } catch (clipErr) {
+          const ta = document.createElement('textarea');
+          ta.value = textContent;
+          ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          clipOk = document.execCommand('copy');
+          ta.remove();
+        }
         // Focus the composer so user can paste immediately
         const editor = document.querySelector('div[contenteditable="true"]');
         if (editor) editor.focus();

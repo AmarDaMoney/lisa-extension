@@ -446,7 +446,7 @@ class LisaProgressiveCapture {
     const isChatGPT = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
     let fileInput = document.querySelector('input[type="file"]');
 
-    if (fileInput && !isChatGPT) {
+    if (fileInput && !(isChatGPT && msg._autoInject)) {
       // fileInput.files assignment works on most platforms but NOT ChatGPT
       // (React ignores synthetic .files changes — silently fails)
       const dt = new DataTransfer();

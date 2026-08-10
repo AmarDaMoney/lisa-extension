@@ -795,33 +795,44 @@ function generateContinuationHandoff(data, platform, mode) {
     const ffWMR = ffCompressor.extractWorkingMemory(messages);
     const ffHasWMR = ffWMR.objectives.length > 0 || ffWMR.resolved.length > 0
       || ffWMR.blocked.length > 0 || ffWMR.next.length > 0 || ffWMR.decisions.length > 0;
-    if (ffHasWMR) {
+    // Always render. Mirrors the adaptive path; keeps both in step.
+    if (true || ffHasWMR) {
       earlySummary += '## ACTIVE WORKING MEMORY\n\n';
+      earlySummary += '### Current Objective\n';
       if (ffWMR.objectives.length > 0) {
-        earlySummary += '### Current Objective\n';
         ffWMR.objectives.forEach(o => { earlySummary += '- ' + o + '\n'; });
-        earlySummary += '\n';
+      } else {
+        earlySummary += '_None detected in recent window._\n';
       }
+      earlySummary += '\n';
+      earlySummary += '### Resolved\n';
       if (ffWMR.resolved.length > 0) {
-        earlySummary += '### Resolved\n';
-        ffWMR.resolved.forEach(r => { earlySummary += '\u2713 ' + r + '\n'; });
-        earlySummary += '\n';
+        ffWMR.resolved.forEach(r => { earlySummary += '\u2713 ' + r.text + '\n'; });
+      } else {
+        earlySummary += '_None detected in recent window._\n';
       }
+      earlySummary += '\n';
+      earlySummary += '### Blocked\n';
       if (ffWMR.blocked.length > 0) {
-        earlySummary += '### Blocked\n';
-        ffWMR.blocked.forEach(b => { earlySummary += '\u26a0 ' + b + '\n'; });
-        earlySummary += '\n';
+        ffWMR.blocked.forEach(b => { earlySummary += '\u26a0 ' + b.text + '\n'; });
+      } else {
+        earlySummary += '_None detected in recent window._\n';
       }
+      earlySummary += '\n';
+      earlySummary += '### Next\n';
       if (ffWMR.next.length > 0) {
-        earlySummary += '### Next\n';
-        ffWMR.next.forEach(n => { earlySummary += '- ' + n + '\n'; });
-        earlySummary += '\n';
+        ffWMR.next.forEach(n => { earlySummary += '- ' + n.text + '\n'; });
+      } else {
+        earlySummary += '_None detected in recent window._\n';
       }
+      earlySummary += '\n';
+      earlySummary += '### Decisions\n';
       if (ffWMR.decisions.length > 0) {
-        earlySummary += '### Decisions\n';
-        ffWMR.decisions.forEach(d => { earlySummary += '\u2022 ' + d + '\n'; });
-        earlySummary += '\n';
+        ffWMR.decisions.forEach(d => { earlySummary += '\u2022 ' + d.text + '\n'; });
+      } else {
+        earlySummary += '_None detected in recent window._\n';
       }
+      earlySummary += '\n';
     }
 
     recentContent = '## FULL CONVERSATION (' + messages.length + ' messages \u2014 verbatim)\n\n';

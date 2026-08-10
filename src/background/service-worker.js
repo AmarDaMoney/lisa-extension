@@ -154,7 +154,8 @@ class LISACompressor {
       if (!text || text.length < 15) continue;
       const lines = text.split('\n');
 
-      for (const line of lines) {
+      for (let li = 0; li < lines.length; li++) {
+        const line = lines[li];
         const trimmed = line.trim();
         if (!trimmed || trimmed.length < 10) continue;
 
@@ -173,7 +174,7 @@ class LISACompressor {
 
         // Resolved: checkmarks, "done", "fixed", "shipped", "completed"
         if (/^(?:[\u2713\u2714\u2705]|\*\*?\[x\]|\-\s*\[x\]|done:|fixed:|shipped:|completed:|resolved:)/i.test(trimmed) ||
-            /\b(?:successfully|shipped|merged|deployed|pushed|committed)\b/i.test(trimmed) && trimmed.length < 120) {
+            (/\b(?:successfully|shipped|merged|deployed|pushed|committed)\b/i.test(trimmed) && trimmed.length < 120)) {
           const clean = trimmed.replace(/^[\u2713\u2714\u2705\-\*\[x\]\s:]+/i, '').trim();
           if (clean.length > 8 && clean.length < 120 && !seen.resolved.has(clean.substring(0, 40))) {
             seen.resolved.add(clean.substring(0, 40));
@@ -187,10 +188,9 @@ class LISACompressor {
           if (clean.length > 12 && !seen.decisions.has(clean.substring(0, 40))) {
             seen.decisions.add(clean.substring(0, 40));
             // Try to extract rationale from next line
-            const lineIdx = lines.indexOf(line);
             let rationale = '';
-            if (lineIdx < lines.length - 1) {
-              const nextLine = lines[lineIdx + 1].trim();
+            if (li < lines.length - 1) {
+              const nextLine = lines[li + 1].trim();
               if (/^(?:because|since|the reason|that way|so that|this (?:means|ensures|prevents|avoids))/i.test(nextLine)) {
                 rationale = nextLine;
               }
@@ -210,7 +210,7 @@ class LISACompressor {
         }
         // Next actions: "next:", "todo:", "still need", "for next session", numbered future items
         else if (/^(?:next:|todo:|\-\s*\[ \]|action:|still need|for next session|on deck|still to do)/i.test(trimmed) ||
-                 /\b(?:next session|next step|still need to|remaining:|upcoming:)\b/i.test(trimmed) && trimmed.length < 120) {
+                 (/\b(?:next session|next step|still need to|remaining:|upcoming:)\b/i.test(trimmed) && trimmed.length < 120)) {
           const clean = trimmed.replace(/^[\-\*\s\[\]]+(?:next:|todo:|action:)?/i, '').trim();
           if (clean.length > 8 && clean.length < 120 && !seen.next.has(clean.substring(0, 40))
               && !/^[A-Z][a-z]+(\s+[A-Z][a-z]+){0,4}$/.test(clean)) {
@@ -246,7 +246,7 @@ class LISACompressor {
     memory.objectives = memory.objectives.slice(0, 3);
     memory.resolved = memory.resolved.slice(-10);
     memory.blocked = memory.blocked.slice(-5);
-    memory.next = memory.next.slice(0, 8);
+    memory.next = memory.next.slice(-8);
     memory.decisions = memory.decisions.slice(-8);
 
     return memory;

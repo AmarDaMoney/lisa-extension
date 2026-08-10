@@ -148,6 +148,20 @@ class LISACompressor {
     };
     const seen = { objectives: new Set(), resolved: new Set(), blocked: new Set(), next: new Set(), decisions: new Set() };
 
+    // Shape guard: compressed snapshots store `summary`, not `content`.
+    // Without this, every message yields '' and the register returns
+    // silently empty - indistinguishable from an uneventful session.
+    const usable = messages.filter(m => (m.content || m.text || m.v || '').length >= 15).length;
+    if (messages.length > 0 && usable === 0) {
+      const note = 'Unavailable - snapshot is compressed; original text not retained.';
+      memory.objectives.push(note);
+      memory.resolved.push({ text: note, source: 'guard' });
+      memory.blocked.push({ text: note, source: 'guard' });
+      memory.next.push({ text: note, source: 'guard' });
+      memory.decisions.push({ text: note, source: 'guard' });
+      return memory;
+    }
+
     // Scan all messages for cognitive state signals
     for (let i = 0; i < messages.length; i++) {
       const text = messages[i].content || messages[i].text || messages[i].v || '';

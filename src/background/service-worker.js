@@ -941,33 +941,45 @@ function generateContinuationHandoff(data, platform, mode) {
     let wmrBlock = '';
     const hasWMR = workingMemory.objectives.length > 0 || workingMemory.resolved.length > 0
       || workingMemory.blocked.length > 0 || workingMemory.next.length > 0 || workingMemory.decisions.length > 0;
-    if (hasWMR) {
+    // Always render the register. A silently absent block is
+    // indistinguishable from a session with nothing to report.
+    if (true || hasWMR) {
       wmrBlock = '## ACTIVE WORKING MEMORY\n\n';
+      wmrBlock += '### Current Objective\n';
       if (workingMemory.objectives.length > 0) {
-        wmrBlock += '### Current Objective\n';
         workingMemory.objectives.forEach(o => { wmrBlock += '- ' + o + '\n'; });
-        wmrBlock += '\n';
+      } else {
+        wmrBlock += '_None detected in recent window._\n';
       }
+      wmrBlock += '\n';
+      wmrBlock += '### Resolved\n';
       if (workingMemory.resolved.length > 0) {
-        wmrBlock += '### Resolved\n';
         workingMemory.resolved.forEach(r => { wmrBlock += '\u2713 ' + r.text + '\n'; });
-        wmrBlock += '\n';
+      } else {
+        wmrBlock += '_None detected in recent window._\n';
       }
+      wmrBlock += '\n';
+      wmrBlock += '### Blocked\n';
       if (workingMemory.blocked.length > 0) {
-        wmrBlock += '### Blocked\n';
         workingMemory.blocked.forEach(b => { wmrBlock += '\u26a0 ' + b.text + '\n'; });
-        wmrBlock += '\n';
+      } else {
+        wmrBlock += '_None detected in recent window._\n';
       }
+      wmrBlock += '\n';
+      wmrBlock += '### Next\n';
       if (workingMemory.next.length > 0) {
-        wmrBlock += '### Next\n';
         workingMemory.next.forEach(n => { wmrBlock += '- ' + n.text + '\n'; });
-        wmrBlock += '\n';
+      } else {
+        wmrBlock += '_None detected in recent window._\n';
       }
+      wmrBlock += '\n';
+      wmrBlock += '### Decisions\n';
       if (workingMemory.decisions.length > 0) {
-        wmrBlock += '### Decisions\n';
         workingMemory.decisions.forEach(d => { wmrBlock += '\u2022 ' + d.text + '\n'; });
-        wmrBlock += '\n';
+      } else {
+        wmrBlock += '_None detected in recent window._\n';
       }
+      wmrBlock += '\n';
     }
 
     // Step 7: Build mixed-fidelity conversation body

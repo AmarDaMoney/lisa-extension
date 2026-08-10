@@ -153,41 +153,48 @@ class LISACompressor {
       const text = messages[i].content || messages[i].text || messages[i].v || '';
       if (!text || text.length < 15) continue;
       const lines = text.split('\n');
+      const isRecent = i >= Math.floor(messages.length * 0.7);
+      let inFence = false;
 
       for (let li = 0; li < lines.length; li++) {
-        const line = lines[li];
-        const trimmed = line.trim();
+        const trimmed = lines[li].trim();
+
+        // Fence tracking: never scan inside code blocks
+        if (/^```/.test(trimmed)) { inFence = !inFence; continue; }
+        if (inFence) continue;
         if (!trimmed || trimmed.length < 10) continue;
 
-        // Skip code-like lines (variable assignments, regex, function calls, syntax)
-        if (/^(?:const |let |var |if \(|for \(|else |return |function |async |await |new |import |export |class |try |catch )/.test(trimmed)) continue;
-        if (/^(?:\/\/|\/\*|\*|#!|<!--)/.test(trimmed)) continue;
-        if (/[=!]=|=>|\.(?:test|match|replace|forEach|map|filter|push|slice|join|trim|split)\(/.test(trimmed)) continue;
-        if (/^['"`]|^\{|^\[|^\(|^<[a-z]|^\$\(/.test(trimmed)) continue;
-        if (/(?:getElementById|querySelector|addEventListener|console\.|chrome\.|window\.|document\.)/.test(trimmed)) continue;
-        if (/^(?:old|new|count|path|result|content|data|payload|response)\d?\s*[=+]/.test(trimmed)) continue;
-        if (/^\w+Block\s*\+=|^\w+Content\s*\+=|^\w+Summary\s*\+=/.test(trimmed)) continue;
-        // Skip conversational openers in assistant text
-        if (/^(?:Wait|Actually|Hmm|Oh|Ha|Good|Now|Let me|Here's|Found|Right)[\s—\-,]/.test(trimmed) && trimmed.length < 80) continue;
-        if (/^(?:Command #|sed -n|grep -n|cat >|python3|node -c)/.test(trimmed)) continue;
-        if (/^action:\s*'/.test(trimmed)) continue;
+        // POSITIVE RULE: scan only lines the author marked as structure
+        const bulletMatch = /^(?:[-*\u2022\u2192\u2713\u2714\u2705\u26a0]|\[[ xX]\]|\d+\.)\s+/.exec(trimmed);
+        const labelMatch = bulletMatch ? null
+          : /^(?:blocked|todo|next|issue|waiting on|decision|fixed|done|resolved|shipped)\s*:/i.exec(trimmed);
+        if (!bulletMatch && !labelMatch) continue;
 
-        // Resolved: checkmarks, "done", "fixed", "shipped", "completed"
-        if (/^(?:[\u2713\u2714\u2705]|\*\*?\[x\]|\-\s*\[x\]|done:|fixed:|shipped:|completed:|resolved:)/i.test(trimmed) ||
-            (/\b(?:successfully|shipped|merged|deployed|pushed|committed)\b/i.test(trimmed) && trimmed.length < 120)) {
-          const clean = trimmed.replace(/^[\u2713\u2714\u2705\-\*\[x\]\s:]+/i, '').trim();
-          if (clean.length > 8 && clean.length < 120 && !seen.resolved.has(clean.substring(0, 40))) {
-            seen.resolved.add(clean.substring(0, 40));
-            memory.resolved.push(clean);
+        const marker = (bulletMatch || labelMatch)[0].toLowerCase();
+        const body = trimmed.slice(marker.length).trim();
+        if (body.length < 8 || body.length > 200) continue;
+        const key = body.substring(0, 40).toLowerCase();
+
+        // Resolved: completion markers, all messages
+        if (/^[\u2713\u2714\u2705]/.test(marker) || /^\[[x]\]/.test(marker)
+            || /^(?:fixed|done|resolved|shipped)\s*:/.test(marker)) {
+          if (!seen.resolved.has(key)) {
+            seen.resolved.add(key);
+            memory.resolved.push({ text: body, source: 'extracted' });
           }
         }
-        // Decisions: "we'll use", "let's replace", "decided", "agreed", "going with"
-        else if (/\b(?:we'?ll use|let'?s (?:replace|use|go with|keep|drop|add|build|make|switch)|decided to|agreed to|going with|the plan is|instead of .+ we)\b/i.test(trimmed) &&
-                 trimmed.length > 15 && trimmed.length < 200) {
-          const clean = trimmed.replace(/^[\-\*\s]+/, '').trim();
-          if (clean.length > 12 && !seen.decisions.has(clean.substring(0, 40))) {
-            seen.decisions.add(clean.substring(0, 40));
-            // Try to extract rationale from next line
+        // Blocked: recency-gated
+        else if (isRecent && (/^[\u26a0]/.test(marker) || /^(?:blocked|issue|waiting on)\s*:/.test(marker)
+                 || /\b(?:blocked|stuck|waiting on|failing|broken|not working)\b/i.test(body))) {
+          if (!seen.blocked.has(key)) {
+            seen.blocked.add(key);
+            memory.blocked.push({ text: body, source: 'extracted' });
+          }
+        }
+        // Decisions: all messages, strong signals only
+        else if (/^decision\s*:/.test(marker)
+                 || /\b(?:we'?ll use|let'?s (?:replace|use|go with|keep|drop|add|build|make|switch)|decided to|agreed to|going with|the plan is)\b/i.test(body)) {
+          if (!seen.decisions.has(key)) {
             let rationale = '';
             if (li < lines.length - 1) {
               const nextLine = lines[li + 1].trim();
@@ -195,32 +202,20 @@ class LISACompressor {
                 rationale = nextLine;
               }
             }
-            memory.decisions.push(rationale ? clean + ' — ' + rationale : clean);
+            seen.decisions.add(key);
+            memory.decisions.push({ text: rationale ? body + ' \u2014 ' + rationale : body, source: 'extracted' });
           }
         }
-        // Blocked: "blocked", "stuck", "waiting", "can't", "failing"
-        else if (/\b(?:blocked|stuck|waiting on|can'?t|failing|broken|not working|issue:|bug:)/i.test(trimmed) &&
-                 trimmed.length < 120 && !/\b(?:fixed|resolved|done)\b/i.test(trimmed) &&
-                 !/^(?:I'd be happy|I can't honestly|I don't have|I would need|I cannot)/i.test(trimmed)) {
-          const clean = trimmed.replace(/^[\-\*\s]+/, '').trim();
-          if (clean.length > 8 && !seen.blocked.has(clean.substring(0, 40))) {
-            seen.blocked.add(clean.substring(0, 40));
-            memory.blocked.push(clean);
-          }
-        }
-        // Next actions: "next:", "todo:", "still need", "for next session", numbered future items
-        else if (/^(?:next:|todo:|\-\s*\[ \]|action:|still need|for next session|on deck|still to do)/i.test(trimmed) ||
-                 (/\b(?:next session|next step|still need to|remaining:|upcoming:)\b/i.test(trimmed) && trimmed.length < 120)) {
-          const clean = trimmed.replace(/^[\-\*\s\[\]]+(?:next:|todo:|action:)?/i, '').trim();
-          if (clean.length > 8 && clean.length < 120 && !seen.next.has(clean.substring(0, 40))
-              && !/^[A-Z][a-z]+(\s+[A-Z][a-z]+){0,4}$/.test(clean)) {
-            seen.next.add(clean.substring(0, 40));
-            memory.next.push(clean);
+        // Next: recency-gated
+        else if (isRecent && (/^(?:todo|next)\s*:/.test(marker) || /^\[ \]/.test(marker)
+                 || /\b(?:next session|next step|still need to|remaining|upcoming)\b/i.test(body))) {
+          if (!seen.next.has(key)) {
+            seen.next.add(key);
+            memory.next.push({ text: body, source: 'extracted' });
           }
         }
       }
     }
-
     // Extract current objective from last few user messages
     for (let i = messages.length - 1; i >= Math.max(0, messages.length - 10); i--) {
       if (messages[i].role !== 'user') continue;
@@ -239,8 +234,8 @@ class LISACompressor {
     }
 
     // Deduplicate: remove items from "next" that appear in "resolved"
-    const resolvedLower = new Set(memory.resolved.map(r => r.toLowerCase().substring(0, 30)));
-    memory.next = memory.next.filter(n => !resolvedLower.has(n.toLowerCase().substring(0, 30)));
+    const resolvedLower = new Set(memory.resolved.map(r => r.text.toLowerCase().substring(0, 30)));
+    memory.next = memory.next.filter(n => !resolvedLower.has(n.text.toLowerCase().substring(0, 30)));
 
     // Cap each category
     memory.objectives = memory.objectives.slice(0, 3);
@@ -935,22 +930,22 @@ function generateContinuationHandoff(data, platform, mode) {
       }
       if (workingMemory.resolved.length > 0) {
         wmrBlock += '### Resolved\n';
-        workingMemory.resolved.forEach(r => { wmrBlock += '\u2713 ' + r + '\n'; });
+        workingMemory.resolved.forEach(r => { wmrBlock += '\u2713 ' + r.text + '\n'; });
         wmrBlock += '\n';
       }
       if (workingMemory.blocked.length > 0) {
         wmrBlock += '### Blocked\n';
-        workingMemory.blocked.forEach(b => { wmrBlock += '\u26a0 ' + b + '\n'; });
+        workingMemory.blocked.forEach(b => { wmrBlock += '\u26a0 ' + b.text + '\n'; });
         wmrBlock += '\n';
       }
       if (workingMemory.next.length > 0) {
         wmrBlock += '### Next\n';
-        workingMemory.next.forEach(n => { wmrBlock += '- ' + n + '\n'; });
+        workingMemory.next.forEach(n => { wmrBlock += '- ' + n.text + '\n'; });
         wmrBlock += '\n';
       }
       if (workingMemory.decisions.length > 0) {
         wmrBlock += '### Decisions\n';
-        workingMemory.decisions.forEach(d => { wmrBlock += '\u2022 ' + d + '\n'; });
+        workingMemory.decisions.forEach(d => { wmrBlock += '\u2022 ' + d.text + '\n'; });
         wmrBlock += '\n';
       }
     }

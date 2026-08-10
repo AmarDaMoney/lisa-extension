@@ -916,11 +916,17 @@ function generateContinuationHandoff(data, platform, mode) {
     for (let i = messages.length - 1; i >= 0 && lastHighAssistant.length < 3; i--) {
       if (messages[i].role === 'assistant' && isHighDensity[i]) {
         const text = messages[i].content || messages[i].text || messages[i].v || '';
-        // Skip code-heavy turns — they produce garbled snapshots
-        const codeLen = (text.match(/```[\s\S]*?```/g) || []).reduce((a, b) => a + b.length, 0);
-        if (codeLen > text.length * 0.5) continue;
         const summary = compressor.summarize(text);
-        if (summary && summary.length > 20 && !/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b|^(?:Wait|Actually|Hmm|Found it|Let me|Good —|Now |The |Command #)/i.test(summary)) lastHighAssistant.unshift(summary);
+        if (!summary || summary.length <= 20) continue;
+        // Split on sentence ends, but not on dots inside identifiers
+        // (memory.next) or decimals. Requires whitespace + capital after.
+        const sentences = summary.split(/(?<=[.!?])\s+(?=[A-Z])/);
+        const kept = sentences.filter(sn => {
+          if (/\b(?:I|you|we|my|your|our|me|us)\b/i.test(sn)) return false;
+          if (/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b/i.test(sn)) return false;
+          return sn.trim().length > 15;
+        });
+        if (kept.length > 0) lastHighAssistant.unshift(kept.join(' ').trim());
       }
     }
     if (lastHighAssistant.length > 0) {

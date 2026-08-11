@@ -851,9 +851,7 @@ function generateContinuationHandoff(data, platform, mode) {
 
 
     // Working Memory Register for full fidelity
-    const ffWMR = ffCompressor.extractWorkingMemory(messages);
-    const ffHasWMR = ffWMR.objectives.length > 0 || ffWMR.resolved.length > 0
-      || ffWMR.blocked.length > 0 || ffWMR.next.length > 0 || ffWMR.decisions.length > 0;
+    const ffWMR = mergeAiWorkingMemory(ffCompressor.extractWorkingMemory(messages), data);
     // Always render. Mirrors the adaptive path; keeps both in step.
     if (true || ffHasWMR) {
       earlySummary += '## ACTIVE WORKING MEMORY\n\n';
@@ -1007,13 +1005,11 @@ function generateContinuationHandoff(data, platform, mode) {
     }
 
     // Step 6: Working Memory Register — cognitive state extraction
-    const workingMemory = compressor.extractWorkingMemory(messages);
+    const workingMemory = mergeAiWorkingMemory(compressor.extractWorkingMemory(messages), data);
     let wmrBlock = '';
-    const hasWMR = workingMemory.objectives.length > 0 || workingMemory.resolved.length > 0
-      || workingMemory.blocked.length > 0 || workingMemory.next.length > 0 || workingMemory.decisions.length > 0;
     // Always render the register. A silently absent block is
     // indistinguishable from a session with nothing to report.
-    if (true || hasWMR) {
+    {
       wmrBlock = '## ACTIVE WORKING MEMORY\n\n';
       wmrBlock += '### Current Objective\n';
       if (workingMemory.objectives.length > 0) {

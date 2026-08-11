@@ -80,6 +80,7 @@ function describeSnapshot(snapshot) {
 
   if (view.markdown) {
     out.text = view.markdown;
+    out.markdownOnly = view.markdown;
     out.source = 'markdown';
     return out;
   }

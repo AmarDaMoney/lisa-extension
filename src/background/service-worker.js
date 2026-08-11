@@ -308,7 +308,9 @@ class LISACompressor {
   }
 
   // Density scorer for adaptive rebirth mode
-  // Returns numeric score: >= 5 means high-density (preserve verbatim)
+  // Returns numeric score — higher means denser content. Used by the
+  // percentile split to rank turns against each other, not against a
+  // fixed threshold.
   scoreDensity(text) {
     if (!text || text.length < 10) return 0;
     let score = 0;
@@ -857,8 +859,9 @@ function generateContinuationHandoff(data, platform, mode) {
 
     // Working Memory Register for full fidelity
     const ffWMR = mergeAiWorkingMemory(ffCompressor.extractWorkingMemory(messages), data);
-    // Always render. Mirrors the adaptive path; keeps both in step.
-    if (true || ffHasWMR) {
+    // Always render the register — a silently absent block is
+    // indistinguishable from a session with nothing to report.
+    {
       earlySummary += '## ACTIVE WORKING MEMORY\n\n';
       earlySummary += '### Current Objective\n';
       if (ffWMR.objectives.length > 0) {

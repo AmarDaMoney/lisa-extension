@@ -240,15 +240,21 @@
 
       // ── Button handlers ──
       document.getElementById('lisa-phoenix-rebirth-btn').addEventListener('click', async () => {
-        const storage = await chrome.storage.sync.get(['userTier', 'rebirthCount', 'rebirthDate']);
+        const storage = await chrome.storage.sync.get(['userTier', 'usageStats', 'rebirthCount', 'rebirthDate']);
         const tier = storage.userTier || 'free';
+        const stats = storage.usageStats || {};
+        const pool = stats.lifetimeFreePool ?? 0;
         const today = new Date().toISOString().slice(0, 10);
         let count = (storage.rebirthDate === today) ? (storage.rebirthCount || 0) : 0;
 
-        if (tier === 'premium' || count < 5) {
-          // Increment daily count for free users
+        if (tier === 'premium' || pool > 0 || count < 5) {
           if (tier !== 'premium') {
-            await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
+            if (pool > 0) {
+              stats.lifetimeFreePool = pool - 1;
+              await chrome.storage.sync.set({ usageStats: stats });
+            } else {
+              await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
+            }
           }
           chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform, mode: rebirthMode });
           overlay.remove();
@@ -258,10 +264,10 @@
           const btn = document.getElementById('lisa-phoenix-rebirth-btn');
           btn.style.background = 'rgba(100,100,100,0.3)';
           btn.style.cursor = 'default';
-          btn.innerHTML = '\u{1F512} Daily limit reached (5/5)';
+          btn.innerHTML = '\u{1F512} Rebirth limit reached';
           const note = document.createElement('p');
           note.style.cssText = 'margin:8px 0 0;color:#fbbf24;font-size:12px;line-height:1.4;';
-          note.innerHTML = 'Free tier allows 5 rebirths per day. '
+          note.innerHTML = 'Welcome pool and daily rebirths used. '
             + '<a href="https://sat-chain.com" target="_blank" style="color:#fbbf24;text-decoration:underline;">Upgrade to Premium</a>'
             + ' for unlimited rebirths, or use the manual export below.';
           btn.parentNode.insertBefore(note, btn.nextSibling);
@@ -292,19 +298,26 @@
         xplatList.querySelectorAll('.lisa-xplat-opt').forEach(opt => {
           opt.addEventListener('click', async () => {
             const target = opt.dataset.platform;
-            const storage = await chrome.storage.sync.get(['userTier', 'rebirthCount', 'rebirthDate']);
+            const storage = await chrome.storage.sync.get(['userTier', 'usageStats', 'rebirthCount', 'rebirthDate']);
             const tier = storage.userTier || 'free';
+            const stats = storage.usageStats || {};
+            const pool = stats.lifetimeFreePool ?? 0;
             const today = new Date().toISOString().slice(0, 10);
             let count = (storage.rebirthDate === today) ? (storage.rebirthCount || 0) : 0;
-            if (tier === 'premium' || count < 5) {
+            if (tier === 'premium' || pool > 0 || count < 5) {
               if (tier !== 'premium') {
-                await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
+                if (pool > 0) {
+                  stats.lifetimeFreePool = pool - 1;
+                  await chrome.storage.sync.set({ usageStats: stats });
+                } else {
+                  await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
+                }
               }
               chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: target, mode: rebirthMode });
               overlay.remove();
               const bd = document.getElementById('lisa-phoenix-backdrop'); if (bd) bd.remove();
             } else {
-              alert('Daily rebirth limit reached (5/5). Upgrade to Premium for unlimited.');
+              alert('Welcome pool and daily rebirths used. Upgrade to Premium for unlimited.');
             }
           });
         });

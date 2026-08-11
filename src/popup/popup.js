@@ -1954,14 +1954,11 @@ class LISAPopup {
       const isLisaV = snapshot.format === 'lisa-v';
       let fileContent, mimeType, extension;
       
-      if (snapshot.format === 'markdown' && snapshot.raw?.markdownContent) {
-        // Markdown: download the clean formatted conversation
-        fileContent = snapshot.raw.markdownContent;
-        mimeType = 'text/markdown';
-        extension = 'md';
-      } else if (snapshot.raw?.rebirthHandoff || snapshot.rebirthHandoff) {
-        // Rebirth: download the handoff markdown
-        fileContent = snapshot.raw?.rebirthHandoff || snapshot.rebirthHandoff;
+      const view = readSnapshot(snapshot);
+
+      if (view.markdown) {
+        // Markdown export or rebirth handoff - both are renderable text.
+        fileContent = view.markdown;
         mimeType = 'text/markdown';
         extension = 'md';
       } else if (isLisaV) {

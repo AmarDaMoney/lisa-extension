@@ -386,7 +386,6 @@ class LISACompressor {
     }
     // Strip ChatGPT citation syntax
     text = text.replace(/filecite\w+/g, '');
-    // Strip code blocks to prevent code pollution in summaries
     // Fences must open and close a line of their own. Matching them
     // inline let a sentence that merely mentions two fence sequences
     // delete itself and everything between - which corrupted the
@@ -397,8 +396,6 @@ class LISACompressor {
     // filenames, field names); deleting them left fluent summaries
     // about nothing.
     text = text.replace(/`([^`]+)`/g, '$1');
-    // Strip orphaned language identifiers left after code block removal
-    text = text.replace(/\b(bash|python3?|javascript|js|json)(grep|sed|cat|node|git|head|tail)/gi, '$2');
     // Strip console/log output noise
     text = text.replace(/^\s*(matches:|replaced|aborted|syntax|\$|>|\d+[:|]|\[LISA).*/gm, '');
     // Strip bash/command lines

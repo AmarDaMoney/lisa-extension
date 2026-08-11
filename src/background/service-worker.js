@@ -2,6 +2,10 @@
 // Background Service Worker (Manifest V3)
 // v0.52.1 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
 
+// Shared snapshot schema — one definition of where content lives.
+// Must load before any code that reads snapshots.
+importScripts('src/shared/snapshot-shim.js');
+
 class LISACompressor {
   constructor() {
     this.compressionRatio = null;

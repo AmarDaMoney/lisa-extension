@@ -962,10 +962,19 @@ function generateContinuationHandoff(data, platform, mode) {
       const text = m.content || m.text || m.v || '';
       return compressor.scoreDensity(text);
     });
-    const DENSITY_THRESHOLD = 5;
-
-    // Step 2: Mark high/low density
-    const isHighDensity = densityScores.map(s => s >= DENSITY_THRESHOLD);
+    // Step 2: Percentile split — rank turns against each other, not
+    // an absolute bar. In a coding session every turn crosses a fixed
+    // threshold; relative ranking ensures a meaningful verbatim/semantic
+    // split regardless of conversation type.
+    const len = messages.length;
+    const verbatimPct = len < 15 ? 0.70
+                      : len < 50 ? 0.45
+                      : len < 100 ? 0.35
+                      : 0.25;
+    const sorted = densityScores.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s);
+    const verbatimSlots = Math.max(1, Math.round(len * verbatimPct));
+    const verbatimIndices = new Set(sorted.slice(0, verbatimSlots).map(x => x.i));
+    const isHighDensity = densityScores.map((_, i) => verbatimIndices.has(i));
 
     // Step 3: Adjacency smoothing — promote low-density turns to verbatim
     // if both neighbors are high-density (prevent semantic islands)

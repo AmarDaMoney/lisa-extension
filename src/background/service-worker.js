@@ -401,7 +401,18 @@ class LISACompressor {
     // Strip bash/command lines
     text = text.replace(/^\s*(sed|grep|python3|node|git|cat|head|tail|wc|cd|bash)\s.*/gm, '');
     text = text.trim();
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 10);
+    // Deduplicate before scoring. A sentence repeated in the source -
+    // a draft and its revision, a quoted reply - scores identically
+    // twice and lands in the output twice, side by side.
+    const seenSentence = new Set();
+    const sentences = text.split(/[.!?]+/).filter(s => {
+      const t = s.trim();
+      if (t.length <= 10) return false;
+      const k = t.toLowerCase().replace(/\s+/g, ' ');
+      if (seenSentence.has(k)) return false;
+      seenSentence.add(k);
+      return true;
+    });
     
     if (sentences.length <= 2) {
       // End at sentence boundary, not mid-word

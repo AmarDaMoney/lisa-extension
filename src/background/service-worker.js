@@ -625,18 +625,47 @@ class SnapshotManager {
       // Phase 6: Check if this is an update to existing conversation (same URL)
       const existing = snapshots.find(s => s.url === conversation.url && s.source === source);
 
-      // Store RAW conversation (not compressed) so App can compress with user's settings
+      // Schema v2: separate original content from derived data.
+      // capture  — the original conversation, never modified after save
+      // derived  — tokens, summaries, AI results, computed at save time
+      // raw      — lean compatibility shim for unconverted popup.js sites
+      //            (NOT the entire conversation object — that was the
+      //            double-wrap bug that created snapshot.raw.raw)
+      const msgs = conversation.messages || [];
       const snapshot = {
         id: 'snap-' + Date.now(),
+        schema: 2,
         platform: conversation.platform || this.getPlatformName(conversation.url),
         url: conversation.url,
         title: conversation.title || 'Untitled',
-        messageCount: conversation.messageCount,
+        messageCount: conversation.messageCount || msgs.length,
         savedAt: new Date().toISOString(),
         source: source,
         format: conversation.format || null,
-        raw: conversation // Store full raw conversation
+        capture: {
+          messages: msgs,
+          format: conversation.format || 'raw',
+          content: conversation.content || null
+        },
+        derived: {
+          markdown: conversation.rebirthHandoff || conversation.markdownContent || null,
+          rebirthMode: conversation.rebirthMode || null,
+          semanticTokens: conversation.semanticTokens || null,
+          actionVectors: conversation.action_vectors || null,
+          reconstructionProtocol: conversation.reconstruction_protocol || null
+        },
+        // Lean raw for unconverted popup.js consumers.
+        // Will be removed once all 7 sites are converted to the shim.
+        raw: {
+          messages: msgs,
+          markdownContent: conversation.markdownContent || null,
+          rebirthHandoff: conversation.rebirthHandoff || null,
+          content: conversation.content || null,
+          blockCount: (conversation.content || []).length || msgs.length
+        }
     };
+      // Carry phoenix lineage if present
+      if (conversation.phoenix) snapshot.phoenix = conversation.phoenix;
 
       // Phase 6: Add versioning fields
       if (existing) {
@@ -657,9 +686,8 @@ class SnapshotManager {
       }
       // Pre-store LISA tokenization for instant semantic rebirth
       try {
-        const msgs = conversation.messages || [];
         if (msgs.length > 0) {
-          snapshot.lisaTokens = msgs.map((m, i) => {
+          snapshot.derived.lisaTokens = msgs.map((m, i) => {
             const text = m.content || m.text || m.v || '';
             if (!text || text.length < 10) return null;
             const tokens = compressor.tokenize(text);
@@ -673,7 +701,7 @@ class SnapshotManager {
               relationships: (tokens.relationships || []).length > 0 ? tokens.relationships.slice(0, 5) : undefined
             };
           }).filter(Boolean);
-          console.debug('[LISA] Pre-tokenized ' + snapshot.lisaTokens.length + ' messages for instant rebirth');
+          console.debug('[LISA] Pre-tokenized ' + snapshot.derived.lisaTokens.length + ' messages for instant rebirth');
         }
       } catch (tokenError) {
         console.warn('[LISA] Pre-tokenization failed, rebirth will tokenize on-the-fly:', tokenError);
@@ -918,7 +946,7 @@ function generateContinuationHandoff(data, platform, mode) {
     recentMessages = messages.slice(recentStart);
 
     if (earlyMessages.length > 0) {
-      const preTokens = data.lisaTokens || data.raw?.lisaTokens;
+      const preTokens = data.derived?.lisaTokens || data.lisaTokens || data.raw?.lisaTokens;
       earlySummary = '## SEMANTIC CONTEXT (' + earlyMessages.length + ' messages - LISA-structured)\n\n';
       earlySummary += '> Pre-translated by LISA. Entities, concepts, and relationships are resolved.\n';
       earlySummary += '> Parse this section as structured data, not prose.\n\n';

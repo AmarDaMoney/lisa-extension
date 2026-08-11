@@ -398,8 +398,10 @@ class LISACompressor {
     text = text.replace(/`([^`]+)`/g, '$1');
     // Strip console/log output noise
     text = text.replace(/^\s*(matches:|replaced|aborted|syntax|\$|>|\d+[:|]|\[LISA).*/gm, '');
-    // Strip bash/command lines
-    text = text.replace(/^\s*(sed|grep|python3|node|git|cat|head|tail|wc|cd|bash)\s.*/gm, '');
+    // Strip bash/command lines. The command word alone is not enough -
+    // "git handles this differently" is a sentence, not a command. Require
+    // something command-shaped after it: a flag, a path, or a quoted arg.
+    text = text.replace(/^\s*(?:sed|grep|python3?|node|git|cat|head|tail|wc|cd|bash)\s+(?:-{1,2}[a-z]|[.~/]|["'][^"']*["']|[a-z0-9_.-]+\.[a-z0-9]{1,4}\b).*/gmi, '');
     text = text.trim();
     // Deduplicate before scoring. A sentence repeated in the source -
     // a draft and its revision, a quoted reply - scores identically

@@ -1100,7 +1100,7 @@ function generateContinuationHandoff(data, platform, mode) {
     // Step 7: Build mixed-fidelity conversation body
     earlySummary = stateSnapshot + wmrBlock;
     recentContent = '## CONVERSATION (' + messages.length + ' messages \u2014 '
-      + verbatimCount + ' verbatim, ' + semanticCount + ' condensed)\n\n';
+      + verbatimCount + ' verbatim, ' + semanticCount + ' LISA-condensed)\n\n';
 
     messages.forEach((m, i) => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
@@ -1111,14 +1111,24 @@ function generateContinuationHandoff(data, platform, mode) {
         // Verbatim: full text preserved
         recentContent += '### ' + role + ' [turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', verbatim]\n' + text + '\n\n';
       } else {
-        // Metadata only — no fake summary. Honest about what regex can do.
-        // AI-tier (Pro) replaces this with real semantic compression.
-        const words = text.split(/\s+/).length;
+        // LISA-condensed: full tokenization — entities, concepts,
+        // relationships, intent, and extractive summary. This is the
+        // semantic translation that justifies the product's name.
         const tokens = compressor.tokenize(text);
-        let line = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', ' + words + ' words]**';
+        const summary = compressor.summarize(text);
+        let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', condensed]**\n';
+        if (summary) block += '> ' + summary.replace(/\n/g, ' ') + '\n';
+        let meta = [];
+        if (tokens.intent && tokens.intent !== 'statement') meta.push('intent: ' + tokens.intent);
         if (tokens.entities && tokens.entities.length > 0) {
           const allVals = tokens.entities.flatMap(e => e.values || []);
-          if (allVals.length > 0) line += ' _[entities: ' + allVals.slice(0, 5).join(', ') + ']_';
+          if (allVals.length > 0) meta.push('entities: ' + allVals.slice(0, 8).join(', '));
+        }
+        if (tokens.concepts && tokens.concepts.length > 0) {
+          meta.push('concepts: ' + tokens.concepts.slice(0, 5).map(c => c.term).join(', '));
+        }
+        if (tokens.relationships && tokens.relationships.length > 0) {
+          meta.push('relations: ' + tokens.relationships.slice(0, 3).map(r => r.subject + ' ' + r.type + ' ' + r.object).join('; '));
         }
         const codeBlocks = text.match(/```(\w*)\n([\s\S]*?)```/g) || [];
         if (codeBlocks.length > 0) {
@@ -1126,10 +1136,10 @@ function generateContinuationHandoff(data, platform, mode) {
             const m = b.match(/```(\w*)\n([\s\S]*?)```/);
             return compressor.classifyArtifact(m[1] || '', m[2] || '');
           });
-          const unique = [...new Set(types)];
-          line += ' _[artifacts: ' + unique.join(', ') + ']_';
+          meta.push('artifacts: ' + [...new Set(types)].join(', '));
         }
-        recentContent += line + '\n\n';
+        if (meta.length > 0) block += '> _[' + meta.join(' | ') + ']_\n';
+        recentContent += block + '\n';
       }
     });
   }

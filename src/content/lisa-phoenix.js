@@ -173,7 +173,7 @@
           ">🧠 Semantic</button>
         </div>
         <div id="lisa-phoenix-mode-desc" style="margin-bottom:12px;font-size:11px;color:rgba(226,232,240,0.5);line-height:1.4;">
-          Density-scored: high-value turns verbatim, low-density condensed to metadata. Smart default.
+          Density-scored: high-value turns verbatim, low-density LISA-translated with entities and concepts. Smart default.
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <button id="lisa-phoenix-rebirth-btn" style="
@@ -219,7 +219,7 @@
         modeDistilled.style.background = 'rgba(74,222,128,0.15)';
         modeDistilled.style.borderColor = 'rgba(74,222,128,0.4)';
         modeDistilled.style.color = '#4ade80';
-        modeDesc.textContent = 'Density-scored: high-value turns verbatim, low-density condensed to metadata. Smart default.';
+        modeDesc.textContent = 'Density-scored: high-value turns verbatim, low-density LISA-translated with entities and concepts. Smart default.';
       });
       modeFull.addEventListener('click', () => {
         rebirthMode = 'full';

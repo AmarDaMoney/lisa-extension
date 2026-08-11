@@ -2201,8 +2201,7 @@ class LISAPopup {
     const timestamp = snapshot.savedAt || new Date().toISOString();
     const format = snapshot.format || 'lisa-v';
     const title = snapshot.title || 'Untitled';
-    const msgCount = snapshot.messageCount || snapshot.messages?.length
-      || snapshot.raw?.messages?.length || snapshot.raw?.blockCount || snapshot.blockCount || 0;
+    const msgCount = snapshot.messageCount || readSnapshot(snapshot).count;
 
     // Get the raw structured content
     let rawContent = '';

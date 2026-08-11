@@ -592,7 +592,7 @@ const hasher = new LISAHasher();
 
 class SnapshotManager {
   constructor() {
-    this.MAX_SNAPSHOTS = 20;
+    this.MAX_SNAPSHOTS = 200;
     this.STORAGE_KEY = 'lisaSnapshots';
     this.SETTINGS_KEY = 'lisaAutoSaveSettings';
   }

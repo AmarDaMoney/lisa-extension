@@ -1100,7 +1100,7 @@ function generateContinuationHandoff(data, platform, mode) {
     // Step 7: Build mixed-fidelity conversation body
     earlySummary = stateSnapshot + wmrBlock;
     recentContent = '## CONVERSATION (' + messages.length + ' messages \u2014 '
-      + verbatimCount + ' verbatim, ' + semanticCount + ' semantic)\n\n';
+      + verbatimCount + ' verbatim, ' + semanticCount + ' condensed)\n\n';
 
     messages.forEach((m, i) => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
@@ -1111,15 +1111,15 @@ function generateContinuationHandoff(data, platform, mode) {
         // Verbatim: full text preserved
         recentContent += '### ' + role + ' [turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', verbatim]\n' + text + '\n\n';
       } else {
-        // Semantic: summarized with metadata
-        const summary = compressor.summarize(text);
+        // Metadata only — no fake summary. Honest about what regex can do.
+        // AI-tier (Pro) replaces this with real semantic compression.
+        const words = text.split(/\s+/).length;
         const tokens = compressor.tokenize(text);
-        let line = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', semantic]** ' + (summary || '(short exchange)');
+        let line = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', ' + words + ' words]**';
         if (tokens.entities && tokens.entities.length > 0) {
           const allVals = tokens.entities.flatMap(e => e.values || []);
           if (allVals.length > 0) line += ' _[entities: ' + allVals.slice(0, 5).join(', ') + ']_';
         }
-        // Classify any code blocks in this turn
         const codeBlocks = text.match(/```(\w*)\n([\s\S]*?)```/g) || [];
         if (codeBlocks.length > 0) {
           const types = codeBlocks.map(b => {

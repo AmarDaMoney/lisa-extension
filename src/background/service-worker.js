@@ -396,8 +396,13 @@ class LISACompressor {
     // filenames, field names); deleting them left fluent summaries
     // about nothing.
     text = text.replace(/`([^`]+)`/g, '$1');
-    // Strip console/log output noise
-    text = text.replace(/^\s*(matches:|replaced|aborted|syntax|\$|>|\d+[:|]|\[LISA).*/gm, '');
+    // Strip console/log output noise. Two patterns were dropped: '>' is a
+    // markdown blockquote far more often than a shell prompt, and \d+[:|]
+    // matched numbered points and clock times as readily as grep -n output.
+    // Together they removed 938 chars from one 2,649-char turn - quoted
+    // material and enumerated arguments, not noise. '$' now requires the
+    // trailing space of a shell prompt.
+    text = text.replace(/^\s*(?:matches:|replaced|aborted|syntax|\$\s|\[LISA).*/gm, '');
     // Strip bash/command lines. The command word alone is not enough -
     // "git handles this differently" is a sentence, not a command. Require
     // something command-shaped after it: a flag, a path, or a quoted arg.

@@ -19,7 +19,17 @@ function readSnapshot(snapshot) {
   const out = { format: 'unknown', messages: [], markdown: null, count: 0, isLossy: false };
   if (!snapshot || typeof snapshot !== 'object') return out;
 
-  const raw = (snapshot.raw && typeof snapshot.raw === 'object') ? snapshot.raw : {};
+  let raw = (snapshot.raw && typeof snapshot.raw === 'object') ? snapshot.raw : {};
+
+  // Some save paths wrap a whole snapshot inside raw, so content sits at
+  // raw.raw. Descend when raw looks like a snapshot rather than content:
+  // it carries its own raw, and none of the content fields we look for.
+  if (raw.raw && typeof raw.raw === 'object'
+      && !raw.markdownContent && !raw.rebirthHandoff
+      && !(Array.isArray(raw.messages) && raw.messages.length > 0)) {
+    raw = raw.raw;
+  }
+
   out.format = snapshot.format || raw.format || 'unknown';
 
   out.markdown = snapshot.rebirthHandoff || raw.rebirthHandoff || raw.markdownContent || null;

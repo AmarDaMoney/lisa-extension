@@ -1436,7 +1436,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         data.rebirthHandoff = mdContent;
         data.rebirthMode = request.mode || 'adaptive';
         await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
-        await snapshotManager.decrementFreePool();
+        // Pool deduction handled by phoenix.js gate — not here.
+        // (Double-deduction bug: phoenix decrements at the gate,
+        //  this line decremented again after save.)
 
         const filename = 'LISA_REBIRTH_' + data.platform + '_' + Date.now() + '.md';
 

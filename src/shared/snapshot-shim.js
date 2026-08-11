@@ -19,6 +19,26 @@ function readSnapshot(snapshot) {
   const out = { format: 'unknown', messages: [], markdown: null, count: 0, isLossy: false };
   if (!snapshot || typeof snapshot !== 'object') return out;
 
+  // Schema v2: explicit capture/derived separation.
+  // No guessing, no unwrapping, no field-name archaeology.
+  if (snapshot.capture) {
+    out.format = snapshot.format || snapshot.capture.format || 'unknown';
+    out.markdown = (snapshot.derived && snapshot.derived.markdown) || null;
+    const msgs = snapshot.capture.messages || [];
+    out.messages = msgs.filter(m => {
+      const t = m && (m.content || m.text);
+      return typeof t === 'string' && t.trim().length >= 15;
+    }).map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: m.content || m.text
+    }));
+    out.count = out.messages.length || snapshot.messageCount || 0;
+    out.isLossy = (msgs.length > 0 && out.messages.length === 0);
+    return out;
+  }
+
+  // Schema v1: legacy raw-based snapshots.
+  // Handles three shapes, double-wrapping, and seven field names.
   let raw = (snapshot.raw && typeof snapshot.raw === 'object') ? snapshot.raw : {};
 
   // Some save paths wrap a whole snapshot inside raw, so content sits at
@@ -93,9 +113,11 @@ function describeSnapshot(snapshot) {
     return out;
   }
 
+  // Schema v2: derived summaries live in derived.semanticTokens
+  const derived = snapshot.derived || {};
   const raw = (snapshot.raw && typeof snapshot.raw === 'object') ? snapshot.raw : {};
 
-  const summaryHolders = raw.messages || raw.semanticTokens || raw.compressed || null;
+  const summaryHolders = derived.semanticTokens || raw.messages || raw.semanticTokens || raw.compressed || null;
   if (Array.isArray(summaryHolders)) {
     const parts = summaryHolders
       .map(m => m && typeof m.summary === 'string' ? m.summary.trim() : '')

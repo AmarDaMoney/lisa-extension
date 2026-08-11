@@ -1964,7 +1964,7 @@ class LISAPopup {
       } else if (isLisaV) {
         // LISA-V: output the raw JSONL content directly
         // Convert array to JSONL string for download
-        const contentData = snapshot.content || snapshot.raw?.content;
+        const contentData = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
         if (Array.isArray(contentData)) {
           fileContent = contentData.map(item => JSON.stringify(item)).join('\n');
         } else {
@@ -2004,10 +2004,11 @@ class LISAPopup {
     let isLisaV = snapshot.format === 'lisa-v';
 
     // Parse blocks from content — handle both LISA-V and raw/compressed formats
-    const contentData = snapshot.content || snapshot.raw?.content;
-    const messagesData = (snapshot.messages && snapshot.messages.length > 0 ? snapshot.messages : null)
+    const contentData = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
+    const messagesData = (snapshot.capture?.messages && snapshot.capture.messages.length > 0 ? snapshot.capture.messages : null)
+      || (snapshot.messages && snapshot.messages.length > 0 ? snapshot.messages : null)
       || (snapshot.raw?.messages && snapshot.raw.messages.length > 0 ? snapshot.raw.messages : null)
-      || snapshot.raw?.semanticTokens
+      || snapshot.derived?.semanticTokens || snapshot.raw?.semanticTokens
       || snapshot.raw?.compressed;
 
     if (contentData) {
@@ -2180,7 +2181,7 @@ class LISAPopup {
 
       if (result && result.success) {
         // Compute value metrics from snapshot
-        const msgs = snapshot.messages || snapshot.raw?.messages || snapshot.raw?.semanticTokens || [];
+        const msgs = snapshot.derived?.lisaTokens || snapshot.messages || snapshot.raw?.messages || snapshot.raw?.semanticTokens || [];
         const msgCount = snapshot.messageCount || msgs.length || 0;
         let entities = 0, concepts = 0;
         for (const m of msgs) {
@@ -2213,7 +2214,7 @@ class LISAPopup {
 
     // Get the raw structured content
     let rawContent = '';
-    const contentData = snapshot.content || snapshot.raw?.content;
+    const contentData = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
 
     if (contentData) {
       if (Array.isArray(contentData)) {

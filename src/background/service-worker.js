@@ -4,7 +4,7 @@
 
 // Shared snapshot schema — one definition of where content lives.
 // Must load before any code that reads snapshots.
-importScripts('src/shared/snapshot-shim.js');
+importScripts('../shared/snapshot-shim.js');
 
 class LISACompressor {
   constructor() {

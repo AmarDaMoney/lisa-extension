@@ -774,6 +774,47 @@ const NEW_CHAT_URLS = {
 
 const pendingRebirths = new Map();
 
+// AI-compressed snapshots carry a working memory register the regex
+// extractor cannot produce: action_vectors from the compression backend.
+// The data sits at raw.raw on snapshots whose save path double-wrapped.
+// Free-tier snapshots have none, and are left exactly as they were.
+function mergeAiWorkingMemory(memory, data) {
+  if (!memory || !data) return memory;
+  let r = (data.raw && typeof data.raw === 'object') ? data.raw : {};
+  if (r.raw && typeof r.raw === 'object' && !r.action_vectors) r = r.raw;
+
+  const vectors = r.action_vectors;
+  if (!vectors || typeof vectors !== 'object') return memory;
+  const keys = Object.keys(vectors);
+  if (keys.length === 0) return memory;
+
+  // Guard notes are placeholders for absent data. Real data supersedes them.
+  ['objectives', 'resolved', 'blocked', 'next', 'decisions'].forEach(k => {
+    memory[k] = (memory[k] || []).filter(e => !(e && e.source === 'guard'));
+  });
+  memory.objectives = memory.objectives.filter(o =>
+    typeof o !== 'string' || o.indexOf('Unavailable - snapshot is compressed') !== 0);
+
+  keys.forEach(k => {
+    const v = vectors[k];
+    if (!v || typeof v.action !== 'string' || !v.action.trim()) return;
+    let line = v.action.trim();
+    if (v.priority) line += ' [' + v.priority + ']';
+    if (Array.isArray(v.dependencies) && v.dependencies.length > 0) {
+      line += ' (depends on: ' + v.dependencies.join('; ') + ')';
+    }
+    memory.next.push({ text: line, source: 'ai' });
+  });
+
+  const themes = r.reconstruction_protocol && r.reconstruction_protocol.key_themes;
+  if (Array.isArray(themes)) {
+    themes.filter(t => typeof t === 'string' && t.trim())
+          .forEach(t => memory.objectives.push(t.trim()));
+  }
+
+  return memory;
+}
+
 function generateContinuationHandoff(data, platform, mode) {
   const messages = data.messages || [];
   const title = data.title || 'Untitled';

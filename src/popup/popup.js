@@ -2154,7 +2154,15 @@ class LISAPopup {
       // Use stored rebirth handoff if available (preserves the exact MD that was generated)
       const markdown = describeSnapshot(snapshot).markdownOnly || this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
-      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + (snapshot.format || 'lisa-v') + '.md';
+      // Platforms dedupe attachments by filename within a conversation: a
+      // repeated name silently re-attaches the first file. Two snapshots of
+      // one conversation share title and platform, and a null format used to
+      // fall back to 'lisa-v', so a rebirth could collide with a LISA-V
+      // export. Label the real kind and add a short unique suffix.
+      const kind = snapshot.format
+        || (snapshot.source === 'phoenix-rebirth' || snapshot.phoenix ? 'rebirth' : 'snapshot');
+      const stamp = String(snapshot.savedAt || Date.now()).replace(/\D/g, '').slice(-6);
+      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + kind + '-' + stamp + '.md';
 
       // Send to content script on active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

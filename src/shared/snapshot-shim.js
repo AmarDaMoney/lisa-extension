@@ -51,4 +51,69 @@ function readSnapshot(snapshot) {
   return out;
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { readSnapshot };
+/**
+ * describeSnapshot(snapshot)
+ *
+ * Display counterpart to readSnapshot. Where readSnapshot refuses to
+ * return summaries as messages - nothing should analyse a summary as if
+ * it were conversation - this returns whatever is safe to show a user,
+ * clearly flagged when the original text was not retained.
+ *
+ * Returns { text, isLossy, source } where source names what was found:
+ * 'markdown', 'messages', 'summaries', 'blocks', or 'none'.
+ */
+function describeSnapshot(snapshot) {
+  const out = { text: null, isLossy: false, source: 'none' };
+  if (!snapshot || typeof snapshot !== 'object') return out;
+
+  const view = readSnapshot(snapshot);
+
+  if (view.markdown) {
+    out.text = view.markdown;
+    out.source = 'markdown';
+    return out;
+  }
+
+  if (view.messages.length > 0) {
+    out.text = view.messages
+      .map(m => '### ' + (m.role === 'user' ? 'User' : 'Assistant') + '\n' + m.content)
+      .join('\n\n');
+    out.source = 'messages';
+    return out;
+  }
+
+  const raw = (snapshot.raw && typeof snapshot.raw === 'object') ? snapshot.raw : {};
+
+  const summaryHolders = raw.messages || raw.semanticTokens || raw.compressed || null;
+  if (Array.isArray(summaryHolders)) {
+    const parts = summaryHolders
+      .map(m => m && typeof m.summary === 'string' ? m.summary.trim() : '')
+      .filter(t => t.length > 0);
+    if (parts.length > 0) {
+      out.text = parts.join('\n\n');
+      out.isLossy = true;
+      out.source = 'summaries';
+      return out;
+    }
+  }
+
+  const c = snapshot.content || raw.content;
+  if (Array.isArray(c)) {
+    const parts = c
+      .map(b => (b && typeof b.v === 'string') ? b.v : '')
+      .filter(t => t.trim().length > 0);
+    if (parts.length > 0) {
+      out.text = parts.join('\n');
+      out.source = 'blocks';
+      return out;
+    }
+  } else if (typeof c === 'string' && c.trim().length > 0) {
+    out.text = c;
+    out.source = 'blocks';
+    return out;
+  }
+
+  return out;
+}
+
+if (typeof module !== 'undefined' && module.exports) module.exports = { readSnapshot, describeSnapshot };

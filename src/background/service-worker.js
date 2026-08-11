@@ -1098,6 +1098,19 @@ function generateContinuationHandoff(data, platform, mode) {
     }
 
     // Step 7: Build mixed-fidelity conversation body
+    // Skip State Snapshot when almost everything is verbatim — regex-extracted
+    // "state" from high-density turns adds noise when the turns themselves are
+    // already in the output.
+    if (verbatimCount / messages.length > 0.8) stateSnapshot = '';
+    // Skip WMR when every category is empty — five "None detected" headings
+    // waste tokens and look broken. The section appears when regex or AI
+    // actually found something.
+    const wmrHasContent = workingMemory.objectives.length > 0
+      || workingMemory.resolved.length > 0
+      || workingMemory.blocked.length > 0
+      || workingMemory.next.length > 0
+      || workingMemory.decisions.length > 0;
+    if (!wmrHasContent) wmrBlock = '';
     earlySummary = stateSnapshot + wmrBlock;
     recentContent = '## CONVERSATION (' + messages.length + ' messages \u2014 '
       + verbatimCount + ' verbatim, ' + semanticCount + ' LISA-condensed)\n\n';

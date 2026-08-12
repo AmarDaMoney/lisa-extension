@@ -256,9 +256,21 @@
               await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
             }
           }
+          // Show loading state while AI processes
+          const btn = document.getElementById('lisa-phoenix-rebirth-btn');
+          if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            btn.innerHTML = '\u23F3 Translating context...';
+          }
           chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform, mode: rebirthMode });
-          overlay.remove();
-          const bd = document.getElementById('lisa-phoenix-backdrop'); if (bd) bd.remove();
+          // Modal stays visible until rebirth completes or 15s timeout
+          setTimeout(() => {
+            const ov = document.getElementById('lisa-phoenix-overlay');
+            if (ov) ov.remove();
+            const bd = document.getElementById('lisa-phoenix-backdrop');
+            if (bd) bd.remove();
+          }, 15000);
         } else {
           // Free tier limit reached
           const btn = document.getElementById('lisa-phoenix-rebirth-btn');
@@ -313,9 +325,20 @@
                   await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
                 }
               }
+              // Show loading state while AI processes
+              const xbtn = document.getElementById('lisa-phoenix-rebirth-btn');
+              if (xbtn) {
+                xbtn.disabled = true;
+                xbtn.style.opacity = '0.6';
+                xbtn.innerHTML = '\u23F3 Translating context...';
+              }
               chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: target, mode: rebirthMode });
-              overlay.remove();
-              const bd = document.getElementById('lisa-phoenix-backdrop'); if (bd) bd.remove();
+              setTimeout(() => {
+                const ov = document.getElementById('lisa-phoenix-overlay');
+                if (ov) ov.remove();
+                const bd = document.getElementById('lisa-phoenix-backdrop');
+                if (bd) bd.remove();
+              }, 15000);
             } else {
               alert('Welcome pool and daily rebirths used. Upgrade to Premium for unlimited.');
             }
@@ -592,6 +615,11 @@
     _listenForRebirthComplete() {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg.type === 'PHOENIX_REBIRTH_COMPLETE') {
+          // Dismiss modal if still showing
+          const ov = document.getElementById('lisa-phoenix-overlay');
+          if (ov) ov.remove();
+          const bd = document.getElementById('lisa-phoenix-backdrop');
+          if (bd) bd.remove();
           const toast = document.createElement('div');
           toast.id = 'lisa-phoenix-toast';
           Object.assign(toast.style, {

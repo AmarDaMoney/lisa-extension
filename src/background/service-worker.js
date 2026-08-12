@@ -1114,7 +1114,7 @@ function generateContinuationHandoff(data, platform, mode) {
 
       if (isHighDensity[i]) {
         // Verbatim: full text preserved
-        recentContent += '### ' + role + ' [turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', verbatim]\n' + text + '\n\n';
+        recentContent += '### ' + role + ' [turn ' + (i + 1) + ', verbatim]\n' + text + '\n\n';
       } else {
         // LISA-condensed: semantic translation. AI-disambiguated summary
         // when available (Pro/PAYG), regex tokenization as fallback.
@@ -1123,20 +1123,20 @@ function generateContinuationHandoff(data, platform, mode) {
         if (aiTurn) {
           // AI-condensed: disambiguated summary is the complete representation.
           // No regex metadata — the AI already resolved everything.
-          let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', AI-condensed]**\n';
+          let block = '**[Turn ' + (i + 1) + ', ' + role + ', AI-condensed]**\n';
           block += '> ' + aiTurn.summary.replace(/\n/g, ' ') + '\n';
           recentContent += block + '\n';
         } else {
           // Regex fallback: short turns stay verbatim (condensing inflates them)
           const wordCount = text.split(/\s+/).filter(Boolean).length;
           if (wordCount < 100) {
-            let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', verbatim]**\n';
+            let block = '**[Turn ' + (i + 1) + ', ' + role + ', verbatim]**\n';
             block += text.replace(/\n{3,}/g, '\n\n') + '\n';
             recentContent += block + '\n';
           } else {
           const tokens = compressor.tokenize(text);
           const summary = compressor.summarize(text);
-          let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', condensed]**\n';
+          let block = '**[Turn ' + (i + 1) + ', ' + role + ', condensed]**\n';
           if (summary) block += '> ' + summary.replace(/\n/g, ' ') + '\n';
           let meta = [];
           if (tokens.entities && tokens.entities.length > 0) {
@@ -1165,55 +1165,18 @@ function generateContinuationHandoff(data, platform, mode) {
     });
   }
 
-  return '# LISA SESSION REBIRTH — CONTINUATION DIRECTIVE\n\n'
-    + 'You are RESUMING work in progress, not starting a new task. The previous\n'
-    + 'session reached context capacity and was distilled into this handoff by\n'
-    + 'LISA (Linguistic Intelligence Semantic Anchoring).\n\n'
-    + 'MANDATORY BEHAVIOR\n\n'
-    + '1. Read this entire handoff sequentially and in full before responding.\n'
-    + '2. Adopt the working state described below as YOUR current state. Do not\n'
-    + '   re-litigate decisions marked RESOLVED; do not re-ask answered questions.\n'
-    + '3. Treat OPEN THREADS as your immediate working agenda.\n'
-    + '4. Your first reply: confirm (a) the task you are resuming, (b) current\n'
-    + '   state, (c) what you see as the next logical action based on the handoff.\n'
-    + '   Then proceed directly.\n'
-    + '5. Conversation language: continue in the language the user was using.\n\n'
-    + '## SESSION LINEAGE\n'
-    + '- Parent session: ' + title + ' (' + platform + ', ' + messages.length + ' messages)\n'
-    + '- Generation: ' + (data.phoenix ? data.phoenix.generation : 1) + ' in this work chain\n'
-    + '- Session ID: ' + (data.phoenix ? data.phoenix.session_id : 'genesis') + '\n'
-    + '- Reborn at: ' + new Date().toISOString() + '\n'
-    + '- Integrity: ' + (data.phoenix && data.phoenix.chain_hash ? 'SHA-256 ' + data.phoenix.chain_hash.slice(0, 16) : 'pending') + '\n'
-    + '- Mode: ' + (mode === 'full' ? 'Full fidelity (' + messages.length + ' messages verbatim)' : mode === 'semantic' ? 'Semantic (' + earlyMessages.length + ' LISA-structured, ' + recentMessages.length + ' verbatim)' : 'Adaptive (' + messages.length + ' messages, density-scored)') + '\n\n'
+  return '# LISA SESSION REBIRTH\n\n'
+    + 'Resume this session. Do not re-ask resolved questions or restart work.\n'
+    + 'Confirm current state and next action, then proceed.\n\n'
+    + '## Lineage\n'
+    + '- Parent: ' + title + ' (' + platform + ', ' + messages.length + ' messages)\n'
+    + '- Generation: ' + (data.phoenix ? data.phoenix.generation : 1) + ' | Mode: ' + mode + '\n'
+    + '- Reborn: ' + new Date().toISOString() + '\n\n'
     + '---\n\n'
     + earlySummary
     + recentContent
-    + '## Session Metrics\n\n'
-    + '| Metric | Value |\n'
-    + '|--------|-------|\n'
-    + '| Original messages | ' + messages.length + ' |\n'
-    + '| Mode | ' + mode + ' |\n'
-    + '| Estimated original tokens | ~' + Math.round(messages.reduce(function(a, m) { return a + msgText(m).length; }, 0) / 4) + ' |\n'
-    + '| Handoff size | ~' + Math.round((earlySummary.length + recentContent.length) / 4) + ' tokens |\n'
-    + '| Reduction | ~' + Math.round((1 - (earlySummary.length + recentContent.length) / Math.max(messages.reduce(function(a, m) { return a + msgText(m).length; }, 0), 1)) * 100) + '% |\n\n'
-    + '---\n\n'
-    + '## ⚖️ SAT-CHAIN Governance Node\n'
-    + '> LISA Core v0.52.1 | Phoenix Generation: ' + (data.phoenix ? data.phoenix.generation : 1) + '\n'
-    + '> Chain Hash: ' + (data.phoenix && data.phoenix.chain_hash ? data.phoenix.chain_hash.slice(0, 16) : 'genesis') + '\n'
-    + '> Enforcement: ACTIVE\n\n'
-    + '### Reading Protocol\n'
-    + 'Process this handoff in its entirety before responding. '
-    + 'Every block above is source of truth.\n\n'
-    + '### Enforcement Directives\n'
-    + '1. **SOURCE FIDELITY**: All claims, decisions, and context are verified. '
-    + 'Do not contradict, re-derive, or silently override them.\n'
-    + '2. **NO HALLUCINATION**: Do not introduce entities, decisions, or conclusions not present in this handoff.\n'
-    + '3. **CONFLICT PROTOCOL**: If the user\u2019s new request conflicts with handoff context, '
-    + 'flag the conflict explicitly \u2014 do not assume precedence.\n'
-    + '4. **CONTINUATION**: This is a reborn session (Generation ' + (data.phoenix ? data.phoenix.generation : 1) + '). '
-    + 'Resume work, do not restart.\n\n'
     + '---\n'
-    + '*LISA Core v0.52.1 \u2022 SAT-CHAIN LLC \u2022 Phoenix Session Rebirth*\n';
+    + '*LISA Core v0.52.1 \u2022 SAT-CHAIN LLC*\n';
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

@@ -6,6 +6,22 @@
 // Must load before any code that reads snapshots.
 importScripts('../shared/snapshot-shim.js');
 
+// Safe text extraction — m.content can be a string, an array of
+// content blocks (Claude API), or an object. Only strings pass through;
+// arrays get their text parts joined; objects are skipped.
+function msgText(m) {
+  const raw = m && (m.content || m.text || m.v);
+  if (!raw) return '';
+  if (typeof raw === 'string') return raw;
+  if (Array.isArray(raw)) {
+    return raw
+      .filter(b => b && typeof b === 'object' && b.type === 'text' && typeof b.text === 'string')
+      .map(b => b.text)
+      .join('\n');
+  }
+  return '';
+}
+
 class LISACompressor {
   constructor() {
     this.compressionRatio = null;
@@ -155,7 +171,7 @@ class LISACompressor {
     // Shape guard: compressed snapshots store `summary`, not `content`.
     // Without this, every message yields '' and the register returns
     // silently empty - indistinguishable from an uneventful session.
-    const usable = messages.filter(m => (m.content || m.text || m.v || '').length >= 15).length;
+    const usable = messages.filter(m => msgText(m).length >= 15).length;
     if (messages.length > 0 && usable === 0) {
       const note = 'Unavailable - snapshot is compressed; original text not retained.';
       memory.objectives.push(note);
@@ -168,7 +184,7 @@ class LISACompressor {
 
     // Scan all messages for cognitive state signals
     for (let i = 0; i < messages.length; i++) {
-      const text = messages[i].content || messages[i].text || messages[i].v || '';
+      const text = msgText(messages[i]);
       if (!text || text.length < 15) continue;
       const lines = text.split('\n');
       const isRecent = i >= Math.floor(messages.length * 0.7);
@@ -237,7 +253,7 @@ class LISACompressor {
     // Extract current objective from last few user messages
     for (let i = messages.length - 1; i >= Math.max(0, messages.length - 10); i--) {
       if (messages[i].role !== 'user') continue;
-      const text = messages[i].content || messages[i].text || messages[i].v || '';
+      const text = msgText(messages[i]);
       if (!text || text.length < 15 || text.length > 300) continue;
       // Skip code outputs and confirmations
       if (/^(?:done|ok|yes|sure|syntax|match|both|empty|✅)/i.test(text.trim())) continue;
@@ -492,7 +508,7 @@ class LISACompressor {
     const assistantMsgs = messages.filter(m => m.role === 'assistant');
     // Sample first + last 5 messages for concept extraction
     const sample = [...messages.slice(0, 5), ...messages.slice(-5)];
-    const allText = sample.map(m => m.content || m.v || '').join(' ');
+    const allText = sample.map(m => msgText(m)).join(' ');
     const stopwords = new Set(['this','that','with','from','have','been','will','would','could',
       'should','their','there','they','what','when','where','which','more','also','into',
       'your','about','just','like','some','than','then','them','these','those','were','very','well']);
@@ -688,7 +704,7 @@ class SnapshotManager {
       try {
         if (msgs.length > 0) {
           snapshot.derived.lisaTokens = msgs.map((m, i) => {
-            const text = m.content || m.text || m.v || '';
+            const text = msgText(m);
             if (!text || text.length < 10) return null;
             const tokens = compressor.tokenize(text);
             return {
@@ -873,7 +889,7 @@ function generateContinuationHandoff(data, platform, mode) {
     const ffSnapshots = [];
     for (let i = messages.length - 1; i >= 0 && ffSnapshots.length < 3; i--) {
       if (messages[i].role === 'assistant') {
-        const t = messages[i].content || messages[i].text || messages[i].v || '';
+        const t = msgText(messages[i]);
         // Skip code-heavy turns — they produce garbled snapshots
         const codeLen = (t.match(/```[\s\S]*?```/g) || []).reduce((a, b) => a + b.length, 0);
         if (codeLen > t.length * 0.5) continue;
@@ -935,7 +951,7 @@ function generateContinuationHandoff(data, platform, mode) {
     recentContent = '## FULL CONVERSATION (' + messages.length + ' messages \u2014 verbatim)\n\n';
     messages.forEach(m => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
-      const text = m.content || m.text || m.v || '';
+      const text = msgText(m);
       if (text) recentContent += '### ' + role + '\n' + text + '\n\n';
     });
   } else if (mode === 'semantic') {
@@ -960,7 +976,7 @@ function generateContinuationHandoff(data, platform, mode) {
         // Fallback: tokenize on-the-fly
         const compressor = new LISACompressor();
         semanticBlocks = earlyMessages.map((m, i) => {
-          const content = m.content || m.text || m.v || '';
+          const content = msgText(m);
           const tokens = compressor.tokenize(content);
           const block = {
             index: i,
@@ -982,7 +998,7 @@ function generateContinuationHandoff(data, platform, mode) {
     recentContent = '## RECENT CONVERSATION (last ' + recentMessages.length + ' messages \u2014 verbatim)\n\n';
     recentMessages.forEach(m => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
-      const text = m.content || m.text || m.v || '';
+      const text = msgText(m);
       if (text) recentContent += '### ' + role + '\n' + text + '\n\n';
     });
 
@@ -994,7 +1010,7 @@ function generateContinuationHandoff(data, platform, mode) {
 
     // Step 1: Score every turn
     const densityScores = messages.map(m => {
-      const text = m.content || m.text || m.v || '';
+      const text = msgText(m);
       return compressor.scoreDensity(text);
     });
     // Step 2: Percentile split — rank turns against each other, not
@@ -1032,7 +1048,7 @@ function generateContinuationHandoff(data, platform, mode) {
     const lastHighAssistant = [];
     for (let i = messages.length - 1; i >= 0 && lastHighAssistant.length < 3; i--) {
       if (messages[i].role === 'assistant' && isHighDensity[i]) {
-        const text = messages[i].content || messages[i].text || messages[i].v || '';
+        const text = msgText(messages[i]);
         const summary = compressor.summarize(text);
         if (!summary || summary.length <= 20) continue;
         // Split on sentence ends, but not on dots inside identifiers
@@ -1124,7 +1140,7 @@ function generateContinuationHandoff(data, platform, mode) {
 
     messages.forEach((m, i) => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
-      const text = m.content || m.text || m.v || '';
+      const text = msgText(m);
       if (!text) return;
 
       if (isHighDensity[i]) {
@@ -1194,9 +1210,9 @@ function generateContinuationHandoff(data, platform, mode) {
     + '|--------|-------|\n'
     + '| Original messages | ' + messages.length + ' |\n'
     + '| Mode | ' + mode + ' |\n'
-    + '| Estimated original tokens | ~' + Math.round(messages.reduce(function(a, m) { return a + (m.content || m.text || m.v || '').length; }, 0) / 4) + ' |\n'
+    + '| Estimated original tokens | ~' + Math.round(messages.reduce(function(a, m) { return a + msgText(m).length; }, 0) / 4) + ' |\n'
     + '| Handoff size | ~' + Math.round((earlySummary.length + recentContent.length) / 4) + ' tokens |\n'
-    + '| Reduction | ~' + Math.round((1 - (earlySummary.length + recentContent.length) / Math.max(messages.reduce(function(a, m) { return a + (m.content || m.text || m.v || '').length; }, 0), 1)) * 100) + '% |\n\n'
+    + '| Reduction | ~' + Math.round((1 - (earlySummary.length + recentContent.length) / Math.max(messages.reduce(function(a, m) { return a + msgText(m).length; }, 0), 1)) * 100) + '% |\n\n'
     + '---\n\n'
     + '## ⚖️ SAT-CHAIN Governance Node\n'
     + '> LISA Core v0.52.1 | Phoenix Generation: ' + (data.phoenix ? data.phoenix.generation : 1) + '\n'
@@ -1501,7 +1517,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             const tail = msgs.slice(-30);
             const formatted = tail.map((m, i) => {
               const role = m.role === 'user' ? 'User' : 'Assistant';
-              const text = m.content || m.text || m.v || '';
+              const text = msgText(m);
               return 'Turn ' + (i + 1) + ' [' + role + ']:\n' + text;
             }).join('\n\n');
             const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/extract-wmr', {

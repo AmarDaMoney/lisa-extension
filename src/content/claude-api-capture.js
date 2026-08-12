@@ -149,7 +149,7 @@
       if (!block) continue;
 
       if (block.type === 'text') {
-        if (block.text) textParts.push(block.text);
+        if (typeof block.text === 'string') textParts.push(block.text);
       } else if (block.type === 'tool_use') {
         artifacts.push({
           type: 'tool_use',
@@ -163,7 +163,7 @@
           tool_use_id: block.tool_use_id || null,
           content: block.content || ''
         });
-      } else if (block.text) {
+      } else if (typeof block.text === 'string') {
         textParts.push(block.text);
       }
     }

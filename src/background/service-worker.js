@@ -1054,47 +1054,52 @@ function generateContinuationHandoff(data, platform, mode) {
     }
 
     // Step 6: Working Memory Register — cognitive state extraction
-    const workingMemory = mergeAiWorkingMemory(compressor.extractWorkingMemory(messages), data);
+    // AI-extracted WMR takes priority when available (Pro/PAYG users).
+    // Falls back to regex for free tier.
+    const aiWMR = data.aiWMR || null;
     let wmrBlock = '';
-    // Always render the register. A silently absent block is
-    // indistinguishable from a session with nothing to report.
-    {
+    let wmrHasAI = false;
+    if (aiWMR) {
+      wmrHasAI = true;
+      wmrBlock = '## ACTIVE WORKING MEMORY (AI-extracted)\n\n';
+      const sections = [
+        { title: 'Current Objective', key: 'objectives', marker: '- ' },
+        { title: 'Resolved', key: 'resolved', marker: '\u2713 ' },
+        { title: 'Blocked', key: 'blocked', marker: '\u26a0 ' },
+        { title: 'Next', key: 'next_actions', marker: '- ' },
+        { title: 'Decisions', key: 'decisions', marker: '\u2022 ' }
+      ];
+      sections.forEach(s => {
+        wmrBlock += '### ' + s.title + '\n';
+        const items = aiWMR[s.key] || [];
+        if (items.length > 0) {
+          items.forEach(item => { wmrBlock += s.marker + item + '\n'; });
+        } else {
+          wmrBlock += '_None detected._\n';
+        }
+        wmrBlock += '\n';
+      });
+    } else {
+      const workingMemory = mergeAiWorkingMemory(compressor.extractWorkingMemory(messages), data);
       wmrBlock = '## ACTIVE WORKING MEMORY\n\n';
-      wmrBlock += '### Current Objective\n';
-      if (workingMemory.objectives.length > 0) {
-        workingMemory.objectives.forEach(o => { wmrBlock += '- ' + o + '\n'; });
-      } else {
-        wmrBlock += '_None detected in recent window._\n';
-      }
-      wmrBlock += '\n';
-      wmrBlock += '### Resolved\n';
-      if (workingMemory.resolved.length > 0) {
-        workingMemory.resolved.forEach(r => { wmrBlock += '\u2713 ' + r.text + '\n'; });
-      } else {
-        wmrBlock += '_None detected in recent window._\n';
-      }
-      wmrBlock += '\n';
-      wmrBlock += '### Blocked\n';
-      if (workingMemory.blocked.length > 0) {
-        workingMemory.blocked.forEach(b => { wmrBlock += '\u26a0 ' + b.text + '\n'; });
-      } else {
-        wmrBlock += '_None detected in recent window._\n';
-      }
-      wmrBlock += '\n';
-      wmrBlock += '### Next\n';
-      if (workingMemory.next.length > 0) {
-        workingMemory.next.forEach(n => { wmrBlock += '- ' + n.text + '\n'; });
-      } else {
-        wmrBlock += '_None detected in recent window._\n';
-      }
-      wmrBlock += '\n';
-      wmrBlock += '### Decisions\n';
-      if (workingMemory.decisions.length > 0) {
-        workingMemory.decisions.forEach(d => { wmrBlock += '\u2022 ' + d.text + '\n'; });
-      } else {
-        wmrBlock += '_None detected in recent window._\n';
-      }
-      wmrBlock += '\n';
+      const sections = [
+        { title: 'Current Objective', items: workingMemory.objectives, marker: '- ', isString: true },
+        { title: 'Resolved', items: workingMemory.resolved, marker: '\u2713 ' },
+        { title: 'Blocked', items: workingMemory.blocked, marker: '\u26a0 ' },
+        { title: 'Next', items: workingMemory.next, marker: '- ' },
+        { title: 'Decisions', items: workingMemory.decisions, marker: '\u2022 ' }
+      ];
+      sections.forEach(s => {
+        wmrBlock += '### ' + s.title + '\n';
+        if (s.items.length > 0) {
+          s.items.forEach(item => {
+            wmrBlock += s.marker + (s.isString ? item : item.text) + '\n';
+          });
+        } else {
+          wmrBlock += '_None detected in recent window._\n';
+        }
+        wmrBlock += '\n';
+      });
     }
 
     // Step 7: Build mixed-fidelity conversation body
@@ -1102,18 +1107,20 @@ function generateContinuationHandoff(data, platform, mode) {
     // "state" from high-density turns adds noise when the turns themselves are
     // already in the output.
     if (verbatimCount / messages.length > 0.8) stateSnapshot = '';
+    // AI WMR supersedes the regex state snapshot — it's a better
+    // representation of working state.
+    if (aiWMR) stateSnapshot = '';
     // Skip WMR when every category is empty — five "None detected" headings
     // waste tokens and look broken. The section appears when regex or AI
     // actually found something.
-    const wmrHasContent = workingMemory.objectives.length > 0
-      || workingMemory.resolved.length > 0
-      || workingMemory.blocked.length > 0
-      || workingMemory.next.length > 0
-      || workingMemory.decisions.length > 0;
-    if (!wmrHasContent) wmrBlock = '';
+    // AI WMR always has content worth showing. Regex WMR may be empty.
+    if (!wmrHasAI) {
+      const emptyCount = (wmrBlock.match(/_None detected/g) || []).length;
+      if (emptyCount >= 5) wmrBlock = '';
+    }
     earlySummary = stateSnapshot + wmrBlock;
     recentContent = '## CONVERSATION (' + messages.length + ' messages \u2014 '
-      + verbatimCount + ' verbatim, ' + semanticCount + ' LISA-condensed)\n\n';
+      + verbatimCount + ' verbatim, ' + semanticCount + ' ' + (aiWMR ? 'AI-condensed' : 'LISA-condensed') + ')\n\n';
 
     messages.forEach((m, i) => {
       const role = (m.role === 'user') ? 'User' : 'Assistant';
@@ -1124,12 +1131,14 @@ function generateContinuationHandoff(data, platform, mode) {
         // Verbatim: full text preserved
         recentContent += '### ' + role + ' [turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', verbatim]\n' + text + '\n\n';
       } else {
-        // LISA-condensed: full tokenization — entities, concepts,
-        // relationships, intent, and extractive summary. This is the
-        // semantic translation that justifies the product's name.
+        // LISA-condensed: semantic translation. AI-disambiguated summary
+        // when available (Pro/PAYG), regex tokenization as fallback.
         const tokens = compressor.tokenize(text);
-        const summary = compressor.summarize(text);
-        let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', condensed]**\n';
+        const aiSummaries = aiWMR && aiWMR.turn_summaries || [];
+        const aiTurn = aiSummaries.find(t => t.turn === i + 1);
+        const summary = aiTurn ? aiTurn.summary : compressor.summarize(text);
+        const label = aiTurn ? 'AI-condensed' : 'condensed';
+        let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', ' + label + ']**\n';
         if (summary) block += '> ' + summary.replace(/\n/g, ' ') + '\n';
         let meta = [];
         if (tokens.intent && tokens.intent !== 'statement') meta.push('intent: ' + tokens.intent);
@@ -1476,6 +1485,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           trigger: request.trigger || 'manual'
         };
         // (snapshot saved below after hash computation)
+
+        // 2b. AI WMR extraction for Pro/PAYG users (blocks rebirth)
+        try {
+          const syncStore = await chrome.storage.sync.get(['licenseKey', 'userTier']);
+          const lk = syncStore.licenseKey;
+          const tier = syncStore.userTier || 'free';
+          if (lk && tier !== 'free') {
+            const msgs = data.messages || [];
+            // Send last 30 turns — enough for context, cheap enough for 1 credit
+            const tail = msgs.slice(-30);
+            const formatted = tail.map((m, i) => {
+              const role = m.role === 'user' ? 'User' : 'Assistant';
+              const text = m.content || m.text || m.v || '';
+              return 'Turn ' + (i + 1) + ' [' + role + ']:\n' + text;
+            }).join('\n\n');
+            const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/extract-wmr', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-License-Key': lk },
+              body: JSON.stringify({ messages: formatted, provider: 'claude' })
+            });
+            if (resp.ok) {
+              const result = await resp.json();
+              if (result.success && result.wmr) {
+                data.aiWMR = result.wmr;
+                console.log('[LISA Phoenix] AI WMR extracted — ' + (result.wmr.turn_summaries || []).length + ' turns disambiguated');
+              }
+            }
+          }
+        } catch (wmrErr) {
+          console.warn('[LISA Phoenix] AI WMR skipped:', wmrErr.message);
+          // Falls through to regex — rebirth continues
+        }
 
         // 3. Generate continuation handoff
         const mdContent = generateContinuationHandoff(data, data.platform, request.mode || 'adaptive');

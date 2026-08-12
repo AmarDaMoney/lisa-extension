@@ -466,7 +466,7 @@ class LISACompressor {
       return { text: s.trim(), score, index: i };
     });
     
-    // Take top 3 sentences by score, maintain original order
+    // Take top 4 sentences by score, maintain original order
     const top = scored.sort((a, b) => b.score - a.score).slice(0, 4);
     top.sort((a, b) => a.index - b.index);
     

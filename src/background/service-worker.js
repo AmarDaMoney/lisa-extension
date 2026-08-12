@@ -670,15 +670,8 @@ class SnapshotManager {
           actionVectors: conversation.action_vectors || null,
           reconstructionProtocol: conversation.reconstruction_protocol || null
         },
-        // Lean raw for unconverted popup.js consumers.
-        // Will be removed once all 7 sites are converted to the shim.
-        raw: {
-          messages: msgs,
-          markdownContent: conversation.markdownContent || null,
-          rebirthHandoff: conversation.rebirthHandoff || null,
-          content: conversation.content || null,
-          blockCount: (conversation.content || []).length || msgs.length
-        }
+        // raw removed — all consumers now check capture/derived first,
+        // falling back to raw only for v1 snapshots already on disk.
     };
       // Carry phoenix lineage if present
       if (conversation.phoenix) snapshot.phoenix = conversation.phoenix;

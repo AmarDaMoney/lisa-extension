@@ -1149,35 +1149,43 @@ function generateContinuationHandoff(data, platform, mode) {
       } else {
         // LISA-condensed: semantic translation. AI-disambiguated summary
         // when available (Pro/PAYG), regex tokenization as fallback.
-        const tokens = compressor.tokenize(text);
         const aiSummaries = aiWMR && aiWMR.turn_summaries || [];
         const aiTurn = aiSummaries.find(t => t.turn === i + 1);
-        const summary = aiTurn ? aiTurn.summary : compressor.summarize(text);
-        const label = aiTurn ? 'AI-condensed' : 'condensed';
-        let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', ' + label + ']**\n';
-        if (summary) block += '> ' + summary.replace(/\n/g, ' ') + '\n';
-        let meta = [];
-        if (tokens.intent && tokens.intent !== 'statement') meta.push('intent: ' + tokens.intent);
-        if (tokens.entities && tokens.entities.length > 0) {
-          const allVals = tokens.entities.flatMap(e => e.values || []);
-          if (allVals.length > 0) meta.push('entities: ' + allVals.slice(0, 8).join(', '));
+        if (aiTurn) {
+          // AI-condensed: disambiguated summary is the complete representation.
+          // No regex metadata — the AI already resolved everything.
+          let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', AI-condensed]**\n';
+          block += '> ' + aiTurn.summary.replace(/\n/g, ' ') + '\n';
+          recentContent += block + '\n';
+        } else {
+          // Regex fallback: tokenize for entities, concepts, relationships
+          const tokens = compressor.tokenize(text);
+          const summary = compressor.summarize(text);
+          let block = '**[Turn ' + (i + 1) + ', ' + compressor.messageId(text, i) + ', ' + role + ', condensed]**\n';
+          if (summary) block += '> ' + summary.replace(/\n/g, ' ') + '\n';
+          let meta = [];
+          if (tokens.intent && tokens.intent !== 'statement') meta.push('intent: ' + tokens.intent);
+          if (tokens.entities && tokens.entities.length > 0) {
+            const allVals = tokens.entities.flatMap(e => e.values || []);
+            if (allVals.length > 0) meta.push('entities: ' + allVals.slice(0, 8).join(', '));
+          }
+          if (tokens.concepts && tokens.concepts.length > 0) {
+            meta.push('concepts: ' + tokens.concepts.slice(0, 5).map(c => c.term).join(', '));
+          }
+          if (tokens.relationships && tokens.relationships.length > 0) {
+            meta.push('relations: ' + tokens.relationships.slice(0, 3).map(r => r.subject + ' ' + r.type + ' ' + r.object).join('; '));
+          }
+          const codeBlocks = text.match(/```(\w*)\n([\s\S]*?)```/g) || [];
+          if (codeBlocks.length > 0) {
+            const types = codeBlocks.map(b => {
+              const m = b.match(/```(\w*)\n([\s\S]*?)```/);
+              return compressor.classifyArtifact(m[1] || '', m[2] || '');
+            });
+            meta.push('artifacts: ' + [...new Set(types)].join(', '));
+          }
+          if (meta.length > 0) block += '> _[' + meta.join(' | ') + ']_\n';
+          recentContent += block + '\n';
         }
-        if (tokens.concepts && tokens.concepts.length > 0) {
-          meta.push('concepts: ' + tokens.concepts.slice(0, 5).map(c => c.term).join(', '));
-        }
-        if (tokens.relationships && tokens.relationships.length > 0) {
-          meta.push('relations: ' + tokens.relationships.slice(0, 3).map(r => r.subject + ' ' + r.type + ' ' + r.object).join('; '));
-        }
-        const codeBlocks = text.match(/```(\w*)\n([\s\S]*?)```/g) || [];
-        if (codeBlocks.length > 0) {
-          const types = codeBlocks.map(b => {
-            const m = b.match(/```(\w*)\n([\s\S]*?)```/);
-            return compressor.classifyArtifact(m[1] || '', m[2] || '');
-          });
-          meta.push('artifacts: ' + [...new Set(types)].join(', '));
-        }
-        if (meta.length > 0) block += '> _[' + meta.join(' | ') + ']_\n';
-        recentContent += block + '\n';
       }
     });
   }

@@ -1489,8 +1489,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const rebirthMode = request.mode || 'adaptive';
         try {
           if (rebirthMode === 'adaptive') {
-          const syncStore = await chrome.storage.sync.get(['licenseKey', 'userTier', 'usageStats']);
-          const lk = syncStore.licenseKey;
+          const syncStore = await chrome.storage.sync.get(['licenseKey', 'userTier', 'usageStats', 'installId']);
+          const lk = syncStore.licenseKey || syncStore.installId || null;
           const tier = syncStore.userTier || 'free';
           const pool = (syncStore.usageStats || {}).lifetimeFreePool ?? 0;
           // AI WMR for anyone with credits: Pro/PAYG by tier, free users by pool
@@ -1678,6 +1678,15 @@ chrome.runtime.setUninstallURL("https://forms.gle/2Vu8M8NQYP6eKBnR9");
 chrome.runtime.onInstalled.addListener((details) => {
   console.debug("[LISA] Extension installed/updated:", details.reason);
   createContextMenus();
+
+  // Generate anonymous install ID for free-tier API tracking
+  chrome.storage.sync.get(['installId'], (result) => {
+    if (!result.installId) {
+      const id = 'free-' + crypto.randomUUID();
+      chrome.storage.sync.set({ installId: id });
+      console.debug('[LISA] Install ID generated:', id);
+    }
+  });
   
   // Show "What's new" for updates (not fresh installs)
   if (details.reason === 'update') {

@@ -42,6 +42,14 @@
       this._saveTimer = null;
 
       this._init();
+
+        // Inject spinner keyframes
+        if (!document.getElementById('lisa-phoenix-styles')) {
+          const style = document.createElement('style');
+          style.id = 'lisa-phoenix-styles';
+          style.textContent = '@keyframes lisa-spin { to { transform: rotate(360deg); } }';
+          document.head.appendChild(style);
+        }
     }
 
     // ── Platform detection (mirrors lisa-progressive.js) ──
@@ -256,30 +264,31 @@
               await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
             }
           }
-          const willAI = rebirthMode === 'adaptive' && (tier !== 'free' || pool > 0);
-          const btn = document.getElementById('lisa-phoenix-rebirth-btn');
-          if (btn && willAI) {
-            // Show loading state only when AI call will actually fire
-            btn.disabled = true;
-            btn.style.opacity = '0.6';
-            btn.innerHTML = '\u23F3 Translating context...';
+          // Dismiss modal immediately — progress shows on floating button
+          const ov = document.getElementById('lisa-phoenix-overlay');
+          if (ov) ov.remove();
+          const bd = document.getElementById('lisa-phoenix-backdrop');
+          if (bd) bd.remove();
+          // Transform floating button into cooldown spinner
+          const floatBtn = document.getElementById('lisa-rebirth-btn');
+          if (floatBtn) {
+            floatBtn.textContent = '';
+            floatBtn.style.border = '2px solid rgba(249,115,22,0.2)';
+            floatBtn.style.borderTop = '2px solid #f97316';
+            floatBtn.style.animation = 'lisa-spin 0.8s linear infinite';
+            floatBtn.style.pointerEvents = 'none';
           }
           chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: this.platform, mode: rebirthMode });
-          if (willAI) {
-            // Modal stays visible until rebirth completes or 15s timeout
-            setTimeout(() => {
-              const ov = document.getElementById('lisa-phoenix-overlay');
-              if (ov) ov.remove();
-              const bd = document.getElementById('lisa-phoenix-backdrop');
-              if (bd) bd.remove();
-            }, 15000);
-          } else {
-            // No AI call — dismiss immediately
-            const ov = document.getElementById('lisa-phoenix-overlay');
-            if (ov) ov.remove();
-            const bd = document.getElementById('lisa-phoenix-backdrop');
-            if (bd) bd.remove();
-          }
+          // Safety timeout: restore button if completion never arrives
+          setTimeout(() => {
+            const fb = document.getElementById('lisa-rebirth-btn');
+            if (fb && !fb.textContent) {
+              fb.style.animation = 'none';
+              fb.style.border = '2px solid #f97316';
+              fb.textContent = '\uD83D\uDD25';
+              fb.style.pointerEvents = 'auto';
+            }
+          }, 30000);
         } else {
           // Free tier limit reached
           const btn = document.getElementById('lisa-phoenix-rebirth-btn');
@@ -334,30 +343,31 @@
                   await chrome.storage.sync.set({ rebirthCount: count + 1, rebirthDate: today });
                 }
               }
-              const willAI = rebirthMode === 'adaptive' && (tier !== 'free' || pool > 0);
-              const xbtn = document.getElementById('lisa-phoenix-rebirth-btn');
-              if (xbtn && willAI) {
-                // Show loading state only when AI call will actually fire
-                xbtn.disabled = true;
-                xbtn.style.opacity = '0.6';
-                xbtn.innerHTML = '\u23F3 Translating context...';
+              // Dismiss modal immediately — progress shows on floating button
+              const ov = document.getElementById('lisa-phoenix-overlay');
+              if (ov) ov.remove();
+              const bd = document.getElementById('lisa-phoenix-backdrop');
+              if (bd) bd.remove();
+              // Transform floating button into cooldown spinner
+              const floatBtn = document.getElementById('lisa-rebirth-btn');
+              if (floatBtn) {
+                floatBtn.textContent = '';
+                floatBtn.style.border = '2px solid rgba(249,115,22,0.2)';
+                floatBtn.style.borderTop = '2px solid #f97316';
+                floatBtn.style.animation = 'lisa-spin 0.8s linear infinite';
+                floatBtn.style.pointerEvents = 'none';
               }
               chrome.runtime.sendMessage({ type: 'PHOENIX_REBIRTH', platform: target, mode: rebirthMode });
-              if (willAI) {
-                // Modal stays visible until rebirth completes or 15s timeout
-                setTimeout(() => {
-                  const ov = document.getElementById('lisa-phoenix-overlay');
-                  if (ov) ov.remove();
-                  const bd = document.getElementById('lisa-phoenix-backdrop');
-                  if (bd) bd.remove();
-                }, 15000);
-              } else {
-                // No AI call — dismiss immediately
-                const ov = document.getElementById('lisa-phoenix-overlay');
-                if (ov) ov.remove();
-                const bd = document.getElementById('lisa-phoenix-backdrop');
-                if (bd) bd.remove();
-              }
+              // Safety timeout: restore button if completion never arrives
+              setTimeout(() => {
+                const fb = document.getElementById('lisa-rebirth-btn');
+                if (fb && !fb.textContent) {
+                  fb.style.animation = 'none';
+                  fb.style.border = '2px solid #f97316';
+                  fb.textContent = '\uD83D\uDD25';
+                  fb.style.pointerEvents = 'auto';
+                }
+              }, 30000);
             } else {
               alert('Welcome pool and daily rebirths used. Upgrade to Premium for unlimited.');
             }
@@ -634,11 +644,24 @@
     _listenForRebirthComplete() {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg.type === 'PHOENIX_REBIRTH_COMPLETE') {
-          // Dismiss modal if still showing
+          // Restore floating button from spinner to success, then back to fire
+          const floatBtn = document.getElementById('lisa-rebirth-btn');
+          if (floatBtn) {
+            floatBtn.style.animation = 'none';
+            floatBtn.style.border = '2px solid #4ade80';
+            floatBtn.textContent = '\u2705';
+            floatBtn.style.pointerEvents = 'auto';
+            setTimeout(() => {
+              floatBtn.style.border = '2px solid #f97316';
+              floatBtn.textContent = '\uD83D\uDD25';
+            }, 3000);
+          }
+          // Dismiss modal if somehow still showing
           const ov = document.getElementById('lisa-phoenix-overlay');
           if (ov) ov.remove();
           const bd = document.getElementById('lisa-phoenix-backdrop');
           if (bd) bd.remove();
+          // Toast notification
           const toast = document.createElement('div');
           toast.id = 'lisa-phoenix-toast';
           Object.assign(toast.style, {

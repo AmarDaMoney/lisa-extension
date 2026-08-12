@@ -1486,8 +1486,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         };
         // (snapshot saved below after hash computation)
 
-        // 2b. AI WMR extraction for Pro/PAYG users (blocks rebirth)
+        // 2b. AI WMR extraction — adaptive mode only (blocks rebirth)
+        const rebirthMode = request.mode || 'adaptive';
         try {
+          if (rebirthMode === 'adaptive') {
           const syncStore = await chrome.storage.sync.get(['licenseKey', 'userTier', 'usageStats']);
           const lk = syncStore.licenseKey;
           const tier = syncStore.userTier || 'free';
@@ -1515,13 +1517,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               }
             }
           }
+          } // end if (rebirthMode === 'adaptive')
         } catch (wmrErr) {
           console.warn('[LISA Phoenix] AI WMR skipped:', wmrErr.message);
           // Falls through to regex — rebirth continues
         }
 
         // 3. Generate continuation handoff
-        const mdContent = generateContinuationHandoff(data, data.platform, request.mode || 'adaptive');
+        const mdContent = generateContinuationHandoff(data, data.platform, rebirthMode);
 
         // Compute handoff hash + chain hash
         const encoder = new TextEncoder();
@@ -1535,7 +1538,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         // Save once with complete data (hashes + handoff content)
         data.rebirthHandoff = mdContent;
-        data.rebirthMode = request.mode || 'adaptive';
+        data.rebirthMode = rebirthMode;
         await snapshotManager.saveSnapshot(data, 'phoenix-rebirth');
         // Pool deduction handled by phoenix.js gate — not here.
         // (Double-deduction bug: phoenix decrements at the gate,

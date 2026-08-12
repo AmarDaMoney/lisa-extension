@@ -1488,10 +1488,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         // 2b. AI WMR extraction for Pro/PAYG users (blocks rebirth)
         try {
-          const syncStore = await chrome.storage.sync.get(['licenseKey', 'userTier']);
+          const syncStore = await chrome.storage.sync.get(['licenseKey', 'userTier', 'usageStats']);
           const lk = syncStore.licenseKey;
           const tier = syncStore.userTier || 'free';
-          if (lk && tier !== 'free') {
+          const pool = (syncStore.usageStats || {}).lifetimeFreePool ?? 0;
+          // AI WMR for anyone with credits: Pro/PAYG by tier, free users by pool
+          if (lk && (tier !== 'free' || pool > 0)) {
             const msgs = data.messages || [];
             // Send last 30 turns — enough for context, cheap enough for 1 credit
             const tail = msgs.slice(-30);
@@ -1503,7 +1505,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/extract-wmr', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'X-License-Key': lk },
-              body: JSON.stringify({ messages: formatted, provider: 'claude' })
+              body: JSON.stringify({ messages: formatted, provider: 'deepseek' })
             });
             if (resp.ok) {
               const result = await resp.json();

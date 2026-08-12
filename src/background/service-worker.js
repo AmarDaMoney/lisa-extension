@@ -1043,31 +1043,9 @@ function generateContinuationHandoff(data, platform, mode) {
     const verbatimCount = isHighDensity.filter(Boolean).length;
     const semanticCount = messages.length - verbatimCount;
 
-    // Step 5: State snapshot — extract from last few high-density assistant turns
-    let stateSnapshot = '';
-    const lastHighAssistant = [];
-    for (let i = messages.length - 1; i >= 0 && lastHighAssistant.length < 3; i--) {
-      if (messages[i].role === 'assistant' && isHighDensity[i]) {
-        const text = msgText(messages[i]);
-        const summary = compressor.summarize(text);
-        if (!summary || summary.length <= 20) continue;
-        // Split on sentence ends, but not on dots inside identifiers
-        // (memory.next) or decimals. Requires whitespace + capital after.
-        const sentences = summary.split(/(?<=[.!?])\s+(?=[A-Z])/);
-        const kept = sentences.filter(sn => {
-          if (/\b(?:I|you|we|my|your|our|me|us)\b/i.test(sn)) return false;
-          if (/\b(?:suppose|imagine|for example|consider|let'?s say|hypothetically)\b/i.test(sn)) return false;
-          return sn.trim().length > 15;
-        });
-        if (kept.length > 0) lastHighAssistant.unshift(kept.join(' ').trim());
-      }
-    }
-    if (lastHighAssistant.length > 0) {
-      stateSnapshot = '## STATE SNAPSHOT\n\n';
-      stateSnapshot += '> Current working state distilled from high-density turns:\n\n';
-      lastHighAssistant.forEach(s => { stateSnapshot += '- ' + s + '\n'; });
-      stateSnapshot += '\n';
-    }
+    // Step 5: State Snapshot removed — regex-summarized fragments produced
+    // garbled output. AI WMR now provides the working state when available.
+    // Free users get the WMR section (regex) without the garbled snapshot.
 
     // Step 6: Working Memory Register — cognitive state extraction
     // AI-extracted WMR takes priority when available (Pro/PAYG users).
@@ -1122,10 +1100,8 @@ function generateContinuationHandoff(data, platform, mode) {
     // Skip State Snapshot when almost everything is verbatim — regex-extracted
     // "state" from high-density turns adds noise when the turns themselves are
     // already in the output.
-    if (verbatimCount / messages.length > 0.8) stateSnapshot = '';
-    // AI WMR supersedes the regex state snapshot — it's a better
-    // representation of working state.
-    if (aiWMR) stateSnapshot = '';
+
+
     // Skip WMR when every category is empty — five "None detected" headings
     // waste tokens and look broken. The section appears when regex or AI
     // actually found something.
@@ -1134,7 +1110,7 @@ function generateContinuationHandoff(data, platform, mode) {
       const emptyCount = (wmrBlock.match(/_None detected/g) || []).length;
       if (emptyCount >= 5) wmrBlock = '';
     }
-    earlySummary = stateSnapshot + wmrBlock;
+    earlySummary = wmrBlock;
     recentContent = '## CONVERSATION (' + messages.length + ' messages \u2014 '
       + verbatimCount + ' verbatim, ' + semanticCount + ' ' + (aiWMR ? 'AI-condensed' : 'LISA-condensed') + ')\n\n';
 

@@ -1807,7 +1807,7 @@ class LISAPopup {
   }
   applyLibFilter() {
     const snaps = this._allSnapshots || [];
-    if (this._libFilter === 'ai') {
+    if (this._libFilter === 'compressed') {
       this.renderSnapshots(snaps.filter(s => s.format === 'ai-compressed'));
     } else {
       // Saves tab: all saves except AI compressed

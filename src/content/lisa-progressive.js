@@ -135,10 +135,7 @@ class LisaProgressiveCapture {
       capturedAt: new Date().toISOString()
     });
     this.scheduleSave();
-    // Notify CPE (lisa-phoenix.js) of new capture
-    document.dispatchEvent(new CustomEvent('lisa-message-captured', {
-      detail: { role, textLength: text.length, bufferSize: this.buffer.size }
-    }));
+
   }
 
   captureAllVisible() {

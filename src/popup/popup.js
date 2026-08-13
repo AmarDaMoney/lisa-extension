@@ -1807,14 +1807,6 @@ class LISAPopup {
   }
   applyLibFilter() {
     const snaps = this._allSnapshots || [];
-    if (false) { // rebirths tab removed
-    } else if (this._libFilter === 'compressed') {
-      // AI compressed tab: backend AI compressions only
-      this.renderSnapshots(snaps.filter(s => s.format === 'ai-compressed'));
-    } else {
-      // Saves tab: regular saves (exclude rebirths and AI compressed)
-      this.renderSnapshots(snaps.filter(s => s.format !== 'ai-compressed'));
-    }
   }
 
   renderSnapshots(snapshots) {
@@ -1834,7 +1826,7 @@ class LISAPopup {
         </div>
         <div class="snapshot-actions">
           <button class="snapshot-btn history" data-root-id="${snap.rootId || snap.id}" title="Version History">🕒</button>
-          ${snap.phoenix ? '<button class="snapshot-btn lineage" data-session-id="' + snap.phoenix.session_id + '" title="Phoenix Lineage">🔗</button>' : ''}
+          
           <button class="snapshot-btn download" data-id="${snap.id}" title="Download JSON">💾</button>
             <button class="snapshot-btn inject" data-id="${snap.id}" title="Inject context to active AI tab">📎</button>
           <button class="snapshot-btn send" data-id="${snap.id}" title="Send to App">📤</button>
@@ -1864,9 +1856,6 @@ class LISAPopup {
       btn.addEventListener('click', (e) => this.deleteSnapshot(e.target.dataset.id));
     });
 
-    container.querySelectorAll('.snapshot-btn.lineage').forEach(btn => {
-      btn.addEventListener('click', (e) => this.showLineageView(e.target.dataset.sessionId));
-    });
 
     // Checkbox multi-select logic for inject
     const bar = document.getElementById('injectSelectedBar');
@@ -1954,7 +1943,7 @@ class LISAPopup {
       const view = readSnapshot(snapshot);
 
       if (view.markdown) {
-        // Markdown export or rebirth handoff - both are renderable text.
+        // Markdown export - renderable text.
         fileContent = view.markdown;
         mimeType = 'text/markdown';
         extension = 'md';
@@ -2149,7 +2138,7 @@ class LISAPopup {
         return;
       }
 
-      // Use stored rebirth handoff if available (preserves the exact MD that was generated)
+      // Use stored markdown if available
       const markdown = describeSnapshot(snapshot).markdownOnly || this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
       // Platforms dedupe attachments by filename within a conversation: a
@@ -2338,66 +2327,6 @@ class LISAPopup {
     }
   }
 
-  async showLineageView(sessionId) {
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
-      if (!response.success || !response.snapshots) {
-        alert('Could not load snapshots');
-        return;
-      }
-
-      const phoenixSnaps = response.snapshots.filter(s => s.phoenix);
-      const bySessionId = {};
-      phoenixSnaps.forEach(s => { bySessionId[s.phoenix.session_id] = s; });
-
-      // Walk chain backwards to genesis
-      let current = bySessionId[sessionId];
-      const chain = [];
-      const visited = new Set();
-      while (current && !visited.has(current.phoenix.session_id)) {
-        chain.unshift(current);
-        visited.add(current.phoenix.session_id);
-        const parentId = current.phoenix.parent_session_id;
-        current = parentId ? bySessionId[parentId] : null;
-      }
-
-      // Walk chain forwards to descendants
-      const childMap = {};
-      phoenixSnaps.forEach(s => {
-        if (s.phoenix.parent_session_id) {
-          childMap[s.phoenix.parent_session_id] = s;
-        }
-      });
-      let desc = childMap[sessionId];
-      while (desc && !visited.has(desc.phoenix.session_id)) {
-        chain.push(desc);
-        visited.add(desc.phoenix.session_id);
-        desc = childMap[desc.phoenix.session_id];
-      }
-
-      if (chain.length === 0) {
-        alert('No lineage data found.');
-        return;
-      }
-
-      const lines = chain.map((s, i) => {
-        const gen = s.phoenix.generation || 1;
-        const plat = s.phoenix.platform || s.platform || '?';
-        const hash = s.phoenix.chain_hash ? s.phoenix.chain_hash.slice(0, 12) : 'N/A';
-        const date = s.phoenix.reborn_at ? new Date(s.phoenix.reborn_at).toLocaleString() : 'genesis';
-        const title = (s.title || 'Untitled').substring(0, 40);
-        const marker = s.phoenix.session_id === sessionId ? ' \u25c0 current' : '';
-        const arrow = i < chain.length - 1 ? '\n    \u2193 reborn' : '';
-        return 'Gen ' + gen + ' | ' + plat + ' | ' + title + marker
-          + '\n    Hash: ' + hash + ' | ' + date + arrow;
-      });
-
-      alert('\ud83d\udd25 Phoenix Lineage (' + chain.length + ' sessions)\n\n' + lines.join('\n'));
-    } catch (error) {
-      console.error('[LISA] Lineage view error:', error);
-      alert('Failed to load lineage');
-    }
-  }
 
   formatTimeAgo(dateString) {
     const date = new Date(dateString);

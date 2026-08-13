@@ -848,7 +848,6 @@ const readyTabs = new Map();
 // ============================================
 
 
-      earlySummary += JSON.stringify(semanticBlocks, null, 1) + '\n';
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Handle parser ready signals
   if (request.action === 'parserReady') {

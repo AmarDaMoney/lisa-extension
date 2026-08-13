@@ -159,7 +159,6 @@ class LISAFloatingButton {
     const button = document.createElement('div');
     button.id = 'lisa-floating-btn';
     button.innerHTML = `
-      <div class="lisa-rebirth-icon" title="LISA Phoenix — Rebirth">🔥</div>
       <button class="lisa-fab" title="Export to LISA">
         <span class="lisa-fab-icon">💾</span>
         <span class="lisa-fab-text">Export to LISA</span>
@@ -177,24 +176,6 @@ class LISAFloatingButton {
         display: flex;
         align-items: center;
         gap: 8px;
-      }
-      .lisa-rebirth-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: rgba(0,0,0,0.7);
-        border: 2px solid #f97316;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        font-size: 16px;
-        box-shadow: 0 2px 8px rgba(249,115,22,0.3);
-        transition: all 0.2s ease;
-      }
-      .lisa-rebirth-icon:hover {
-        transform: scale(1.1);
-        box-shadow: 0 2px 12px rgba(249,115,22,0.5);
       }
       .lisa-fab {
         display: flex;
@@ -335,9 +316,6 @@ class LISAFloatingButton {
     document.body.appendChild(button);
 
     button.querySelector(".lisa-fab").addEventListener("click", () => this.showActionMenu());
-    button.querySelector(".lisa-rebirth-icon").addEventListener("click", () => {
-      document.dispatchEvent(new CustomEvent('lisa-rebirth-click'));
-    });
     this.button = button;
     console.debug('[LISA] Floating button ready');
   }

@@ -1966,7 +1966,9 @@ class LISAPopup {
         extension = 'jsonl';
       } else {
         // Standard format: JSON stringify the data
-        const data = snapshot.raw || snapshot;
+        const data = (snapshot.format === 'ai-compressed' && snapshot.capture?.content)
+          ? snapshot.capture.content
+          : snapshot.raw || snapshot;
         fileContent = JSON.stringify(data, null, 2);
         mimeType = 'application/json';
         extension = 'json';

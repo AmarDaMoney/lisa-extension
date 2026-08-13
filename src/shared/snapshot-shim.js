@@ -34,6 +34,33 @@ function readSnapshot(snapshot) {
     }));
     out.count = out.messages.length || snapshot.messageCount || 0;
     out.isLossy = (msgs.length > 0 && out.messages.length === 0);
+    // AI compressed: token data lives in capture.content
+    if (!out.markdown && out.messages.length === 0 && snapshot.capture.content) {
+      const token = snapshot.capture.content;
+      if (typeof token === 'object' && token.semantic_anchors) {
+        const parts = [];
+        const meta = token.session_metadata || {};
+        if (meta.session_id) parts.push('# ' + meta.session_id);
+        const anchors = token.semantic_anchors || {};
+        if (Object.keys(anchors).length > 0) {
+          parts.push('## Semantic Anchors');
+          for (const [id, a] of Object.entries(anchors)) {
+            parts.push('**' + id + '**: ' + (a.anchor_text || a.content || JSON.stringify(a)));
+          }
+        }
+        const actions = token.action_vectors || {};
+        if (Object.keys(actions).length > 0) {
+          parts.push('## Action Vectors');
+          for (const [id, a] of Object.entries(actions)) {
+            parts.push('**' + id + '**: ' + (a.description || a.action || JSON.stringify(a)));
+          }
+        }
+        if (parts.length > 0) {
+          out.markdown = parts.join('\n\n');
+          out.isLossy = true;
+        }
+      }
+    }
     return out;
   }
 

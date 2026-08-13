@@ -1344,7 +1344,7 @@ class LISAPopup {
         messageCount: this.compressedData.metadata?.messageCount || 0,
         messages: this.compressedData.semanticTokens || this.compressedData.compressed || [],
         format: this.compressedData._aiCompressed ? 'ai-compressed' : 'compressed',
-        raw: this.compressedData
+        content: this.compressedData
       };
 
       const response = await chrome.runtime.sendMessage({ 

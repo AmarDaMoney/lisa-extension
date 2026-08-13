@@ -613,40 +613,71 @@ const hasher = new LISAHasher();
 class SnapshotManager {
   constructor() {
     this.MAX_SNAPSHOTS = 200;
-    this.STORAGE_KEY = 'lisaSnapshots';
+    this.INDEX_KEY = 'lisaSnapshotsIndex';
+    this.OLD_KEY = 'lisaSnapshots';
     this.SETTINGS_KEY = 'lisaAutoSaveSettings';
+    this._migrated = false;
   }
 
+  // Index fields — everything the popup needs for listing
+  _toIndexEntry(snapshot) {
+    return {
+      id: snapshot.id,
+      schema: snapshot.schema || 1,
+      platform: snapshot.platform,
+      url: snapshot.url,
+      title: snapshot.title,
+      messageCount: snapshot.messageCount,
+      savedAt: snapshot.savedAt,
+      source: snapshot.source,
+      format: snapshot.format || null,
+      version: snapshot.version || 1,
+      parentId: snapshot.parentId || null,
+      rootId: snapshot.rootId || snapshot.id,
+      hash: snapshot.hash || null,
+      phoenix: snapshot.phoenix || null
+    };
+  }
 
-
-
+  // One-time migration from monolithic array to index + individual keys
+  async _migrate() {
+    if (this._migrated) return;
+    this._migrated = true;
+    const data = await chrome.storage.local.get([this.OLD_KEY, this.INDEX_KEY]);
+    if (data[this.INDEX_KEY]) return; // already migrated
+    const old = data[this.OLD_KEY];
+    if (!old || !Array.isArray(old) || old.length === 0) return;
+    console.debug('[LISA] Migrating ' + old.length + ' snapshots to indexed storage...');
+    const index = [];
+    const writes = {};
+    for (const snap of old) {
+      index.push(this._toIndexEntry(snap));
+      writes['lisa_snap_' + snap.id] = snap;
+    }
+    writes[this.INDEX_KEY] = index;
+    await chrome.storage.local.set(writes);
+    await chrome.storage.local.remove(this.OLD_KEY);
+    console.debug('[LISA] Migration complete: ' + index.length + ' snapshots indexed');
+  }
 
   async decrementFreePool() {
-    try {
-      const result = await chrome.storage.sync.get(['usageStats']);
-      if (result.usageStats && result.usageStats.lifetimeFreePool > 0) {
-        result.usageStats.lifetimeFreePool--;
-        await chrome.storage.sync.set({ usageStats: result.usageStats });
-      }
-    } catch (e) {
-      console.debug('[LISA] Pool decrement error:', e.message);
+    const data = await chrome.storage.sync.get(['usageStats']);
+    const stats = data.usageStats || {};
+    if (typeof stats.lifetimeFreePool === 'number' && stats.lifetimeFreePool > 0) {
+      stats.lifetimeFreePool--;
+      await chrome.storage.sync.set({ usageStats: stats });
     }
   }
 
   async saveSnapshot(conversation, source = 'auto') {
     try {
-      const data = await chrome.storage.local.get(this.STORAGE_KEY);
-      const snapshots = data[this.STORAGE_KEY] || [];
+      await this._migrate();
+      const data = await chrome.storage.local.get(this.INDEX_KEY);
+      const index = data[this.INDEX_KEY] || [];
 
-      // Phase 6: Check if this is an update to existing conversation (same URL)
-      const existing = snapshots.find(s => s.url === conversation.url && s.source === source);
+      // Check if this is an update to existing conversation (same URL)
+      const existing = index.find(s => s.url === conversation.url && s.source === source);
 
-      // Schema v2: separate original content from derived data.
-      // capture  — the original conversation, never modified after save
-      // derived  — tokens, summaries, AI results, computed at save time
-      // raw      — lean compatibility shim for unconverted popup.js sites
-      //            (NOT the entire conversation object — that was the
-      //            double-wrap bug that created snapshot.raw.raw)
       const msgs = conversation.messages || [];
       const snapshot = {
         id: 'snap-' + Date.now(),
@@ -670,13 +701,9 @@ class SnapshotManager {
           actionVectors: conversation.action_vectors || null,
           reconstructionProtocol: conversation.reconstruction_protocol || null
         },
-        // raw removed — all consumers now check capture/derived first,
-        // falling back to raw only for v1 snapshots already on disk.
-    };
-      // Carry phoenix lineage if present
+      };
       if (conversation.phoenix) snapshot.phoenix = conversation.phoenix;
 
-      // Phase 6: Add versioning fields
       if (existing) {
         snapshot.version = (existing.version || 1) + 1;
         snapshot.parentId = existing.id;
@@ -688,11 +715,12 @@ class SnapshotManager {
       }
 
       // Inject lightweight anchor if not already present
-      if (!conversation.anchor && (conversation.messages || []).length > 0) {
+      if (!conversation.anchor && msgs.length > 0) {
         snapshot.anchor = compressor.generateRawAnchor(conversation);
       } else if (conversation.anchor) {
         snapshot.anchor = conversation.anchor;
       }
+
       // Pre-store LISA tokenization for instant semantic rebirth
       try {
         if (msgs.length > 0) {
@@ -710,29 +738,36 @@ class SnapshotManager {
               relationships: (tokens.relationships || []).length > 0 ? tokens.relationships.slice(0, 5) : undefined
             };
           }).filter(Boolean);
-          console.debug('[LISA] Pre-tokenized ' + snapshot.derived.lisaTokens.length + ' messages for instant rebirth');
+          console.debug('[LISA] Pre-tokenized ' + snapshot.derived.lisaTokens.length + ' messages');
         }
       } catch (tokenError) {
-        console.warn('[LISA] Pre-tokenization failed, rebirth will tokenize on-the-fly:', tokenError);
+        console.warn('[LISA] Pre-tokenization failed:', tokenError);
       }
 
-      // Phase 6: Generate content hash (non-fatal — save proceeds even if hashing fails)
+      // Generate content hash
       try {
         snapshot.hash = await this.hashContent(JSON.stringify(conversation));
       } catch (hashError) {
-        console.warn('[LISA] Hash generation failed, saving without hash:', hashError);
         snapshot.hash = null;
       }
 
-      snapshots.unshift(snapshot);
+      // Update index (add to front)
+      index.unshift(this._toIndexEntry(snapshot));
 
-      if (snapshots.length > this.MAX_SNAPSHOTS) {
-        snapshots.length = this.MAX_SNAPSHOTS;
+      // Enforce cap — remove oldest entries + their data
+      if (index.length > this.MAX_SNAPSHOTS) {
+        const removed = index.splice(this.MAX_SNAPSHOTS);
+        const removeKeys = removed.map(s => 'lisa_snap_' + s.id);
+        await chrome.storage.local.remove(removeKeys);
       }
 
-      await chrome.storage.local.set({ [this.STORAGE_KEY]: snapshots });
+      // Write index + individual snapshot atomically
+      await chrome.storage.local.set({
+        [this.INDEX_KEY]: index,
+        ['lisa_snap_' + snapshot.id]: snapshot
+      });
 
-      console.debug(`[LISA] Snapshot saved: ${snapshot.platform} - ${snapshot.title} (v${snapshot.version})`);
+      console.debug('[LISA] Snapshot saved: ' + snapshot.platform + ' - ' + snapshot.title + ' (v' + snapshot.version + ')');
       return snapshot;
     } catch (error) {
       console.error('[LISA] Failed to save snapshot:', error);
@@ -741,26 +776,35 @@ class SnapshotManager {
   }
 
   async getSnapshots() {
-    const data = await chrome.storage.local.get(this.STORAGE_KEY);
-    return data[this.STORAGE_KEY] || [];
+    await this._migrate();
+    const data = await chrome.storage.local.get(this.INDEX_KEY);
+    return data[this.INDEX_KEY] || [];
   }
 
   async getSnapshot(id) {
-    const snapshots = await this.getSnapshots();
-    return snapshots.find(s => s.id === id);
+    await this._migrate();
+    const key = 'lisa_snap_' + id;
+    const data = await chrome.storage.local.get(key);
+    return data[key] || null;
   }
 
   async deleteSnapshot(id) {
-    const data = await chrome.storage.local.get(this.STORAGE_KEY);
-    const snapshots = data[this.STORAGE_KEY] || [];
-    const filtered = snapshots.filter(s => s.id !== id);
-    await chrome.storage.local.set({ [this.STORAGE_KEY]: filtered });
+    await this._migrate();
+    const data = await chrome.storage.local.get(this.INDEX_KEY);
+    const index = data[this.INDEX_KEY] || [];
+    const filtered = index.filter(s => s.id !== id);
+    await chrome.storage.local.set({ [this.INDEX_KEY]: filtered });
+    await chrome.storage.local.remove('lisa_snap_' + id);
   }
 
   async clearAllSnapshots() {
-    await chrome.storage.local.remove(this.STORAGE_KEY);
+    const data = await chrome.storage.local.get(this.INDEX_KEY);
+    const index = data[this.INDEX_KEY] || [];
+    const keys = index.map(s => 'lisa_snap_' + s.id);
+    keys.push(this.INDEX_KEY);
+    await chrome.storage.local.remove(keys);
   }
-// Get friendly platform name from URL
+
   getPlatformName(url) {
     if (!url) return 'Unknown';
     if (url.includes('claude.ai')) return 'Claude';
@@ -777,7 +821,7 @@ class SnapshotManager {
       return 'Unknown';
     }
   }
-  // Phase 6: Generate content hash for version integrity
+
   async hashContent(content) {
     const encoder = new TextEncoder();
     const data = encoder.encode(content);
@@ -786,10 +830,9 @@ class SnapshotManager {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
   }
 
-  // Phase 6: Get version history for a conversation
   async getVersionHistory(rootId) {
-    const snapshots = await this.getSnapshots();
-    return snapshots
+    const index = await this.getSnapshots();
+    return index
       .filter(s => s.rootId === rootId || s.id === rootId)
       .sort((a, b) => (a.version || 1) - (b.version || 1));
   }
@@ -1359,6 +1402,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getSnapshots') {
     snapshotManager.getSnapshots().then(snapshots => {
       sendResponse({ success: true, snapshots });
+    }).catch(error => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+
+  if (request.action === 'getFullSnapshot') {
+    snapshotManager.getSnapshot(request.id).then(snapshot => {
+      sendResponse({ success: true, snapshot });
     }).catch(error => {
       sendResponse({ success: false, error: error.message });
     });

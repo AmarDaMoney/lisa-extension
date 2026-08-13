@@ -1942,8 +1942,8 @@ class LISAPopup {
   }
   async downloadSnapshot(id) {
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
-      const snapshot = response.snapshots.find(s => s.id === id);
+      const response = await chrome.runtime.sendMessage({ action: 'getFullSnapshot', id });
+      const snapshot = response.snapshot;
       
       if (!snapshot) {
         alert('Snapshot not found');
@@ -2144,8 +2144,8 @@ class LISAPopup {
   // ── Inject snapshot as .md file attachment into active chat ──
   async injectSnapshotAsMarkdown(id) {
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
-      const snapshot = response.snapshots.find(s => s.id === id);
+      const response = await chrome.runtime.sendMessage({ action: 'getFullSnapshot', id });
+      const snapshot = response.snapshot;
 
       if (!snapshot) {
         alert('Snapshot not found');
@@ -2260,8 +2260,8 @@ class LISAPopup {
 
   async sendSnapshotToApp(id) {
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
-      const snapshot = response.snapshots.find(s => s.id === id);
+      const response = await chrome.runtime.sendMessage({ action: 'getFullSnapshot', id });
+      const snapshot = response.snapshot;
       
       if (!snapshot) {
         alert('Snapshot not found');

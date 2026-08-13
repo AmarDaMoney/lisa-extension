@@ -487,7 +487,6 @@ class LISAPopup {
     // Library filter tabs — three tabs
     const libTabs = {
       all: { el: document.getElementById('libTabAll'), bg: 'rgba(74,222,128,0.15)', border: 'rgba(74,222,128,0.4)', color: '#4ade80' },
-      rebirths: { el: document.getElementById('libTabRebirths'), bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)', color: '#ef4444' },
       compressed: { el: document.getElementById('libTabCompressed'), bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.4)', color: '#818cf8' }
     };
     const activateLibTab = (key) => {
@@ -506,7 +505,6 @@ class LISAPopup {
       this.applyLibFilter();
     };
     libTabs.all.el.addEventListener('click', () => activateLibTab('all'));
-    libTabs.rebirths.el.addEventListener('click', () => activateLibTab('rebirths'));
     libTabs.compressed.el.addEventListener('click', () => activateLibTab('compressed'));
 
     // Download
@@ -1809,14 +1807,13 @@ class LISAPopup {
   }
   applyLibFilter() {
     const snaps = this._allSnapshots || [];
-    if (this._libFilter === 'rebirths') {
-      this.renderSnapshots(snaps.filter(s => s.phoenix || s.source === 'phoenix-rebirth'));
+    if (false) { // rebirths tab removed
     } else if (this._libFilter === 'compressed') {
       // AI compressed tab: backend AI compressions only
       this.renderSnapshots(snaps.filter(s => s.format === 'ai-compressed'));
     } else {
       // Saves tab: regular saves (exclude rebirths and AI compressed)
-      this.renderSnapshots(snaps.filter(s => !s.phoenix && s.source !== 'phoenix-rebirth' && s.format !== 'ai-compressed'));
+      this.renderSnapshots(snaps.filter(s => s.format !== 'ai-compressed'));
     }
   }
 

@@ -44,7 +44,6 @@
       "js": [
         "src/utils/semantic-analyzer.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/claude-code-parser.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
@@ -59,7 +58,6 @@
         "src/content/claude-api-capture.js",
         "src/content/claude-parser.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
       ],
@@ -73,7 +71,6 @@
         "src/content/chatgpt-api-capture.js",
         "src/content/chatgpt-parser.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
       ],
@@ -86,7 +83,6 @@
       "js": [
         "src/content/gemini-parser.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
       ],
@@ -99,7 +95,6 @@
       "js": [
         "src/content/grok-parser.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
       ],
@@ -112,7 +107,6 @@
       "js": [
         "src/content/mistral-parser.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
       ],
@@ -125,7 +119,6 @@
       "js": [
         "src/content/deepseek-parser.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
       ],
@@ -138,7 +131,6 @@
       "js": [
         "src/content/copilot-parser.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
       ],
@@ -151,7 +143,6 @@
       "js": [
         "src/content/perplexity-parser.js",
         "src/content/lisa-progressive.js",
-        "src/content/lisa-phoenix.js",
         "src/content/lisa-v-parser.js",
         "src/content/lisa-floating-button.js"
       ],

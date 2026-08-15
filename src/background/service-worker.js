@@ -1009,7 +1009,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           platform: data.platform,
           url: data.url,
           title: data.title || "LISA-V Capture",
-          messageCount: data.stats?.totalBlocks || 0
+          messageCount: (data.stats?.userMessages || 0) + (data.stats?.assistantMessages || 0)
         };
         const saved = await snapshotManager.saveSnapshot(conversation, "floating-button-lisav");
         await snapshotManager.decrementFreePool();

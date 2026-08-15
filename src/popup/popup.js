@@ -1954,11 +1954,13 @@ class LISAPopup {
 
       if (fmt === 'lisa-v') {
         // LISA-V: output raw JSONL
-        const contentData = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
+        const contentRaw = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
+        // capture.content may be { blocks: [...], stats: {...} } or a plain array
+        const contentData = contentRaw?.blocks || (Array.isArray(contentRaw) ? contentRaw : null);
         if (Array.isArray(contentData)) {
           fileContent = contentData.map(item => JSON.stringify(item)).join('\n');
         } else {
-          fileContent = contentData;
+          fileContent = JSON.stringify(contentRaw, null, 2);
         }
         mimeType = 'application/jsonl';
         extension = 'jsonl';
@@ -1970,7 +1972,7 @@ class LISAPopup {
         extension = 'json';
       } else if (fmt === 'compressed') {
         // Local compressed: output JSON
-        const data = snapshot.raw || snapshot;
+        const data = snapshot.capture?.content || snapshot.raw || snapshot;
         fileContent = JSON.stringify(data, null, 2);
         mimeType = 'application/json';
         extension = 'json';
@@ -2020,7 +2022,9 @@ class LISAPopup {
     let isLisaV = snapshot.format === 'lisa-v';
 
     // Parse blocks from content — handle both LISA-V and raw/compressed formats
-    const contentData = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
+    const contentRaw = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
+    // capture.content may be { blocks: [...], stats: {...} } or a plain array
+    const contentData = contentRaw?.blocks || (Array.isArray(contentRaw) ? contentRaw : null);
     const messagesData = (snapshot.capture?.messages && snapshot.capture.messages.length > 0 ? snapshot.capture.messages : null)
       || (snapshot.messages && snapshot.messages.length > 0 ? snapshot.messages : null)
       || (snapshot.raw?.messages && snapshot.raw.messages.length > 0 ? snapshot.raw.messages : null)
@@ -2181,7 +2185,7 @@ class LISAPopup {
       // fall back to 'lisa-v', so a rebirth could collide with a LISA-V
       // export. Label the real kind and add a short unique suffix.
       const kind = snapshot.format
-        || (snapshot.source === 'phoenix-rebirth' || snapshot.phoenix ? 'rebirth' : 'snapshot');
+        || 'snapshot';
       const stamp = String(snapshot.savedAt || Date.now()).replace(/\D/g, '').slice(-6);
       const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + kind + '-' + stamp + '.md';
 
@@ -2234,7 +2238,9 @@ class LISAPopup {
 
     // Get the raw structured content
     let rawContent = '';
-    const contentData = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
+    const contentRaw = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
+    // capture.content may be { blocks: [...], stats: {...} } or a plain array
+    const contentData = contentRaw?.blocks || (Array.isArray(contentRaw) ? contentRaw : contentRaw);
 
     if (contentData) {
       if (Array.isArray(contentData)) {

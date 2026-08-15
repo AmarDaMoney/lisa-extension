@@ -85,6 +85,8 @@ class LISACompressor {
       'think', 'right', 'worth', 'still', 'even', 'well', 'good', 'want',
       'need', 'know', 'make', 'take', 'give', 'given', 'come', 'goes',
       'dear', 'dont', 'cant', 'wont', 'isnt', 'does', 'didnt', 'thats',
+      'its', 'are', 'was', 'has', 'had', 'not', 'can', 'may', 'got', 'let',
+      'way', 'use', 'used', 'line', 'things', 'every', 'between', 'first',
       'const', 'function', 'return', 'await', 'async', 'true', 'false', 'null', 'undefined',
       'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof']);
 

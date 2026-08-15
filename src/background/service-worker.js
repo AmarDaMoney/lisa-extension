@@ -74,7 +74,8 @@ class LISACompressor {
   }
 
   extractConcepts(text) {
-    const words = text.toLowerCase().split(/\s+/);
+    // TextRank: graph-based keyphrase extraction (PageRank over word co-occurrence)
+    // Words that co-occur with other important words rank high, not just frequent ones
     const stopWords = new Set(['the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
       'in', 'with', 'to', 'for', 'of', 'as', 'by', 'from', 'this', 'that', 'then', 'than',
       'what', 'when', 'where', 'will', 'would', 'could', 'should', 'have', 'been', 'were',
@@ -86,20 +87,71 @@ class LISACompressor {
       'dear', 'dont', 'cant', 'wont', 'isnt', 'does', 'didnt', 'thats',
       'const', 'function', 'return', 'await', 'async', 'true', 'false', 'null', 'undefined',
       'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof']);
-    const wordFreq = {};
-    words.forEach(word => {
-      word = word.replace(/[^\w]/g, '');
-      if (word.length > 3 && word.length <= 18 && !stopWords.has(word)
-          && !/\d{3,}/.test(word)
-          && !/[A-Z]/.test(word.slice(1))
-          && !word.includes('_')) {
-        wordFreq[word] = (wordFreq[word] || 0) + 1;
+
+    // Step 1: extract candidate words (same filtering as before)
+    const rawWords = text.toLowerCase().split(/\s+/);
+    const candidates = [];
+    for (const raw of rawWords) {
+      const word = raw.replace(/[^\w]/g, '');
+      if (word.length > 2 && word.length <= 25 && !stopWords.has(word)
+          && !/\d{3,}/.test(word) && !word.includes('_')) {
+        candidates.push(word);
       }
-    });
-    const sorted = Object.entries(wordFreq)
+    }
+    if (candidates.length === 0) return [];
+
+    // Step 2: build co-occurrence graph (window size = 4)
+    const WINDOW = 4;
+    const edges = {};   // edges[a][b] = co-occurrence count
+    const degree = {};  // total edge weight per node
+    for (let i = 0; i < candidates.length; i++) {
+      const a = candidates[i];
+      for (let j = i + 1; j < Math.min(i + WINDOW, candidates.length); j++) {
+        const b = candidates[j];
+        if (a === b) continue;
+        if (!edges[a]) edges[a] = {};
+        if (!edges[b]) edges[b] = {};
+        edges[a][b] = (edges[a][b] || 0) + 1;
+        edges[b][a] = (edges[b][a] || 0) + 1;
+        degree[a] = (degree[a] || 0) + 1;
+        degree[b] = (degree[b] || 0) + 1;
+      }
+    }
+
+    // Step 3: run PageRank (10 iterations, damping = 0.85)
+    const nodes = Object.keys(edges);
+    if (nodes.length === 0) return [];
+    const DAMPING = 0.85;
+    const ITERATIONS = 10;
+    let scores = {};
+    const initScore = 1.0 / nodes.length;
+    nodes.forEach(n => scores[n] = initScore);
+
+    for (let iter = 0; iter < ITERATIONS; iter++) {
+      const newScores = {};
+      for (const node of nodes) {
+        let sum = 0;
+        const neighbors = edges[node] || {};
+        for (const [neighbor, weight] of Object.entries(neighbors)) {
+          if (degree[neighbor] > 0) {
+            sum += (weight / degree[neighbor]) * (scores[neighbor] || 0);
+          }
+        }
+        newScores[node] = (1 - DAMPING) / nodes.length + DAMPING * sum;
+      }
+      scores = newScores;
+    }
+
+    // Step 4: sort by TextRank score, return top 10
+    const sorted = Object.entries(scores)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
-    return sorted.map(([word, freq]) => ({ term: word, weight: freq }));
+    // Normalize weights to 1-10 scale for readability
+    const maxScore = sorted[0]?.[1] || 1;
+    return sorted.map(([term, score]) => ({
+      term,
+      weight: Math.max(1, Math.round((score / maxScore) * 10))
+    }));
   }
 
   extractRelationships(text) {
@@ -519,14 +571,9 @@ class LISACompressor {
     // Sample first + last 5 messages for concept extraction
     const sample = [...messages.slice(0, 5), ...messages.slice(-5)];
     const allText = sample.map(m => msgText(m)).join(' ');
-    const stopwords = new Set(['this','that','with','from','have','been','will','would','could',
-      'should','their','there','they','what','when','where','which','more','also','into',
-      'your','about','just','like','some','than','then','them','these','those','were','very','well']);
-    const freq = {};
-    (allText.toLowerCase().match(/[a-z]{4,}/g) || []).forEach(w => {
-      if (!stopwords.has(w)) freq[w] = (freq[w] || 0) + 1;
-    });
-    const dominantConcepts = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 6).map(([w]) => w);
+    // Reuse TextRank for consistent concept extraction
+    const concepts = this.extractConcepts(allText);
+    const dominantConcepts = concepts.slice(0, 6).map(c => c.term);
     const coreTopic = conversation.title ||
       (userMsgs[0]?.content || userMsgs[0]?.v || '').substring(0, 100).replace(/\n/g, ' ').trim();
     return {
@@ -535,7 +582,7 @@ class LISACompressor {
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
       generated_by:      'LISA v0.52.2',
-      key_entities:    Object.keys(freq).length > 0 ? Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 12).map(([w]) => w) : [],
+      key_entities:    this.extractEntities(allText).flatMap(e => e.values).slice(0, 12),
       note:              'Lightweight anchor — raw verbatim format'
     };
   }

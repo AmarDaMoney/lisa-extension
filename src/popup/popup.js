@@ -1903,6 +1903,8 @@ class LISAPopup {
       const markdownFiles = snapshots.map(snap => {
         const md = (snap.rebirthHandoff || snap.raw?.rebirthHandoff)
           ? (snap.rebirthHandoff || snap.raw.rebirthHandoff)
+          : snap.derived?.markdown
+          ? snap.derived.markdown
           : (this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap));
         const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
         return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.md', content: md };
@@ -1971,6 +1973,15 @@ class LISAPopup {
         fileContent = JSON.stringify(data, null, 2);
         mimeType = 'application/json';
         extension = 'json';
+      } else if (fmt === 'markdown' || snapshot.derived?.markdown) {
+        // Schema v2 markdown or explicit markdown format
+        fileContent = snapshot.derived?.markdown || snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff;
+        if (!fileContent) {
+          // Fallback: generate from messages
+          fileContent = this.convertSnapshotToMarkdown(snapshot);
+        }
+        mimeType = 'text/markdown';
+        extension = 'md';
       } else if (snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff) {
         // Rebirth: output markdown handoff
         fileContent = snapshot.rebirthHandoff || snapshot.raw.rebirthHandoff;
@@ -2161,6 +2172,9 @@ class LISAPopup {
       if (snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff) {
         // Rebirth: use the handoff markdown directly
         markdown = snapshot.rebirthHandoff || snapshot.raw.rebirthHandoff;
+      } else if (snapshot.derived?.markdown) {
+        // Schema v2: use derived markdown directly
+        markdown = snapshot.derived.markdown;
       } else {
         // All other formats: wrap with structured header for AI consumption
         markdown = this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);

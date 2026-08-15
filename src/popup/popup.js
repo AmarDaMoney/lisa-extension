@@ -2249,6 +2249,9 @@ class LISAPopup {
         ).join('\n');
       } else if (typeof contentData === 'string') {
         rawContent = contentData;
+      } else if (typeof contentData === 'object') {
+        // Compressed/AI-compressed: content is a JSON object
+        rawContent = JSON.stringify(contentData, null, 2);
       }
     } else if (snapshot.raw) {
       // Raw or compressed — emit the full raw object as JSON

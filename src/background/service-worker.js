@@ -548,7 +548,8 @@ class LISACompressor {
     // a draft and its revision, a quoted reply - scores identically
     // twice and lands in the output twice, side by side.
     const seenSentence = new Set();
-    const sentences = text.split(/[.!?]+/).filter(s => {
+    // Split on sentence boundaries — not inside numbers (v0.51), abbreviations, or markdown
+    const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z"*\[(`])/).filter(s => {
       const t = s.trim();
       if (t.length <= 10) return false;
       const k = t.toLowerCase().replace(/\s+/g, ' ');
@@ -595,7 +596,14 @@ class LISACompressor {
     const top = scored.sort((a, b) => b.score - a.score).slice(0, 4);
     top.sort((a, b) => a.index - b.index);
     
-    return top.map(s => s.text).join('. ').substring(0, 800);
+    // Join selected sentences — respect 800 char limit at sentence boundaries, never mid-sentence
+    let result = '';
+    for (const s of top) {
+      const next = result ? result + '. ' + s.text : s.text;
+      if (next.length > 800) break;
+      result = next;
+    }
+    return result || top[0].text.substring(0, 800);
   }
 
   reconstruct(compressed) {

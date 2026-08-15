@@ -175,8 +175,21 @@ class LISACompressor {
         parts.forEach(p => absorbedWords.add(p));
       }
     }
-    // Merge: phrases + unabsorbed single words
-    const merged = { ...phraseScores };
+    // Dedup overlapping phrases — if two phrases share 2+ words, keep the higher-scoring one
+    const sortedPhrases = Object.entries(phraseScores).sort((a, b) => b[1] - a[1]);
+    const keptPhrases = {};
+    const droppedPhraseWords = new Set();
+    for (const [phrase, score] of sortedPhrases) {
+      const parts = phrase.split(' ');
+      // Check if this phrase overlaps heavily with an already-kept phrase
+      const overlapCount = parts.filter(p => droppedPhraseWords.has(p)).length;
+      if (overlapCount >= 2) continue; // skip — too similar to a higher-scoring phrase
+      keptPhrases[phrase] = score;
+      parts.forEach(p => droppedPhraseWords.add(p));
+    }
+
+    // Merge: deduplicated phrases + unabsorbed single words
+    const merged = { ...keptPhrases };
     for (const [word, score] of Object.entries(scores)) {
       if (!absorbedWords.has(word)) merged[word] = score;
     }

@@ -336,9 +336,8 @@ class LISAFloatingButton {
     const menu = document.createElement("div");
     menu.className = "lisa-action-menu";
     menu.innerHTML = `
-      <div class="lisa-menu-item" data-action="save-md">📋 Save as Markdown</div>
-      <div class="lisa-menu-item" data-action="save-json">📄 Save Raw JSON</div>
-      <div class="lisa-menu-item" data-action="save-lisav">📝 Save LISA-Verbatim</div>
+      <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
+      <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
       
     `;
     
@@ -364,7 +363,6 @@ class LISAFloatingButton {
       const action = e.target.dataset?.action;
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
-      else if (action === "save-json") this.saveConversation();
       else if (action === "save-lisav") this.saveLisaV();
     });
     
@@ -550,45 +548,6 @@ class LISAFloatingButton {
 
 
 
-
-  async saveConversation() {
-    try {
-      // Check free tier limit
-        const limitCheck = await this.checkFloatingLimit('rawjson');
-        if (!limitCheck.allowed) {
-          this.showToast(limitCheck.message, true);
-          this.showUpgradePrompt();
-          return;
-        }
-      this.showToast('Extracting...');
-      
-      // Use LISA-V parser for extraction, then flatten to messages for backend compat
-      const parser = new LisaVParser();
-      await parser.extractConversation();
-      await parser.finalize();
-      const messagesData = parser.toMessages();
-      
-      const response = await chrome.runtime.sendMessage({
-        action: 'extractAndSave',
-        source: 'floating-button',
-        format: 'lisa-v',
-        data: messagesData
-      });
-      
-      if (response && response.success) {
-        this.showToast('✅ Saved to LISA library!');
-        const remaining = await this.incrementFloatingLimit('rawjson');
-          if (remaining !== undefined && remaining <= 2) {
-            setTimeout(() => this.showToast(`${remaining} Raw JSON saves remaining today`), 2000);
-          }
-      } else {
-        this.showToast('❌ ' + (response?.error || 'Save failed'), true);
-      }
-    } catch (error) {
-      console.error('[LISA] Save error:', error);
-      this.showToast('❌ Could not save', true);
-    }
-  }
 
   showToast(message, isError = false) {
     const existing = document.querySelector('.lisa-toast');

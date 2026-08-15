@@ -1342,13 +1342,14 @@ class LISAPopup {
         url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || window.location.href,
         title: this.compressedData.metadata?.title || 'Compressed Conversation',
         messageCount: this.compressedData.metadata?.messageCount || 0,
-        messages: this.compressedData.semanticTokens || this.compressedData.compressed || [],
+        messages: [],
         format: this.compressedData._aiCompressed ? 'ai-compressed' : 'compressed',
         content: this.compressedData
       };
 
       const response = await chrome.runtime.sendMessage({ 
         action: 'extractAndSave',
+        source: 'popup-compressed',
         data: data
       });
 

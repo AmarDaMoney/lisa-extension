@@ -444,6 +444,7 @@ class LISAFloatingButton {
       // Save formatted markdown to library
       const response = await chrome.runtime.sendMessage({
         action: 'extractAndSave',
+        source: 'floating-button',
         format: 'markdown',
         data: {
           platform: platform,
@@ -569,7 +570,8 @@ class LISAFloatingButton {
       
       const response = await chrome.runtime.sendMessage({
         action: 'extractAndSave',
-        format: 'raw',
+        source: 'floating-button',
+        format: 'lisa-v',
         data: messagesData
       });
       

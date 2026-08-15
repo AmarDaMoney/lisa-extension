@@ -634,8 +634,7 @@ class SnapshotManager {
       version: snapshot.version || 1,
       parentId: snapshot.parentId || null,
       rootId: snapshot.rootId || snapshot.id,
-      hash: snapshot.hash || null,
-      phoenix: snapshot.phoenix || null
+      hash: snapshot.hash || null
     };
   }
 
@@ -679,6 +678,8 @@ class SnapshotManager {
       const existing = index.find(s => s.url === conversation.url && s.source === source);
 
       const msgs = conversation.messages || [];
+      // Resolve format once — single source of truth for top-level and capture
+      const resolvedFormat = conversation.format || (msgs.length > 0 ? 'raw' : null);
       const snapshot = {
         id: 'snap-' + Date.now(),
         schema: 2,
@@ -688,21 +689,19 @@ class SnapshotManager {
         messageCount: conversation.messageCount || msgs.length,
         savedAt: new Date().toISOString(),
         source: source,
-        format: conversation.format || null,
+        format: resolvedFormat,
         capture: {
           messages: msgs,
-          format: conversation.format || 'raw',
+          format: resolvedFormat || 'raw',
           content: conversation.content || null
         },
         derived: {
-          markdown: conversation.rebirthHandoff || conversation.markdownContent || null,
-          rebirthMode: conversation.rebirthMode || null,
+          markdown: conversation.markdownContent || null,
           semanticTokens: conversation.semanticTokens || null,
           actionVectors: conversation.action_vectors || null,
           reconstructionProtocol: conversation.reconstruction_protocol || null
         },
       };
-      if (conversation.phoenix) snapshot.phoenix = conversation.phoenix;
 
       if (existing) {
         snapshot.version = (existing.version || 1) + 1;
@@ -982,8 +981,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
           // Tag format if provided
           if (request.format) data.format = request.format;
-          // Save snapshot with appropriate source
-          const source = request.data ? 'extension-compressed' : 'floating-button';
+          // Save snapshot with appropriate source — caller can override
+          const source = request.source || (request.data ? 'extension-compressed' : 'floating-button');
           const snapshot = await snapshotManager.saveSnapshot(data, source);
           await snapshotManager.decrementFreePool();
         sendResponse({ success: true, snapshot });
@@ -1002,21 +1001,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
         const data = request.data;
-        const snapshot = {
-          id: "lisav-" + Date.now(),
-          syncId: "sync-" + Date.now(),
-          format: "lisa-v",
-          content: data.content,
-          stats: data.stats,
+        // Build v2-shaped input so saveSnapshot() produces a correct snapshot
+        const conversation = {
+          format: 'lisa-v',
+          messages: [],
+          content: { blocks: data.content, stats: data.stats },
           platform: data.platform,
           url: data.url,
           title: data.title || "LISA-V Capture",
-          timestamp: new Date().toISOString(),
-          source: "floating-button"
+          messageCount: data.stats?.totalBlocks || 0
         };
-        await snapshotManager.saveSnapshot(snapshot, "floating-button-lisav");
+        const saved = await snapshotManager.saveSnapshot(conversation, "floating-button-lisav");
         await snapshotManager.decrementFreePool();
-        sendResponse({ success: true, snapshot });
+        sendResponse({ success: true, snapshot: saved });
       } catch (error) {
         console.error("[LISA] LISA-V save error:", error);
         sendResponse({ success: false, error: error.message });

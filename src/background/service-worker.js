@@ -144,8 +144,45 @@ class LISACompressor {
       scores = newScores;
     }
 
-    // Step 4: sort by TextRank score, return top 10
-    const sorted = Object.entries(scores)
+    // Step 4: detect multi-word keyphrases from adjacent high-scoring words
+    const scoreValues = Object.values(scores);
+    const medianScore = scoreValues.sort((a, b) => a - b)[Math.floor(scoreValues.length / 2)] || 0;
+    const threshold = medianScore * 0.8;
+    // Scan candidates for adjacent pairs/triples above threshold
+    const phraseCounts = {};
+    for (let i = 0; i < candidates.length - 1; i++) {
+      const a = candidates[i], b = candidates[i + 1];
+      if ((scores[a] || 0) >= threshold && (scores[b] || 0) >= threshold) {
+        const bigram = a + ' ' + b;
+        phraseCounts[bigram] = (phraseCounts[bigram] || 0) + 1;
+        // Check trigram
+        if (i + 2 < candidates.length) {
+          const c = candidates[i + 2];
+          if ((scores[c] || 0) >= threshold) {
+            const trigram = a + ' ' + b + ' ' + c;
+            phraseCounts[trigram] = (phraseCounts[trigram] || 0) + 1;
+          }
+        }
+      }
+    }
+    // Promote phrases that appear 2+ times — sum component scores
+    const phraseScores = {};
+    const absorbedWords = new Set();
+    for (const [phrase, count] of Object.entries(phraseCounts)) {
+      if (count >= 2) {
+        const parts = phrase.split(' ');
+        phraseScores[phrase] = parts.reduce((sum, p) => sum + (scores[p] || 0), 0);
+        parts.forEach(p => absorbedWords.add(p));
+      }
+    }
+    // Merge: phrases + unabsorbed single words
+    const merged = { ...phraseScores };
+    for (const [word, score] of Object.entries(scores)) {
+      if (!absorbedWords.has(word)) merged[word] = score;
+    }
+
+    // Step 5: sort by score, return top 10
+    const sorted = Object.entries(merged)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
     // Normalize weights to 1-10 scale for readability

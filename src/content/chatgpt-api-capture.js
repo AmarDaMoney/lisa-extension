@@ -7,7 +7,7 @@
  * directly. Content script runs on chatgpt.com so browser attaches
  * session cookies automatically.
  *
- * VERSION: 0.52.1
+ * VERSION: 0.52.2
  * AUTHOR: SAT-CHAIN LLC / LISA Core
  */
 

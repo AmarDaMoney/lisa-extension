@@ -79,6 +79,11 @@ class LISACompressor {
       'in', 'with', 'to', 'for', 'of', 'as', 'by', 'from', 'this', 'that', 'then', 'than',
       'what', 'when', 'where', 'will', 'would', 'could', 'should', 'have', 'been', 'were',
       'here', 'there', 'just', 'also', 'very', 'some', 'more', 'into',
+      'your', 'you', 'yours', 'their', 'them', 'they', 'those', 'these',
+      'done', 'being', 'like', 'only', 'already', 'about', 'many', 'much',
+      'think', 'right', 'worth', 'still', 'even', 'well', 'good', 'want',
+      'need', 'know', 'make', 'take', 'give', 'given', 'come', 'goes',
+      'dear', 'dont', 'cant', 'wont', 'isnt', 'does', 'didnt', 'thats',
       'const', 'function', 'return', 'await', 'async', 'true', 'false', 'null', 'undefined',
       'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof']);
     const wordFreq = {};
@@ -117,7 +122,7 @@ class LISACompressor {
         const subj = (match[1] || '').toLowerCase();
         const obj = (match[2] || '').toLowerCase();
         if (subj.length < 3 || obj.length < 3) return;
-        const noise = new Set(['the','this','that','then','here','now','not','all','its','has','was','are','had','can','may','been','done','true','false','null','just','also','very','some','more']);
+        const noise = new Set(['the','this','that','then','here','now','not','all','its','has','was','are','had','can','may','been','done','true','false','null','just','also','very','some','more','and','or','but','you','your','they','them','both','right','already','being','even','still','only','well','any','each','whenever','both','our','those','these']);
         if (noise.has(subj) || noise.has(obj)) return;
         relationships.push({
           type,
@@ -131,11 +136,16 @@ class LISACompressor {
   }
 
   extractIntent(text) {
-    // Only check first sentence for question markers (prevents misclassifying
-    // long assistant responses that contain rhetorical questions)
-    const firstSentence = (text || '').split(/[.!?\n]/)[0] || '';
+    // Short text: check all sentences for question marks (user messages)
+    // Long text: only check first sentence (avoids rhetorical Qs in assistant replies)
+    const sentences = (text || '').split(/[.!?\n]/).map(s => s.trim()).filter(Boolean);
+    const firstSentence = sentences[0] || '';
+    const isShort = text.length < 500;
+    const hasQuestion = isShort
+      ? (sentences.some(s => /\?/.test(s)) || /(?:what|how|why|when|where|who|can|could|would|should)\b/i.test(text))
+      : (/\?$/.test(firstSentence) || /^(?:what|how|why|when|where|who|can|could|would|should)/i.test(text));
     const intents = {
-      question: /\?$/.test(firstSentence.trim()) || /^(?:what|how|why|when|where|who|can|could|would|should)/i.test(text),
+      question: hasQuestion,
       instruction: /^(?:please|could you|can you|would you|let's|make|create|build)/i.test(text),
       statement: true,
       agreement: /^(?:yes|sure|okay|agreed|right|correct)/i.test(text),

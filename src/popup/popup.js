@@ -1901,7 +1901,9 @@ class LISAPopup {
 
       // Convert all selected to markdown and combine
       const markdownFiles = snapshots.map(snap => {
-        const md = describeSnapshot(snap).markdownOnly || this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
+        const md = (snap.rebirthHandoff || snap.raw?.rebirthHandoff)
+          ? (snap.rebirthHandoff || snap.raw.rebirthHandoff)
+          : (this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap));
         const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
         return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.md', content: md };
       });
@@ -1943,37 +1945,45 @@ class LISAPopup {
       }
 
       // Create downloadable file
-      const isLisaV = snapshot.format === 'lisa-v';
+      // Download in declared format — not always markdown
       let fileContent, mimeType, extension;
-      
-      const view = readSnapshot(snapshot);
+      const fmt = snapshot.format || 'unknown';
 
-      if (view.markdown) {
-        // Markdown export - renderable text.
-        fileContent = view.markdown;
-        mimeType = 'text/markdown';
-        extension = 'md';
-      } else if (isLisaV) {
-        // LISA-V: output the raw JSONL content directly
-        // Convert array to JSONL string for download
+      if (fmt === 'lisa-v') {
+        // LISA-V: output raw JSONL
         const contentData = snapshot.capture?.content || snapshot.content || snapshot.raw?.content;
         if (Array.isArray(contentData)) {
           fileContent = contentData.map(item => JSON.stringify(item)).join('\n');
         } else {
-          fileContent = contentData; // Already string
+          fileContent = contentData;
         }
         mimeType = 'application/jsonl';
         extension = 'jsonl';
+      } else if (fmt === 'ai-compressed') {
+        // AI compressed: output JSON token
+        const data = snapshot.capture?.content || snapshot.raw || snapshot;
+        fileContent = JSON.stringify(data, null, 2);
+        mimeType = 'application/json';
+        extension = 'json';
+      } else if (fmt === 'compressed') {
+        // Local compressed: output JSON
+        const data = snapshot.raw || snapshot;
+        fileContent = JSON.stringify(data, null, 2);
+        mimeType = 'application/json';
+        extension = 'json';
+      } else if (snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff) {
+        // Rebirth: output markdown handoff
+        fileContent = snapshot.rebirthHandoff || snapshot.raw.rebirthHandoff;
+        mimeType = 'text/markdown';
+        extension = 'md';
       } else {
-        // Standard format: JSON stringify the data
-        const data = (snapshot.format === 'ai-compressed' && snapshot.capture?.content)
-          ? snapshot.capture.content
-          : snapshot.raw || snapshot;
+        // Fallback: JSON
+        const data = snapshot.raw || snapshot;
         fileContent = JSON.stringify(data, null, 2);
         mimeType = 'application/json';
         extension = 'json';
       }
-      
+
       const blob = new Blob([fileContent], { type: mimeType });
       const url = URL.createObjectURL(blob);
       
@@ -2146,8 +2156,15 @@ class LISAPopup {
         return;
       }
 
-      // Use stored markdown if available
-      const markdown = describeSnapshot(snapshot).markdownOnly || this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
+      // Use format-appropriate markdown for injection
+      let markdown;
+      if (snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff) {
+        // Rebirth: use the handoff markdown directly
+        markdown = snapshot.rebirthHandoff || snapshot.raw.rebirthHandoff;
+      } else {
+        // All other formats: wrap with structured header for AI consumption
+        markdown = this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
+      }
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
       // Platforms dedupe attachments by filename within a conversation: a
       // repeated name silently re-attaches the first file. Two snapshots of

@@ -551,19 +551,30 @@ class LISACompressor {
       return lastPeriod > 50 ? cut.substring(0, lastPeriod + 1) : cut;
     }
     
-    // Score sentences by keyword density (concepts, technical terms, actions)
+    // Score sentences using TextRank word scores — sentences with central concepts rank highest
+    const conceptScores = this.extractConcepts(text);
+    const scoreMap = {};
+    conceptScores.forEach(c => scoreMap[c.term] = c.weight);
+    // Also score multi-word matches
+    const phraseTerms = conceptScores.filter(c => c.term.includes(' ')).map(c => c.term);
+
     const scored = sentences.map((s, i) => {
-      let score = 0;
-      // Position bonus: first and last sentences often have context
-      if (i === 0) score += 2;
-      if (i === sentences.length - 1) score += 1;
-      // Content signals
-      if (/\b(?:because|therefore|however|conclusion|result|key|important|critical|must|should)\b/i.test(s)) score += 3;
-      if (/\b(?:fix|bug|error|issue|implement|deploy|create|update)\b/i.test(s)) score += 2;
-      if (/[A-Z][a-z]+[A-Z]/.test(s)) score += 1; // camelCase = technical
-      if (/\b[A-Z]{2,}\b/.test(s)) score += 1; // ACRONYMS = technical
-      // Penalize short filler sentences
-      if (s.trim().length < 20) score -= 2;
+      const words = s.toLowerCase().split(/\s+/).map(w => w.replace(/[^\w]/g, ''));
+      // Sum TextRank scores for words in this sentence
+      let score = words.reduce((sum, w) => sum + (scoreMap[w] || 0), 0);
+      // Bonus for multi-word phrases found in this sentence
+      const sLower = s.toLowerCase();
+      phraseTerms.forEach(p => { if (sLower.includes(p)) score += (scoreMap[p] || 0); });
+      // Normalize by sentence length to avoid bias toward long sentences
+      score = score / Math.max(words.length, 1);
+      // Position bonus: first and last sentences carry framing context
+      if (i === 0) score += 0.5;
+      if (i === sentences.length - 1) score += 0.3;
+      // Technical signal bonus (acronyms, camelCase)
+      if (/\b[A-Z]{2,}\b/.test(s)) score += 0.2;
+      if (/[A-Z][a-z]+[A-Z]/.test(s)) score += 0.2;
+      // Penalize short filler
+      if (s.trim().length < 20) score -= 1;
       return { text: s.trim(), score, index: i };
     });
     

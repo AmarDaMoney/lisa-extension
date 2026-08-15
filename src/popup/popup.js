@@ -2262,8 +2262,10 @@ class LISAPopup {
     if (!rawContent) return null;
 
     const formatLabel = format === 'lisa-v' ? 'LISA-V JSONL'
+      : format === 'ai-compressed' ? 'LISA AI-Compressed JSON'
       : format === 'compressed' ? 'LISA Compressed JSON'
-      : 'Raw JSON';
+      : format === 'markdown' ? 'Markdown'
+      : 'JSON';
 
     let md = '# LISA Context Injection \u2014 Machine-Readable Format\n\n';
     md += '> **This file contains structured conversation data captured by LISA Core.**\n';

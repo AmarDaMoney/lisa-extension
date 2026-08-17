@@ -75,6 +75,21 @@ class LisaVParser {
 
   // Parse a single message element
   async parseMessageContent(element, role) {
+    // Use shared HTML-to-markdown converter when available (all platforms)
+    // Only for elements without code blocks — code needs separate t:'code' blocks for LISA-V
+    const converter = window.__lisaHtmlToMarkdown;
+    const hasCodeBlocks = element.querySelector('pre code, pre.code-block, [class*="code-block"]');
+    if (converter && !hasCodeBlocks) {
+      const text = converter.extractAsMarkdown(element);
+      if (text) {
+        return [{
+          t: role === 'user' ? 'u' : 'a_text',
+          role: role,
+          v: text
+        }];
+      }
+    }
+    // Fallback: walk DOM manually
     const blocks = [];
     
     // Walk through child nodes

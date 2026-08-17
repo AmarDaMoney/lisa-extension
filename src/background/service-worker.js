@@ -943,6 +943,7 @@ class SnapshotManager {
     if (url.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
     if (url.includes('perplexity.ai')) return 'Perplexity';
     if (url.includes('poe.com')) return 'Poe';
+    if (url.includes('huggingface.co')) return 'HuggingChat';
     try {
       return new URL(url).hostname;
     } catch {
@@ -1439,6 +1440,7 @@ async function ensureContentScriptLoaded(tab) {
     else if (url.includes('copilot.microsoft.com')) scriptFile = 'src/content/copilot-parser.js';
     else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
     else if (url.includes('poe.com')) scriptFile = 'src/content/poe-parser.js';
+    else if (url.includes('huggingface.co')) scriptFile = 'src/content/huggingchat-parser.js';
     
     // Inject the script
     await chrome.scripting.executeScript({

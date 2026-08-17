@@ -318,6 +318,8 @@ class LISAPopup {
         platform = 'Perplexity';
       } else if (url.includes('poe.com')) {
         platform = 'Poe';
+      } else if (url.includes('huggingface.co')) {
+        platform = 'HuggingChat';
       } else {
         platform = 'Web Page (Universal)';
       }
@@ -837,6 +839,7 @@ class LISAPopup {
       else if (url.includes('copilot.microsoft.com')) scriptFile = 'src/content/copilot-parser.js';
       else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
       else if (url.includes('poe.com')) scriptFile = 'src/content/poe-parser.js';
+      else if (url.includes('huggingface.co')) scriptFile = 'src/content/huggingchat-parser.js';
       
       await chrome.scripting.executeScript({
         target: { tabId: tabId },

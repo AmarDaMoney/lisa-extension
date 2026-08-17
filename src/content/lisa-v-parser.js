@@ -30,6 +30,7 @@ class LisaVParser {
     if (host.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
     if (host.includes('perplexity.ai')) return 'Perplexity';
     if (host.includes('poe.com')) return 'Poe';
+    if (host.includes('huggingface.co')) return 'HuggingChat';
     return 'unknown';
   }
 
@@ -284,6 +285,8 @@ class LisaVParser {
       messages = await this.extractPerplexityMessages();
     } else if (platform === 'Poe') {
       messages = await this.extractPoeMessages();
+    } else if (platform === 'HuggingChat') {
+      messages = await this.extractHuggingChatMessages();
     } else if (platform === 'Grok') {
       messages = await this.extractGrokMessages();
     } else {
@@ -811,6 +814,52 @@ class LisaVParser {
     }
     return messages;
   }
+  async extractHuggingChatMessages() {
+    const messages = [];
+    const scroller = document.querySelector('.scrollbar-custom');
+    if (scroller) {
+      const isReversed = getComputedStyle(scroller).flexDirection === 'column-reverse';
+      let stableCount = 0;
+      let lastHeight = scroller.scrollHeight;
+      const step = scroller.clientHeight * 0.8;
+      for (let i = 0; i < 50; i++) {
+        if (isReversed) {
+          scroller.scrollTop = scroller.scrollTop - step;
+        } else {
+          scroller.scrollTop = Math.max(0, scroller.scrollTop - step);
+        }
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 400));
+        if (scroller.scrollHeight !== lastHeight) {
+          stableCount = 0;
+          lastHeight = scroller.scrollHeight;
+        } else {
+          stableCount++;
+          const atEnd = isReversed
+            ? Math.abs(scroller.scrollTop) >= (scroller.scrollHeight - scroller.clientHeight - 10)
+            : scroller.scrollTop <= 0;
+          if (stableCount >= 3 && atEnd) break;
+        }
+      }
+      scroller.scrollTop = isReversed ? 0 : scroller.scrollHeight;
+      await new Promise(r => setTimeout(r, 500));
+    }
+    const allMsgs = document.querySelectorAll('[data-message-type="user"], [data-message-role="assistant"]');
+    for (const msg of allMsgs) {
+      const isUser = msg.dataset.messageType === 'user';
+      let el = null;
+      if (isUser) {
+        el = msg.querySelector('.whitespace-pre-wrap, .whitespace-pre-line') || msg;
+      } else {
+        el = msg.querySelector('.prose');
+      }
+      if (el) {
+        const blocks = await this.parseMessageContent(el, isUser ? 'user' : 'assistant');
+        if (blocks.length > 0) messages.push(blocks);
+      }
+    }
+    return messages;
+  }
   async extractDeepSeekMessages() {
     const messages = [];
     // Scroll sweep for virtualised DeepSeek conversations
@@ -1284,7 +1333,7 @@ class LisaVParser {
 
     // Core topic: page title stripped of platform suffix, or first user message
     let coreTopic = (typeof document !== 'undefined' ? document.title : '')
-      .replace(/ [-|] (Claude|ChatGPT|Gemini|Grok|Mistral|DeepSeek|Copilot|Perplexity|Poe).*/i, '').trim();
+      .replace(/ [-|] (Claude|ChatGPT|Gemini|Grok|Mistral|DeepSeek|Copilot|Perplexity|Poe|HuggingChat).*/i, '').trim();
     if (!coreTopic || coreTopic.length < 5) {
       coreTopic = (userBlocks[0]?.v || '').substring(0, 100).replace(/\n/g, ' ').trim();
     }

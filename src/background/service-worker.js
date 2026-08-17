@@ -1438,6 +1438,7 @@ async function ensureContentScriptLoaded(tab) {
     else if (url.includes('chat.deepseek.com')) scriptFile = 'src/content/deepseek-parser.js';
     else if (url.includes('copilot.microsoft.com')) scriptFile = 'src/content/copilot-parser.js';
     else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
+    else if (url.includes('poe.com')) scriptFile = 'src/content/poe-parser.js';
     
     // Inject the script
     await chrome.scripting.executeScript({

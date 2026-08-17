@@ -16,11 +16,12 @@ class PerplexityParser {
   extractMessages() {
     const messages = [];
     
-    // Perplexity uses group/query for user messages and .prose for assistant responses
-    // Collect user queries (DIV elements with group/query class, skip H1 duplicates)
-    const queries = document.querySelectorAll('div[class*="group/query"]');
-    // Collect assistant responses
-    const proseElements = document.querySelectorAll('div.prose');
+    // Scope to conversation container to avoid sidebar noise
+    const container = document.querySelector('.scrollable-container') || document;
+    // User queries: span with whitespace-pre-line (Perplexity's current user message wrapper)
+    const queries = container.querySelectorAll('span[class*="whitespace-pre-line"]');
+    // Assistant responses: div.prose within conversation
+    const proseElements = container.querySelectorAll('div.prose');
 
     // Interleave: each query is followed by a prose response
     const maxPairs = Math.max(queries.length, proseElements.length);

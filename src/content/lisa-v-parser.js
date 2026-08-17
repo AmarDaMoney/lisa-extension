@@ -698,10 +698,12 @@ class LisaVParser {
 
   async extractPerplexityMessages() {
     const messages = [];
-    // User queries
-    const queries = document.querySelectorAll('div[class*="group/query"]');
-    // Assistant responses
-    const proseElements = document.querySelectorAll('div.prose');
+    // Scope to conversation container to avoid sidebar noise
+    const container = document.querySelector('.scrollable-container') || document;
+    // User queries: span with whitespace-pre-line (current Perplexity user message wrapper)
+    const queries = container.querySelectorAll('span[class*="whitespace-pre-line"]');
+    // Assistant responses: div.prose within conversation
+    const proseElements = container.querySelectorAll('div.prose');
 
     const maxPairs = Math.max(queries.length, proseElements.length);
     for (let i = 0; i < maxPairs; i++) {

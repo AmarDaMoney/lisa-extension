@@ -1,5 +1,6 @@
 // Poe Conversation Parser
 // Extracts conversation data from poe.com
+if (typeof PoeParser === 'undefined') {
 class PoeParser {
   constructor() {
     this.platform = 'Poe';
@@ -121,3 +122,4 @@ chrome.runtime.sendMessage({
   action: 'parserReady',
   platform: 'Poe'
 });
+} // end PoeParser guard

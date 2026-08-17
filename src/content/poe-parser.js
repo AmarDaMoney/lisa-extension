@@ -15,11 +15,19 @@ class PoeParser {
   async scrollToLoadAll() {
     const scroller = document.querySelector('[class*="ChatMessagesScrollWrapper_scrollableContainer"]');
     if (!scroller) return;
-    // Incremental scroll from bottom to top to trigger virtualized message loading
+    // Incremental scroll to load virtualized messages
+    // Poe uses flex-direction: column-reverse, so scrollTop is 0 at bottom
+    // and goes negative to scroll up (load older messages)
+    const isReversed = getComputedStyle(scroller).flexDirection === 'column-reverse';
     let stableCount = 0;
     let lastHeight = scroller.scrollHeight;
+    const step = scroller.clientHeight * 0.8;
     for (let i = 0; i < 50; i++) {
-      scroller.scrollTop = Math.max(0, scroller.scrollTop - scroller.clientHeight * 0.8);
+      if (isReversed) {
+        scroller.scrollTop = scroller.scrollTop - step;
+      } else {
+        scroller.scrollTop = Math.max(0, scroller.scrollTop - step);
+      }
       scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
       await new Promise(r => setTimeout(r, 400));
       if (scroller.scrollHeight !== lastHeight) {
@@ -27,11 +35,14 @@ class PoeParser {
         lastHeight = scroller.scrollHeight;
       } else {
         stableCount++;
-        if (stableCount >= 3 && scroller.scrollTop <= 0) break;
+        const atEnd = isReversed
+          ? Math.abs(scroller.scrollTop) >= (scroller.scrollHeight - scroller.clientHeight - 10)
+          : scroller.scrollTop <= 0;
+        if (stableCount >= 3 && atEnd) break;
       }
     }
     // Scroll back to bottom
-    scroller.scrollTop = scroller.scrollHeight;
+    scroller.scrollTop = isReversed ? 0 : scroller.scrollHeight;
     await new Promise(r => setTimeout(r, 500));
   }
 

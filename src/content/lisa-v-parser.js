@@ -727,10 +727,17 @@ class LisaVParser {
     const container = document.querySelector('[class*="ChatMessagesScrollWrapper_scrollableContainer"]') || document;
     // Scroll to load virtualized messages
     if (container.scrollTop !== undefined) {
+      // Poe uses flex-direction: column-reverse — scrollTop goes negative to scroll up
+      const isReversed = getComputedStyle(container).flexDirection === 'column-reverse';
       let stableCount = 0;
       let lastHeight = container.scrollHeight;
+      const step = container.clientHeight * 0.8;
       for (let i = 0; i < 50; i++) {
-        container.scrollTop = Math.max(0, container.scrollTop - container.clientHeight * 0.8);
+        if (isReversed) {
+          container.scrollTop = container.scrollTop - step;
+        } else {
+          container.scrollTop = Math.max(0, container.scrollTop - step);
+        }
         container.dispatchEvent(new Event('scroll', { bubbles: true }));
         await new Promise(r => setTimeout(r, 400));
         if (container.scrollHeight !== lastHeight) {
@@ -738,10 +745,13 @@ class LisaVParser {
           lastHeight = container.scrollHeight;
         } else {
           stableCount++;
-          if (stableCount >= 3 && container.scrollTop <= 0) break;
+          const atEnd = isReversed
+            ? Math.abs(container.scrollTop) >= (container.scrollHeight - container.clientHeight - 10)
+            : container.scrollTop <= 0;
+          if (stableCount >= 3 && atEnd) break;
         }
       }
-      container.scrollTop = container.scrollHeight;
+      container.scrollTop = isReversed ? 0 : container.scrollHeight;
       await new Promise(r => setTimeout(r, 500));
     }
     // Each ChatMessage is one user or assistant message

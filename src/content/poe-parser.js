@@ -79,60 +79,13 @@ class PoeParser {
   }
 
   extractTextContent(element) {
+    // Use shared HTML-to-markdown converter
+    const converter = window.__lisaHtmlToMarkdown;
+    if (converter) return converter.extractAsMarkdown(element);
+    // Fallback if shared lib not loaded
     const clone = element.cloneNode(true);
-    // Remove UI elements, buttons, citations, attachments
-    clone.querySelectorAll('button, svg, [role="button"], [class*="Attachment"], [class*="citation"]').forEach(el => el.remove());
-    // Convert HTML structure to lightweight markdown
-    return this.htmlToMarkdown(clone);
-  }
-  htmlToMarkdown(node) {
-    let result = '';
-    for (const child of node.childNodes) {
-      if (child.nodeType === Node.TEXT_NODE) {
-        result += child.textContent;
-        continue;
-      }
-      if (child.nodeType !== Node.ELEMENT_NODE) continue;
-      const tag = child.tagName.toLowerCase();
-      const inner = this.htmlToMarkdown(child);
-      if (!inner.trim()) continue;
-      if (tag === 'pre') {
-        const codeEl = child.querySelector('code');
-        const lang = codeEl?.className?.match(/language-(\w+)/)?.[1] || '';
-        const code = codeEl ? codeEl.textContent : child.textContent;
-        result += '\n\n```' + lang + '\n' + code.trim() + '\n```\n\n';
-      } else if (tag === 'code') {
-        result += '`' + child.textContent + '`';
-      } else if (tag === 'strong' || tag === 'b') {
-        result += '**' + inner + '**';
-      } else if (tag === 'em' || tag === 'i') {
-        result += '*' + inner + '*';
-      } else if (tag.match(/^h[1-6]$/)) {
-        const level = '#'.repeat(parseInt(tag[1]));
-        result += '\n\n' + level + ' ' + inner.trim() + '\n\n';
-      } else if (tag === 'li') {
-        const parent = child.parentElement?.tagName?.toLowerCase();
-        const prefix = parent === 'ol'
-          ? ([...child.parentElement.children].indexOf(child) + 1) + '. '
-          : '- ';
-        result += prefix + inner.trim() + '\n';
-      } else if (tag === 'ul' || tag === 'ol') {
-        result += '\n' + inner + '\n';
-      } else if (tag === 'p' || tag === 'div') {
-        result += '\n\n' + inner.trim() + '\n\n';
-      } else if (tag === 'br') {
-        result += '\n';
-      } else if (tag === 'a') {
-        const href = child.getAttribute('href');
-        result += href ? '[' + inner + '](' + href + ')' : inner;
-      } else if (tag === 'blockquote') {
-        result += '\n\n> ' + inner.trim().replace(/\n/g, '\n> ') + '\n\n';
-      } else {
-        result += inner;
-      }
-    }
-    // Collapse 3+ newlines to 2
-    return result.replace(/\n{3,}/g, '\n\n');
+    clone.querySelectorAll('button, svg, [role="button"]').forEach(el => el.remove());
+    return clone.textContent || '';
   }
 
   async extractConversation() {

@@ -153,6 +153,7 @@
         "https://poe.com/*"
       ],
       "js": [
+        "src/shared/html-to-markdown.js",
         "src/content/poe-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-v-parser.js",

@@ -724,32 +724,14 @@ class LisaVParser {
     const messages = [];
     // Scope to conversation container to avoid sidebar noise
     const container = document.querySelector('.scrollable-container') || document;
-    // User queries: span with whitespace-pre-line (current Perplexity user message wrapper)
-    const queries = container.querySelectorAll('span[class*="whitespace-pre-line"]');
-    // Assistant responses: div.prose within conversation
-    const proseElements = container.querySelectorAll('div.prose');
-
-    const converter = window.__lisaHtmlToMarkdown;
-    const maxPairs = Math.max(queries.length, proseElements.length);
-    for (let i = 0; i < maxPairs; i++) {
-      if (i < queries.length) {
-        if (converter) {
-          const text = converter.extractAsMarkdown(queries[i]);
-          if (text) messages.push([{ t: 'u', role: 'user', v: text }]);
-        } else {
-          const blocks = await this.parseMessageContent(queries[i], 'user');
-          if (blocks.length > 0) messages.push(blocks);
-        }
-      }
-      if (i < proseElements.length) {
-        if (converter) {
-          const text = converter.extractAsMarkdown(proseElements[i]);
-          if (text) messages.push([{ t: 'a_text', role: 'assistant', v: text }]);
-        } else {
-          const blocks = await this.parseMessageContent(proseElements[i], 'assistant');
-          if (blocks.length > 0) messages.push(blocks);
-        }
-      }
+    // Walk all user queries and assistant responses in DOM order
+    // (Perplexity may start with an assistant response before any user query)
+    const allEls = container.querySelectorAll('span[class*="whitespace-pre-line"], div.prose');
+    for (const el of allEls) {
+      const isUser = el.tagName === 'SPAN' && el.className.includes('whitespace-pre-line');
+      const role = isUser ? 'user' : 'assistant';
+      const blocks = await this.parseMessageContent(el, role);
+      if (blocks.length > 0) messages.push(blocks);
     }
     return messages;
   }

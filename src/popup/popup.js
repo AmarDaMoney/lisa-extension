@@ -2278,7 +2278,7 @@ class LISAPopup {
     md += '|-------|-------|\n';
     md += '| Source | ' + platform + ' |\n';
     md += '| Title | ' + title + ' |\n';
-    md += '| Messages | ' + msgCount + ' |\n';
+    md += '| ' + (format === 'lisa-v' ? 'Blocks' : 'Messages') + ' | ' + msgCount + ' |\n';
     md += '| Format | ' + formatLabel + ' |\n';
     md += '| Captured | ' + new Date(timestamp).toISOString() + ' |\n';
     md += '| LISA Core | v' + version + ' |\n\n';

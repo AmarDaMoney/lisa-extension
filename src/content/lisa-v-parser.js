@@ -29,6 +29,7 @@ class LisaVParser {
     if (host.includes('chat.deepseek.com')) return 'DeepSeek';
     if (host.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
     if (host.includes('perplexity.ai')) return 'Perplexity';
+    if (host.includes('poe.com')) return 'Poe';
     return 'unknown';
   }
 
@@ -266,6 +267,8 @@ class LisaVParser {
       messages = await this.extractCopilotMessages();
     } else if (platform === 'Perplexity') {
       messages = await this.extractPerplexityMessages();
+    } else if (platform === 'Poe') {
+      messages = await this.extractPoeMessages();
     } else if (platform === 'Grok') {
       messages = await this.extractGrokMessages();
     } else {
@@ -719,6 +722,26 @@ class LisaVParser {
     return messages;
   }
 
+  async extractPoeMessages() {
+    const messages = [];
+    const container = document.querySelector('[class*="ChatMessagesScrollWrapper_scrollableContainer"]') || document;
+    const tuples = container.querySelectorAll('[class*="ChatMessagesView_messageTuple"]');
+    for (const tuple of tuples) {
+      if (tuple.querySelector('[class*="BotInfoCard"]')) continue;
+      const isUser = !!tuple.querySelector('[class*="Message_rightSideMessageBubble"]');
+      let el = null;
+      if (isUser) {
+        el = tuple.querySelector('[class*="Message_messageTextContainer"]');
+      } else {
+        el = tuple.querySelector('[class*="Markdown_markdownContainer"]');
+      }
+      if (el) {
+        const blocks = await this.parseMessageContent(el, isUser ? 'user' : 'assistant');
+        if (blocks.length > 0) messages.push(blocks);
+      }
+    }
+    return messages;
+  }
   async extractDeepSeekMessages() {
     const messages = [];
     // Scroll sweep for virtualised DeepSeek conversations
@@ -1192,7 +1215,7 @@ class LisaVParser {
 
     // Core topic: page title stripped of platform suffix, or first user message
     let coreTopic = (typeof document !== 'undefined' ? document.title : '')
-      .replace(/ [-|] (Claude|ChatGPT|Gemini|Grok|Mistral|DeepSeek|Copilot|Perplexity).*/i, '').trim();
+      .replace(/ [-|] (Claude|ChatGPT|Gemini|Grok|Mistral|DeepSeek|Copilot|Perplexity|Poe).*/i, '').trim();
     if (!coreTopic || coreTopic.length < 5) {
       coreTopic = (userBlocks[0]?.v || '').substring(0, 100).replace(/\n/g, ' ').trim();
     }

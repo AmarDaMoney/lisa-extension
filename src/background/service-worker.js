@@ -942,6 +942,7 @@ class SnapshotManager {
     if (url.includes('chat.deepseek.com')) return 'DeepSeek';
     if (url.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
     if (url.includes('perplexity.ai')) return 'Perplexity';
+    if (url.includes('poe.com')) return 'Poe';
     try {
       return new URL(url).hostname;
     } catch {

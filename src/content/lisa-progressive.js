@@ -71,6 +71,7 @@ class LisaProgressiveCapture {
       [/chat\.mistral\.ai/,        /\/chat\/([a-zA-Z0-9-]+)/],
       [/chat\.deepseek\.com/,      /\/chat\/([a-zA-Z0-9-]+)/],
       [/perplexity\.ai/,           /\/search\/([a-zA-Z0-9-]+)/],
+      [/poe\.com/,                 /\/chat\/([a-zA-Z0-9]+)/],
       [/copilot\.microsoft\.com/,  /\/chat\/([a-zA-Z0-9-]+)/],
     ];
     for (const [hostRe, pathRe] of patterns) {
@@ -92,6 +93,7 @@ class LisaProgressiveCapture {
     if (host.includes('grok.com'))              return '.relative.group.flex.flex-col.justify-center';
     if (host.includes('deepseek.com'))          return '.ds-message';
     if (host.includes('perplexity.ai'))         return 'span[class*="whitespace-pre-line"], div.prose';
+    if (host.includes('poe.com'))               return '[class*="ChatMessagesView_messageTuple"]';
     if (host.includes('mistral.ai'))            return '[class*="message"]';
     if (host.includes('copilot.microsoft.com')) return '[class*="user-message"], [class*="ai-message"]';
     return '[data-message-author-role]';

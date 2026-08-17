@@ -147,6 +147,18 @@
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://poe.com/*"
+      ],
+      "js": [
+        "src/content/poe-parser.js",
+        "src/content/lisa-progressive.js",
+        "src/content/lisa-v-parser.js",
+        "src/content/lisa-floating-button.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "content_security_policy": {

@@ -320,6 +320,8 @@ class LISAPopup {
         platform = 'Poe';
       } else if (url.includes('huggingface.co')) {
         platform = 'HuggingChat';
+      } else if (url.includes('meta.ai')) {
+        platform = 'Meta AI';
       } else {
         platform = 'Web Page (Universal)';
       }
@@ -840,6 +842,7 @@ class LISAPopup {
       else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
       else if (url.includes('poe.com')) scriptFile = 'src/content/poe-parser.js';
       else if (url.includes('huggingface.co')) scriptFile = 'src/content/huggingchat-parser.js';
+      else if (url.includes('meta.ai')) scriptFile = 'src/content/metaai-parser.js';
       
       await chrome.scripting.executeScript({
         target: { tabId: tabId },

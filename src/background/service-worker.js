@@ -944,6 +944,7 @@ class SnapshotManager {
     if (url.includes('perplexity.ai')) return 'Perplexity';
     if (url.includes('poe.com')) return 'Poe';
     if (url.includes('huggingface.co')) return 'HuggingChat';
+    if (url.includes('meta.ai')) return 'Meta AI';
     try {
       return new URL(url).hostname;
     } catch {
@@ -1441,6 +1442,7 @@ async function ensureContentScriptLoaded(tab) {
     else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
     else if (url.includes('poe.com')) scriptFile = 'src/content/poe-parser.js';
     else if (url.includes('huggingface.co')) scriptFile = 'src/content/huggingchat-parser.js';
+    else if (url.includes('meta.ai')) scriptFile = 'src/content/metaai-parser.js';
     
     // Inject the script
     await chrome.scripting.executeScript({

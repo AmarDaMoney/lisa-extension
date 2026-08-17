@@ -172,6 +172,19 @@
     },
     {
       "matches": [
+        "https://meta.ai/*"
+      ],
+      "js": [
+        "src/shared/html-to-markdown.js",
+        "src/content/metaai-parser.js",
+        "src/content/lisa-progressive.js",
+        "src/content/lisa-v-parser.js",
+        "src/content/lisa-floating-button.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
         "https://poe.com/*"
       ],
       "js": [

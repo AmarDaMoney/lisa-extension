@@ -50,20 +50,24 @@ class MetaAIParser {
       const isUser = msg.dataset.messageType === 'user';
       let textContent = '';
       if (isUser) {
-        // User text is in span with break-words class inside the bubble
-        const textEl = msg.querySelector('span.break-words, span[class*="break-words"]');
+        // User text is in span with break-words + text-response (not text-caption "Today" labels)
+        const textEl = msg.querySelector('span[class*="break-words"][class*="text-response"]')
+                     || msg.querySelector('span.break-words');
         if (textEl) {
           textContent = converter ? converter.extractAsMarkdown(textEl) : textEl.textContent?.trim() || '';
         }
       } else {
-        // Assistant text is in div.markdown-content
+        // Assistant text: multiple .markdown-content divs; skip "Show thinking" toggle
         const clone = msg.cloneNode(true);
-        // Remove "Show thinking" buttons and thinking content
-        clone.querySelectorAll('button, [class*="thinking"], svg, [role="button"]').forEach(el => el.remove());
-        const mdEl = clone.querySelector('.markdown-content, [class*="markdown-content"]');
-        if (mdEl) {
-          textContent = converter ? converter.extractAsMarkdown(mdEl) : mdEl.textContent?.trim() || '';
+        clone.querySelectorAll('button, svg, [role="button"]').forEach(el => el.remove());
+        const mdEls = clone.querySelectorAll('.markdown-content, [class*="markdown-content"]');
+        const parts = [];
+        for (const mdEl of mdEls) {
+          const text = mdEl.textContent?.trim() || '';
+          if (text === 'Show thinking' || text === 'Hide thinking' || text.length === 0) continue;
+          parts.push(converter ? converter.extractAsMarkdown(mdEl) : text);
         }
+        textContent = parts.join('\n\n');
       }
       if (textContent && textContent.trim().length > 0) {
         messages.push({

@@ -898,15 +898,24 @@ class LisaVParser {
       const isUser = msg.dataset.messageType === 'user';
       let el = null;
       if (isUser) {
-        el = msg.querySelector('span.break-words, span[class*="break-words"]');
+        el = msg.querySelector('span[class*="break-words"][class*="text-response"]')
+          || msg.querySelector('span.break-words');
+        if (el) {
+          const blocks = await this.parseMessageContent(el, isUser ? 'user' : 'assistant');
+          if (blocks.length > 0) messages.push(blocks);
+        }
       } else {
         const clone = msg.cloneNode(true);
-        clone.querySelectorAll('button, [class*="thinking"], svg, [role="button"]').forEach(e => e.remove());
-        el = clone.querySelector('.markdown-content, [class*="markdown-content"]');
-      }
-      if (el) {
-        const blocks = await this.parseMessageContent(el, isUser ? 'user' : 'assistant');
-        if (blocks.length > 0) messages.push(blocks);
+        clone.querySelectorAll('button, svg, [role="button"]').forEach(e => e.remove());
+        const mdEls = clone.querySelectorAll('.markdown-content, [class*="markdown-content"]');
+        const allBlocks = [];
+        for (const mdEl of mdEls) {
+          const text = mdEl.textContent?.trim() || '';
+          if (text === 'Show thinking' || text === 'Hide thinking' || text.length === 0) continue;
+          const blocks = await this.parseMessageContent(mdEl, 'assistant');
+          if (blocks.length > 0) allBlocks.push(...blocks);
+        }
+        if (allBlocks.length > 0) messages.push(allBlocks);
       }
     }
     return messages;

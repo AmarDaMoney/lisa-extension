@@ -756,6 +756,7 @@ class LisaVParser {
     }
     // Each ChatMessage is one user or assistant message
     const chatMsgs = container.querySelectorAll('[class*="ChatMessage_chatMessage"]');
+    const converter = window.__lisaHtmlToMarkdown;
     for (const msg of chatMsgs) {
       const isUser = !!msg.querySelector('[class*="rightSideMessageBubble"]');
       let el = null;
@@ -765,8 +766,21 @@ class LisaVParser {
         el = msg.querySelector('[class*="Markdown_markdownContainer"]');
       }
       if (el) {
-        const blocks = await this.parseMessageContent(el, isUser ? 'user' : 'assistant');
-        if (blocks.length > 0) messages.push(blocks);
+        if (converter) {
+          // Use shared HTML-to-markdown for clean text extraction
+          const role = isUser ? 'user' : 'assistant';
+          const cleanText = converter.extractAsMarkdown(el);
+          if (cleanText) {
+            messages.push([{
+              t: role === 'user' ? 'u' : 'a_text',
+              role: role,
+              v: cleanText
+            }]);
+          }
+        } else {
+          const blocks = await this.parseMessageContent(el, isUser ? 'user' : 'assistant');
+          if (blocks.length > 0) messages.push(blocks);
+        }
       }
     }
     return messages;

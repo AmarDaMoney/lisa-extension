@@ -37,7 +37,7 @@ class PoeParser {
 
     for (const msg of chatMsgs) {
       // Detect role: right-side bubble = user, left-side = assistant
-      const isUser = !!msg.closest('[class*="Message_rightSideMessageBubble"]');
+      const isUser = !!msg.querySelector('[class*="rightSideMessageBubble"]');
 
       let textContent = '';
       if (isUser) {

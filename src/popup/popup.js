@@ -316,6 +316,8 @@ class LISAPopup {
         platform = 'Microsoft Copilot';
       } else if (url.includes('perplexity.ai')) {
         platform = 'Perplexity';
+      } else if (url.includes('poe.com')) {
+        platform = 'Poe';
       } else {
         platform = 'Web Page (Universal)';
       }

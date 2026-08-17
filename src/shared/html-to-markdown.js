@@ -86,10 +86,35 @@ function cleanMarkdownText(raw) {
   text = text.replace(/[^\S\n]+/g, ' ');
   // Collapse 3+ newlines to 2
   text = text.replace(/\n{3,}/g, '\n\n');
-  // Join lines that are fragments of the same sentence:
-  // a line ending without sentence-final punctuation, followed by a line
-  // starting with a lowercase letter or continuing punctuation
-  text = text.replace(/([^.!?:;\n`#>|\-\d])\n(?=[a-z,;])/g, '$1 ');
+  // Join fragmented lines within paragraphs.
+  // Split into lines, then rejoin lines that aren't markdown structure boundaries.
+  const lines = text.split('\n');
+  const joined = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    // Is this line a markdown structural element that must stay on its own line?
+    const isStructural = /^(#{1,6} |[-*+] |\d+\. |> |```|\|.|---$|$)/.test(trimmed);
+    if (isStructural || joined.length === 0) {
+      joined.push(line);
+      continue;
+    }
+    // Look at previous non-empty joined line
+    const prev = joined[joined.length - 1].trim();
+    const prevIsStructural = /^(#{1,6} |[-*+] |\d+\. |> |```|\|.|---$)/.test(prev);
+    // Previous line ends with sentence-final punctuation → keep the break
+    const prevEndsSentence = /[.!?:;]$/.test(prev);
+    // Empty previous line → keep (paragraph boundary)
+    if (prev === '' || prevIsStructural || prevEndsSentence) {
+      joined.push(line);
+    } else {
+      // Mid-sentence fragment → join with space
+      joined[joined.length - 1] = joined[joined.length - 1].trimEnd() + ' ' + trimmed;
+    }
+  }
+  text = joined.join('\n');
+  // Final cleanup: collapse remaining 3+ newlines
+  text = text.replace(/\n{3,}/g, '\n\n');
   return text.trim();
 }
 

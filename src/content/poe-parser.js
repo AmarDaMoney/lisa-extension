@@ -14,14 +14,20 @@ class PoeParser {
   async scrollToLoadAll() {
     const scroller = document.querySelector('[class*="ChatMessagesScrollWrapper_scrollableContainer"]');
     if (!scroller) return;
-    // Scroll to top to trigger virtualized messages to load
-    let lastHeight = -1;
-    for (let i = 0; i < 30; i++) {
-      scroller.scrollTop = 0;
-      await new Promise(r => setTimeout(r, 300));
-      const currentHeight = scroller.scrollHeight;
-      if (currentHeight === lastHeight) break;
-      lastHeight = currentHeight;
+    // Incremental scroll from bottom to top to trigger virtualized message loading
+    let stableCount = 0;
+    let lastHeight = scroller.scrollHeight;
+    for (let i = 0; i < 50; i++) {
+      scroller.scrollTop = Math.max(0, scroller.scrollTop - scroller.clientHeight * 0.8);
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 400));
+      if (scroller.scrollHeight !== lastHeight) {
+        stableCount = 0;
+        lastHeight = scroller.scrollHeight;
+      } else {
+        stableCount++;
+        if (stableCount >= 3 && scroller.scrollTop <= 0) break;
+      }
     }
     // Scroll back to bottom
     scroller.scrollTop = scroller.scrollHeight;

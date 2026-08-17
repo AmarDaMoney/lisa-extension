@@ -727,12 +727,19 @@ class LisaVParser {
     const container = document.querySelector('[class*="ChatMessagesScrollWrapper_scrollableContainer"]') || document;
     // Scroll to load virtualized messages
     if (container.scrollTop !== undefined) {
-      let lastHeight = -1;
-      for (let i = 0; i < 30; i++) {
-        container.scrollTop = 0;
-        await new Promise(r => setTimeout(r, 300));
-        if (container.scrollHeight === lastHeight) break;
-        lastHeight = container.scrollHeight;
+      let stableCount = 0;
+      let lastHeight = container.scrollHeight;
+      for (let i = 0; i < 50; i++) {
+        container.scrollTop = Math.max(0, container.scrollTop - container.clientHeight * 0.8);
+        container.dispatchEvent(new Event('scroll', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 400));
+        if (container.scrollHeight !== lastHeight) {
+          stableCount = 0;
+          lastHeight = container.scrollHeight;
+        } else {
+          stableCount++;
+          if (stableCount >= 3 && container.scrollTop <= 0) break;
+        }
       }
       container.scrollTop = container.scrollHeight;
       await new Promise(r => setTimeout(r, 500));

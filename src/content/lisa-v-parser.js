@@ -725,15 +725,27 @@ class LisaVParser {
   async extractPoeMessages() {
     const messages = [];
     const container = document.querySelector('[class*="ChatMessagesScrollWrapper_scrollableContainer"]') || document;
-    const tuples = container.querySelectorAll('[class*="ChatMessagesView_messageTuple"]');
-    for (const tuple of tuples) {
-      if (tuple.querySelector('[class*="BotInfoCard"]')) continue;
-      const isUser = !!tuple.querySelector('[class*="Message_rightSideMessageBubble"]');
+    // Scroll to load virtualized messages
+    if (container.scrollTop !== undefined) {
+      let lastHeight = -1;
+      for (let i = 0; i < 30; i++) {
+        container.scrollTop = 0;
+        await new Promise(r => setTimeout(r, 300));
+        if (container.scrollHeight === lastHeight) break;
+        lastHeight = container.scrollHeight;
+      }
+      container.scrollTop = container.scrollHeight;
+      await new Promise(r => setTimeout(r, 500));
+    }
+    // Each ChatMessage is one user or assistant message
+    const chatMsgs = container.querySelectorAll('[class*="ChatMessage_chatMessage"]');
+    for (const msg of chatMsgs) {
+      const isUser = !!msg.closest('[class*="Message_rightSideMessageBubble"]');
       let el = null;
       if (isUser) {
-        el = tuple.querySelector('[class*="Message_messageTextContainer"]');
+        el = msg.querySelector('[class*="Message_messageTextContainer"]');
       } else {
-        el = tuple.querySelector('[class*="Markdown_markdownContainer"]');
+        el = msg.querySelector('[class*="Markdown_markdownContainer"]');
       }
       if (el) {
         const blocks = await this.parseMessageContent(el, isUser ? 'user' : 'assistant');

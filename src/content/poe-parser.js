@@ -11,26 +11,40 @@ class PoeParser {
     return match ? match[1] : null;
   }
 
+  async scrollToLoadAll() {
+    const scroller = document.querySelector('[class*="ChatMessagesScrollWrapper_scrollableContainer"]');
+    if (!scroller) return;
+    // Scroll to top to trigger virtualized messages to load
+    let lastHeight = -1;
+    for (let i = 0; i < 30; i++) {
+      scroller.scrollTop = 0;
+      await new Promise(r => setTimeout(r, 300));
+      const currentHeight = scroller.scrollHeight;
+      if (currentHeight === lastHeight) break;
+      lastHeight = currentHeight;
+    }
+    // Scroll back to bottom
+    scroller.scrollTop = scroller.scrollHeight;
+    await new Promise(r => setTimeout(r, 500));
+  }
+
   extractMessages() {
     const messages = [];
     const container = document.querySelector('[class*="ChatMessagesScrollWrapper_scrollableContainer"]') || document;
 
-    // Each message tuple contains one user or assistant message
-    const tuples = container.querySelectorAll('[class*="ChatMessagesView_messageTuple"]');
+    // Each ChatMessage is one user or assistant message (tuples group pairs)
+    const chatMsgs = container.querySelectorAll('[class*="ChatMessage_chatMessage"]');
 
-    for (const tuple of tuples) {
-      // Skip bot info cards
-      if (tuple.querySelector('[class*="BotInfoCard"]')) continue;
-
-      // Detect role: user messages use right-side bubble
-      const isUser = !!tuple.querySelector('[class*="Message_rightSideMessageBubble"]');
+    for (const msg of chatMsgs) {
+      // Detect role: right-side bubble = user, left-side = assistant
+      const isUser = !!msg.closest('[class*="Message_rightSideMessageBubble"]');
 
       let textContent = '';
       if (isUser) {
-        const textEl = tuple.querySelector('[class*="Message_messageTextContainer"]');
+        const textEl = msg.querySelector('[class*="Message_messageTextContainer"]');
         if (textEl) textContent = this.extractTextContent(textEl);
       } else {
-        const markdownEl = tuple.querySelector('[class*="Markdown_markdownContainer"]');
+        const markdownEl = msg.querySelector('[class*="Markdown_markdownContainer"]');
         if (markdownEl) textContent = this.extractTextContent(markdownEl);
       }
 
@@ -55,6 +69,8 @@ class PoeParser {
 
   async extractConversation() {
     this.conversationId = this.extractConversationId();
+    // Scroll to load virtualized messages
+    await this.scrollToLoadAll();
     const messages = this.extractMessages();
 
     if (messages.length === 0) {

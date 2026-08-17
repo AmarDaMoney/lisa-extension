@@ -708,15 +708,26 @@ class LisaVParser {
     // Assistant responses: div.prose within conversation
     const proseElements = container.querySelectorAll('div.prose');
 
+    const converter = window.__lisaHtmlToMarkdown;
     const maxPairs = Math.max(queries.length, proseElements.length);
     for (let i = 0; i < maxPairs; i++) {
       if (i < queries.length) {
-        const blocks = await this.parseMessageContent(queries[i], 'user');
-        if (blocks.length > 0) messages.push(blocks);
+        if (converter) {
+          const text = converter.extractAsMarkdown(queries[i]);
+          if (text) messages.push([{ t: 'u', role: 'user', v: text }]);
+        } else {
+          const blocks = await this.parseMessageContent(queries[i], 'user');
+          if (blocks.length > 0) messages.push(blocks);
+        }
       }
       if (i < proseElements.length) {
-        const blocks = await this.parseMessageContent(proseElements[i], 'assistant');
-        if (blocks.length > 0) messages.push(blocks);
+        if (converter) {
+          const text = converter.extractAsMarkdown(proseElements[i]);
+          if (text) messages.push([{ t: 'a_text', role: 'assistant', v: text }]);
+        } else {
+          const blocks = await this.parseMessageContent(proseElements[i], 'assistant');
+          if (blocks.length > 0) messages.push(blocks);
+        }
       }
     }
     return messages;

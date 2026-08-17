@@ -740,7 +740,7 @@ class LisaVParser {
     // Each ChatMessage is one user or assistant message
     const chatMsgs = container.querySelectorAll('[class*="ChatMessage_chatMessage"]');
     for (const msg of chatMsgs) {
-      const isUser = !!msg.closest('[class*="Message_rightSideMessageBubble"]');
+      const isUser = !!msg.querySelector('[class*="rightSideMessageBubble"]');
       let el = null;
       if (isUser) {
         el = msg.querySelector('[class*="Message_messageTextContainer"]');

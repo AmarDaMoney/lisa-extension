@@ -94,7 +94,7 @@ function cleanMarkdownText(raw) {
     const line = lines[i];
     const trimmed = line.trim();
     // Is this line a markdown structural element that must stay on its own line?
-    const isStructural = /^(#{1,6} |[-*+] |\d+\. |> |```|\|.|---$|$)/.test(trimmed);
+    const isStructural = trimmed === '' || /^(#{1,6} |[-*+] |\d+\. |> |```|\|.|---$)/.test(trimmed);
     if (isStructural || joined.length === 0) {
       joined.push(line);
       continue;

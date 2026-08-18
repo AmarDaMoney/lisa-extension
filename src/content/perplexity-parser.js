@@ -1,6 +1,7 @@
 // Perplexity AI Conversation Parser
 // Extracts conversation data from perplexity.ai
 
+if (typeof PerplexityParser === 'undefined') {
 class PerplexityParser {
   constructor() {
     this.platform = 'Perplexity';
@@ -105,3 +106,4 @@ chrome.runtime.sendMessage({
   action: 'parserReady', 
   platform: 'Perplexity' 
 });
+} // end PerplexityParser guard

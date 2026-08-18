@@ -149,6 +149,7 @@
         "https://*.perplexity.ai/*"
       ],
       "js": [
+        "src/content/perplexity-api-capture.js",
         "src/content/perplexity-parser.js",
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",

@@ -721,6 +721,27 @@ class LisaVParser {
   }
 
   async extractPerplexityMessages() {
+    // Try API capture first for full conversation history
+    const apiCapture = window.__LISA_PERPLEXITY_API_CAPTURE;
+    if (apiCapture) {
+      try {
+        const apiResult = await apiCapture.extractViaAPI();
+        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+          const messages = [];
+          for (const msg of apiResult.messages) {
+            messages.push([{
+              t: msg.role === 'user' ? 'u' : 'a_text',
+              role: msg.role,
+              v: msg.content
+            }]);
+          }
+          return messages;
+        }
+      } catch (e) {
+        console.debug('[LISA] Perplexity API failed, falling back to DOM:', e);
+      }
+    }
+    // Fallback: DOM extraction
     const messages = [];
     // Scope to conversation container to avoid sidebar noise
     const container = document.querySelector('.scrollable-container') || document;

@@ -47,6 +47,19 @@ class PerplexityParser {
 
   async extractConversation() {
     this.conversationId = this.extractConversationId();
+    // Try API capture first for full conversation history
+    const apiCapture = window.__LISA_PERPLEXITY_API_CAPTURE;
+    if (apiCapture) {
+      try {
+        const apiResult = await apiCapture.extractViaAPI();
+        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+          return apiResult;
+        }
+      } catch (e) {
+        console.debug('[LISA] Perplexity API capture failed, falling back to DOM:', e);
+      }
+    }
+    // Fallback: DOM extraction
     const messages = this.extractMessages();
     
     if (messages.length === 0) {

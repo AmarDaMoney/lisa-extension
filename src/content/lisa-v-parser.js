@@ -274,7 +274,9 @@ class LisaVParser {
         messages = [];
       }
       messages = await this.extractChatGPTMessages();
-    } else if (platform === 'ChatGPT' || platform === 'Mistral AI') {
+    } else if (platform === 'Mistral AI') {
+      messages = await this.extractMistralMessages();
+    } else if (platform === 'ChatGPT') {
       messages = await this.extractChatGPTMessages();
     } else if (platform === 'Gemini') {
       messages = await this.extractGeminiMessages();
@@ -483,6 +485,24 @@ class LisaVParser {
   }
 
   // ChatGPT-specific extraction
+  async extractMistralMessages() {
+    const messages = [];
+    const staleCount = window.__lisaMistralStaleCount || 0;
+    const allElements = document.querySelectorAll('[data-message-author-role]');
+    const currentElements = Array.from(allElements).slice(staleCount);
+    if (staleCount > 0) {
+      console.debug('[LISA] Mistral: skipping', staleCount, 'stale messages, extracting', currentElements.length);
+    }
+    for (const container of currentElements) {
+      const role = container.getAttribute('data-message-author-role') || 'assistant';
+      const blocks = await this.parseMessageContent(container, role);
+      if (blocks.length > 0) {
+        messages.push(blocks);
+      }
+    }
+    return messages;
+  }
+
   async extractChatGPTMessages() {
     const messages = [];
     // Scroll fallback if buffer has no advantage over current DOM

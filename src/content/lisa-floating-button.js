@@ -436,7 +436,8 @@ class LISAFloatingButton {
 
       for (const msg of messages.messages) {
         const role = msg.role === 'user' ? 'User' : 'Assistant';
-        md += `### ${role}\n\n${msg.content || ''}\n\n`;
+        const text = typeof msg.content === 'string' ? msg.content : (msg.content ? JSON.stringify(msg.content) : '');
+        md += `### ${role}\n\n${text}\n\n`;
       }
 
       // Save formatted markdown to library

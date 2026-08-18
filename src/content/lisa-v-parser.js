@@ -1519,7 +1519,7 @@ class LisaVParser {
     for (const block of this.blocks) {
       if (block.t === 'meta' || block.t === 'manifest' || block.t === 'sys' || 
           block.t === 'next' || block.t === 'relationship' || block.t === 'anchor' || 
-          block.t === 'instructions' || block.t === 'summary') continue;
+          block.t === 'instructions' || block.t === 'summary' || block.t === 'checkpoint') continue;
       
       const role = block.t === 'u' ? 'user' : 'assistant';
       

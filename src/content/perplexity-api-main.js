@@ -13,20 +13,19 @@
     if (!entry.blocks) return '';
     const parts = [];
     for (const block of entry.blocks) {
+      // Current format: ask_text with markdown_block.chunks[]
+      if (block.intended_usage === 'ask_text' && block.markdown_block) {
+        const chunks = block.markdown_block.chunks || [];
+        const joined = chunks.join('');
+        if (joined.trim()) parts.push(joined.trim());
+      }
+      // Legacy format: workflow_root with WORKFLOW_ITEM_TEXT
       if (block.intended_usage === 'workflow_root' && block.workflow_block) {
         for (const step of (block.workflow_block.steps || [])) {
           for (const item of (step.items || [])) {
             if (item.type === 'WORKFLOW_ITEM_TEXT' && item.payload?.text_payload?.text) {
               parts.push(item.payload.text_payload.text);
             }
-          }
-        }
-      }
-      if (block.intended_usage === 'plan' && block.plan_block && parts.length === 0) {
-        const goals = block.plan_block.goals || [];
-        for (const goal of goals) {
-          if (goal.description && goal.description.length > 200) {
-            parts.push(goal.description);
           }
         }
       }

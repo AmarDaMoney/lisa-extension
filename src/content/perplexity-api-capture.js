@@ -1,100 +1,93 @@
-// Perplexity API Capture — Direct fetch from content script
-// Content scripts share the page origin, so credentials: 'include' carries session cookies
+// Perplexity API Capture — ISOLATED world bridge
+// Relays fetch requests to MAIN world script via postMessage
+// MAIN world carries session cookies; ISOLATED world cannot
 (function() {
   'use strict';
 
-  function getThreadId() {
-    const match = window.location.pathname.match(/\/search\/([a-f0-9-]+)/);
-    return match ? match[1] : null;
+  var mainWorldReady = false;
+
+  // Listen for ready signal from MAIN world
+  window.addEventListener('message', function(event) {
+    if (event.source !== window) return;
+    if (event.data && event.data.type === '__lisa_perplexity_api_ready') {
+      mainWorldReady = true;
+    }
+  });
+
+  // Wait for MAIN world ready signal with timeout
+  function waitForReady(timeoutMs) {
+    if (mainWorldReady) return Promise.resolve(true);
+    return new Promise(function(resolve) {
+      var elapsed = 0;
+      var interval = setInterval(function() {
+        elapsed += 100;
+        if (mainWorldReady) {
+          clearInterval(interval);
+          resolve(true);
+        } else if (elapsed >= timeoutMs) {
+          clearInterval(interval);
+          resolve(false);
+        }
+      }, 100);
+    });
   }
 
-  function extractAnswerText(entry) {
-    if (!entry.blocks) return '';
-    const parts = [];
-    for (const block of entry.blocks) {
-      if (block.intended_usage === 'workflow_root' && block.workflow_block) {
-        for (const step of (block.workflow_block.steps || [])) {
-          for (const item of (step.items || [])) {
-            if (item.type === 'WORKFLOW_ITEM_TEXT' && item.payload?.text_payload?.text) {
-              parts.push(item.payload.text_payload.text);
-            }
-          }
-        }
-      }
-      if (block.intended_usage === 'plan' && block.plan_block && parts.length === 0) {
-        const goals = block.plan_block.goals || [];
-        for (const goal of goals) {
-          if (goal.description && goal.description.length > 200) {
-            parts.push(goal.description);
-          }
-        }
-      }
-    }
-    return parts.join('\n\n');
-  }
+  // Send request to MAIN world, wait for response with retry
+  function requestFromMain(attempt) {
+    return new Promise(function(resolve, reject) {
+      var timeout = setTimeout(function() {
+        window.removeEventListener('message', handler);
+        reject(new Error('MAIN world response timeout (attempt ' + attempt + ')'));
+      }, 8000);
 
-  async function fetchFullThread(threadUuid) {
-    const allEntries = [];
-    let offset = 0;
-    const limit = 50;
-    let hasMore = true;
-    while (hasMore) {
-      const url = 'https://www.perplexity.ai/rest/thread/' + threadUuid +
-        '?with_schematized_response=true&version=2.18&source=default' +
-        '&limit=' + limit + '&offset=' + offset + '&from_first=true';
-      try {
-        const resp = await fetch(url, {
-          credentials: 'include',
-          headers: { 'accept': '*/*', 'x-app-apiclient': 'web', 'x-app-apiversion': '2.18' }
-        });
-        if (!resp.ok) {
-          console.debug('[LISA] Perplexity API: ' + resp.status + ' at offset ' + offset);
-          break;
+      function handler(event) {
+        if (event.source !== window) return;
+        if (!event.data || event.data.type !== '__lisa_perplexity_api_response') return;
+        clearTimeout(timeout);
+        window.removeEventListener('message', handler);
+        if (event.data.success) {
+          resolve(event.data.data);
+        } else {
+          reject(new Error(event.data.error || 'MAIN world fetch failed'));
         }
-        const data = await resp.json();
-        if (data.entries) allEntries.push(...data.entries);
-        hasMore = data.has_next_page === true;
-        offset += limit;
-        if (offset > limit * 10) break;
-      } catch (e) {
-        console.debug('[LISA] Perplexity API fetch error:', e);
-        break;
       }
-    }
-    return allEntries;
+
+      window.addEventListener('message', handler);
+      window.postMessage({ type: '__lisa_perplexity_api_request' }, '*');
+    });
   }
 
   window.__LISA_PERPLEXITY_API_CAPTURE = {
     extractViaAPI: async function() {
-      const threadUuid = getThreadId();
-      if (!threadUuid) return null;
-
-      const entries = await fetchFullThread(threadUuid);
-      if (!entries || entries.length === 0) return null;
-
-      const messages = [];
-      const title = entries[0]?.thread_title || document.title;
-
-      for (const entry of entries) {
-        const query = entry.query_str || '';
-        const answer = extractAnswerText(entry);
-        if (query) messages.push({ role: 'user', content: query.trim() });
-        if (answer) messages.push({ role: 'assistant', content: answer.trim() });
+      // Wait up to 6 seconds for MAIN world to announce readiness
+      var ready = await waitForReady(6000);
+      if (!ready) {
+        console.debug('[LISA] Perplexity bridge: MAIN world not ready after 6s');
+        return null;
       }
 
-      if (messages.length === 0) return null;
+      // Retry up to 3 times with 500ms gaps
+      var lastError = null;
+      for (var attempt = 1; attempt <= 3; attempt++) {
+        try {
+          var result = await requestFromMain(attempt);
+          if (result && result.messages && result.messages.length > 0) {
+            console.debug('[LISA] Perplexity API capture succeeded: ' + result.messages.length + ' messages (attempt ' + attempt + ')');
+            return result;
+          }
+        } catch (e) {
+          lastError = e;
+          console.debug('[LISA] Perplexity bridge attempt ' + attempt + ' failed:', e.message);
+          if (attempt < 3) {
+            await new Promise(function(r) { setTimeout(r, 500); });
+          }
+        }
+      }
 
-      return {
-        platform: 'Perplexity',
-        conversationId: threadUuid,
-        url: window.location.href,
-        title: title,
-        extractedAt: new Date().toISOString(),
-        messageCount: messages.length,
-        messages: messages
-      };
+      console.debug('[LISA] Perplexity bridge: all attempts failed:', lastError?.message);
+      return null;
     }
   };
 
-  console.debug('[LISA] Perplexity API capture ready (content script direct fetch)');
+  console.debug('[LISA] Perplexity API bridge (ISOLATED world) loaded');
 })();

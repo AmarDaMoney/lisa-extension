@@ -149,6 +149,16 @@
         "https://*.perplexity.ai/*"
       ],
       "js": [
+        "src/content/perplexity-api-main.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://*.perplexity.ai/*"
+      ],
+      "js": [
         "src/content/perplexity-api-capture.js",
         "src/content/perplexity-parser.js",
         "src/content/lisa-progressive.js",

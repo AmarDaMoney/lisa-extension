@@ -1,5 +1,4 @@
 // Perplexity API Capture — runs in MAIN world (page context)
-// Has access to page's fetch and session cookies
 (function() {
   'use strict';
   if (window.__LISA_PERPLEXITY_API_CAPTURE) return;
@@ -41,20 +40,14 @@
     let offset = 0;
     const limit = 50;
     let hasMore = true;
-
     while (hasMore) {
       const url = 'https://www.perplexity.ai/rest/thread/' + threadUuid +
         '?with_schematized_response=true&version=2.18&source=default' +
         '&limit=' + limit + '&offset=' + offset + '&from_first=true';
-
       try {
         const resp = await originalFetch(url, {
           credentials: 'include',
-          headers: {
-            'accept': '*/*',
-            'x-app-apiclient': 'web',
-            'x-app-apiversion': '2.18'
-          }
+          headers: { 'accept': '*/*', 'x-app-apiclient': 'web', 'x-app-apiversion': '2.18' }
         });
         if (!resp.ok) break;
         const data = await resp.json();
@@ -62,52 +55,44 @@
         hasMore = data.has_next_page === true;
         offset += limit;
         if (offset > limit * 10) break;
-      } catch (e) {
-        break;
-      }
+      } catch (e) { break; }
     }
     return allEntries;
   }
 
-  window.addEventListener('__lisa_perplexity_extract', async function() {
+  // Listen for requests via postMessage (crosses world boundary)
+  window.addEventListener('message', async function(event) {
+    if (event.data?.type !== '__lisa_perplexity_extract') return;
     const threadUuid = getThreadId();
     if (!threadUuid) {
-      window.dispatchEvent(new CustomEvent('__lisa_perplexity_result', {
-        detail: JSON.stringify({ success: false, error: 'No thread UUID' })
-      }));
+      window.postMessage({ type: '__lisa_perplexity_result', success: false, error: 'No thread UUID' }, '*');
       return;
     }
-
     try {
       const entries = await fetchFullThread(threadUuid);
       const messages = [];
       const title = entries[0]?.thread_title || document.title;
-
       for (const entry of entries) {
         const query = entry.query_str || '';
         const answer = extractAnswerText(entry);
         if (query) messages.push({ role: 'user', content: query.trim() });
         if (answer) messages.push({ role: 'assistant', content: answer.trim() });
       }
-
-      window.dispatchEvent(new CustomEvent('__lisa_perplexity_result', {
-        detail: JSON.stringify({
-          success: true,
-          data: {
-            platform: 'Perplexity',
-            conversationId: threadUuid,
-            url: window.location.href,
-            title: title,
-            extractedAt: new Date().toISOString(),
-            messageCount: messages.length,
-            messages: messages
-          }
-        })
-      }));
+      window.postMessage({
+        type: '__lisa_perplexity_result',
+        success: true,
+        data: {
+          platform: 'Perplexity',
+          conversationId: threadUuid,
+          url: window.location.href,
+          title: title,
+          extractedAt: new Date().toISOString(),
+          messageCount: messages.length,
+          messages: messages
+        }
+      }, '*');
     } catch (e) {
-      window.dispatchEvent(new CustomEvent('__lisa_perplexity_result', {
-        detail: JSON.stringify({ success: false, error: e.message })
-      }));
+      window.postMessage({ type: '__lisa_perplexity_result', success: false, error: e.message }, '*');
     }
   });
 

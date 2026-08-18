@@ -1,5 +1,5 @@
 // Perplexity API Capture — Content Script Bridge
-// Communicates with perplexity-api-main.js (MAIN world) via CustomEvents
+// Communicates with perplexity-api-main.js (MAIN world) via postMessage
 (function() {
   'use strict';
 
@@ -7,27 +7,23 @@
     extractViaAPI: function() {
       return new Promise(function(resolve, reject) {
         const timeout = setTimeout(function() {
-          window.removeEventListener('__lisa_perplexity_result', handler);
+          window.removeEventListener('message', handler);
           reject(new Error('Perplexity API timeout'));
         }, 15000);
 
         function handler(event) {
+          if (event.data?.type !== '__lisa_perplexity_result') return;
           clearTimeout(timeout);
-          window.removeEventListener('__lisa_perplexity_result', handler);
-          try {
-            const result = JSON.parse(event.detail);
-            if (result.success) {
-              resolve(result.data);
-            } else {
-              reject(new Error(result.error));
-            }
-          } catch (e) {
-            reject(e);
+          window.removeEventListener('message', handler);
+          if (event.data.success) {
+            resolve(event.data.data);
+          } else {
+            reject(new Error(event.data.error));
           }
         }
 
-        window.addEventListener('__lisa_perplexity_result', handler);
-        window.dispatchEvent(new CustomEvent('__lisa_perplexity_extract'));
+        window.addEventListener('message', handler);
+        window.postMessage({ type: '__lisa_perplexity_extract' }, '*');
       });
     }
   };

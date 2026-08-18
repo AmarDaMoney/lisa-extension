@@ -16,7 +16,7 @@
       // Current format: ask_text with markdown_block.chunks[]
       if (block.intended_usage === 'ask_text' && block.markdown_block) {
         const chunks = block.markdown_block.chunks || [];
-        const joined = chunks.join('');
+        const joined = chunks.filter(c => typeof c === 'string').join('');
         if (joined.trim()) parts.push(joined.trim());
       }
       // Legacy format: workflow_root with WORKFLOW_ITEM_TEXT

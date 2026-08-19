@@ -1435,7 +1435,7 @@ class LisaVParser {
         key_entities:      [...entities].slice(0, 10),
         session_register:  register,
         open_tasks:        openTasks,
-        generated_by:      'LISA v0.52.3'
+        generated_by:      'LISA v0.52.4'
       }
     };
   }

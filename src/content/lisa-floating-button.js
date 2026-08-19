@@ -143,12 +143,18 @@ class LISAFloatingButton {
   async incrementFloatingLimit(type) {
     if (this.isPremium) return;
     
-    const storageKey = `floating_${type}_today`;
     try {
-      const result = await chrome.storage.sync.get([storageKey]);
-      const count = (result[storageKey] || 0) + 1;
-      await chrome.storage.sync.set({ [storageKey]: count });
-      return 5 - count;
+      const result = await chrome.storage.sync.get(['usageStats']);
+      const stats = result.usageStats || { exportsToday: 0, importsToday: 0, lifetimeFreePool: 100 };
+      if (stats.lifetimeFreePool > 0) {
+        stats.lifetimeFreePool--;
+        await chrome.storage.sync.set({ usageStats: stats });
+        return stats.lifetimeFreePool;
+      } else {
+        stats.exportsToday = (stats.exportsToday || 0) + 1;
+        await chrome.storage.sync.set({ usageStats: stats });
+        return 5 - stats.exportsToday;
+      }
     } catch (error) {
       console.debug('[LISA] Limit increment error:', error);
     }
@@ -464,8 +470,9 @@ class LISAFloatingButton {
         return;
       }
       const remaining = await this.incrementFloatingLimit('md');
-      if (remaining !== undefined && remaining <= 2) {
-        setTimeout(() => this.showToast(`${remaining} Markdown saves remaining today`), 2000);
+      if (remaining !== undefined && remaining <= 5) {
+        const label = remaining > 2 ? `${remaining} welcome credits remaining` : `${remaining} saves remaining today`;
+        setTimeout(() => this.showToast(label), 2000);
       }
     } catch (error) {
       console.error('[LISA] Markdown save error:', error);
@@ -505,8 +512,9 @@ class LISAFloatingButton {
       if (response?.success) {
         this.showToast("✅ LISA-V saved! " + stats.totalBlocks + " blocks");
         const remaining = await this.incrementFloatingLimit('lisav');
-          if (remaining !== undefined && remaining <= 2) {
-            setTimeout(() => this.showToast(`${remaining} LISA-V saves remaining today`), 2000);
+          if (remaining !== undefined && remaining <= 5) {
+            const label = remaining > 2 ? `${remaining} welcome credits remaining` : `${remaining} saves remaining today`;
+            setTimeout(() => this.showToast(label), 2000);
           }
       } else {
         this.showToast("❌ " + (response?.error || "Save failed"), true);

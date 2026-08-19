@@ -1325,7 +1325,8 @@ class LISAPopup {
         // Show remaining exports for free users
         if (this.userTier === 'free') {
           const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
-            this.updatePlatformStatus(`${remaining} free exports remaining today`, true);
+            const poolActive = (this.usageStats.lifetimeFreePool ?? 0) > 0;
+            this.updatePlatformStatus(`${remaining} ${poolActive ? 'welcome credits' : 'free exports'} remaining`, true);
         }
       }
     });
@@ -1374,7 +1375,8 @@ class LISAPopup {
         // Show remaining exports for free users
         if (this.userTier === 'free') {
           const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
-          this.updatePlatformStatus(`✅ Saved! ${remaining} free exports remaining today`, true);
+          const poolActive = (this.usageStats.lifetimeFreePool ?? 0) > 0;
+          this.updatePlatformStatus(`✅ Saved! ${remaining} ${poolActive ? 'welcome credits' : 'free exports'} remaining`, true);
         }
       } else {
         this.showError(response?.error || 'Failed to save');

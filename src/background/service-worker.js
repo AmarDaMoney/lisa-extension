@@ -1115,7 +1115,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           // Save snapshot with appropriate source — caller can override
           const source = request.source || (request.data ? 'extension-compressed' : 'floating-button');
           const snapshot = await snapshotManager.saveSnapshot(data, source);
-          await snapshotManager.decrementFreePool();
         sendResponse({ success: true, snapshot });
         
       } catch (error) {
@@ -1143,7 +1142,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           messageCount: (data.stats?.userMessages || 0) + (data.stats?.assistantMessages || 0)
         };
         const saved = await snapshotManager.saveSnapshot(conversation, "floating-button-lisav");
-        await snapshotManager.decrementFreePool();
         sendResponse({ success: true, snapshot: saved });
       } catch (error) {
         console.error("[LISA] LISA-V save error:", error);

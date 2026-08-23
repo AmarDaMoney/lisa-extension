@@ -1,5 +1,5 @@
 /**
- * LISA Core - Stripe Payment Integration Manager
+ * LISA - Stripe Payment Integration Manager
  * Handles all Stripe payment flows and subscription management
  * Updated: Uses Stripe Checkout Sessions for Chrome Extension compatibility
  */

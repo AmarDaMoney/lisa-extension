@@ -1,4 +1,4 @@
-// LISA Core Extension - Popup Logic
+// LISA Extension - Popup Logic
 // v0.52.4 - Auto-embed integrity hash, auto-renewal/cancellation notice
 
 class LISAPopup {
@@ -2120,12 +2120,12 @@ class LISAPopup {
       // Raw capture: clean human-readable markdown
       md = '# ' + (snapshot.title || 'Conversation') + '\n';
       md += '> ' + platform + ' | ' + new Date(timestamp).toISOString() + ' | ' + blockCount + ' messages\n';
-      md += '> Captured by LISA Core v' + version + '\n\n';
+      md += '> Captured by LISA v' + version + '\n\n';
       md += '---\n\n';
     } else {
       // Compressed/AI: structured header for AI consumption
       md = '# LISA Context Handoff\n';
-      md += '> LISA Core v' + version + ' | Source: ' + platform + ' | Captured: ' + new Date(timestamp).toISOString() + '\n';
+      md += '> LISA v' + version + ' | Source: ' + platform + ' | Captured: ' + new Date(timestamp).toISOString() + '\n';
       const originalLabel = snapshot.format === 'compressed' ? 'Semantic Compressed' : (snapshot.format === 'ai-compressed' ? 'AI Compressed' : 'LISA-V JSONL');
       md += '> Blocks: ' + blockCount + ' | Format: ' + originalLabel + '\n\n';
       md += 'This file contains a verified conversation capture optimized for AI consumption.\n';
@@ -2157,10 +2157,10 @@ class LISAPopup {
     md += '\n---\n\n';
 
     md += '## Integrity\n';
-    md += '> LISA Core v' + version + ' | Hash: ' + hash + ' | Blocks: ' + blockCount + '\n';
+    md += '> LISA v' + version + ' | Hash: ' + hash + ' | Blocks: ' + blockCount + '\n';
     md += '> Decisions: ' + decisionCount + ' | Entities: ' + entityCount + ' | Open items: ' + openCount + '\n\n';
     md += '---\n';
-    md += '*LISA Core v' + version + ' \u2022 SAT-CHAIN LLC*\n';
+    md += '*LISA v' + version + ' \u2022 SAT-CHAIN LLC*\n';
 
     return md;
   }
@@ -2279,7 +2279,7 @@ class LISAPopup {
       : 'JSON';
 
     let md = '# LISA Context Injection \u2014 Machine-Readable Format\n\n';
-    md += '> **This file contains structured conversation data captured by LISA Core.**\n';
+    md += '> **This file contains structured conversation data captured by LISA.**\n';
     md += '> It is optimized for AI consumption, not human reading.\n';
     md += '> Parse the data below to reconstruct full conversation context.\n\n';
     md += '| Field | Value |\n';
@@ -2289,14 +2289,14 @@ class LISAPopup {
     md += '| ' + (format === 'lisa-v' ? 'Blocks' : 'Messages') + ' | ' + msgCount + ' |\n';
     md += '| Format | ' + formatLabel + ' |\n';
     md += '| Captured | ' + new Date(timestamp).toISOString() + ' |\n';
-    md += '| LISA Core | v' + version + ' |\n\n';
+    md += '| LISA | v' + version + ' |\n\n';
     md += '---\n\n';
     md += '## Structured Data\n\n';
     md += '```json\n';
     md += rawContent + '\n';
     md += '```\n\n';
     md += '---\n';
-    md += '*LISA Core v' + version + ' \u2022 SAT-CHAIN LLC \u2022 Machine-Readable Context Injection*\n';
+    md += '*LISA v' + version + ' \u2022 SAT-CHAIN LLC \u2022 Machine-Readable Context Injection*\n';
     return md;
   }
 

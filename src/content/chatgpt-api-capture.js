@@ -8,7 +8,7 @@
  * session cookies automatically.
  *
  * VERSION: 0.52.4
- * AUTHOR: SAT-CHAIN LLC / LISA Core
+ * AUTHOR: SAT-CHAIN LLC / LISA
  */
 
 (function() {

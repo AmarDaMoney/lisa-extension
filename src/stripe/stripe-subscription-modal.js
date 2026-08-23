@@ -1,5 +1,5 @@
 /**
- * LISA Core - Stripe Subscription Modal
+ * LISA - Stripe Subscription Modal
  * HTML for Stripe payment form and subscription management
  */
 

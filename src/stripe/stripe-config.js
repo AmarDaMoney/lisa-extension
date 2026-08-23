@@ -1,5 +1,5 @@
 /**
- * LISA Core - Stripe Configuration
+ * LISA - Stripe Configuration
  * Manages Stripe API keys and configuration
  */
 
@@ -11,14 +11,14 @@ const STRIPE_CONFIG = {
   products: {
     premium_monthly: {
       priceId: 'price_1TWadARCWqG97BQiHqr7MOMs',
-      name: 'LISA Core Extension Pro - Monthly',
+      name: 'LISA Extension Pro - Monthly',
       amount: 999, // $9.99 in cents
       interval: 'month',
       description: 'LISA Pro: 50 compressions/day, cloud sync, 1M character limit, priority support'
     },
     premium_annual: {
       priceId: 'price_1TWairRCWqG97BQi5HLUnYE0',
-      name: 'LISA Core Extension Pro - Annual',
+      name: 'LISA Extension Pro - Annual',
       amount: 8999, // $89.99 in cents
       interval: 'year',
       description: 'Annual LISA Pro: 50 compressions/day, cloud sync, 1M character limit, priority support'

@@ -1,5 +1,5 @@
 /**
- * LISA Core - Stripe Client
+ * LISA - Stripe Client
  * Handles all Stripe payment operations and subscription management
  * Updated: Uses Stripe Checkout Sessions for Chrome Extension compatibility
  */

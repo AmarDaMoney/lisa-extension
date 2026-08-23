@@ -1,4 +1,4 @@
-// LISA Core - Semantic Compression Engine
+// LISA - Semantic Compression Engine
 // Background Service Worker (Manifest V3)
 // v0.52.4 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
 
@@ -1215,10 +1215,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function createContextMenus() {
   // Remove existing menus first to avoid duplicates
   chrome.contextMenus.removeAll(() => {
-    // Export selected text to LISA Core
+    // Export selected text to LISA
     chrome.contextMenus.create({
       id: 'export-selection',
-      title: '📤 Export Selection to LISA Core',
+      title: '📤 Export Selection to LISA',
       contexts: ['selection']
     }, () => {
       if (chrome.runtime.lastError) {
@@ -1313,7 +1313,7 @@ async function handleExportSelection(info, tab) {
     const selectedText = info.selectionText;
     
     if (!selectedText || selectedText.trim().length === 0) {
-      showNotification('LISA Core', '❌ No text selected');
+      showNotification('LISA', '❌ No text selected');
       return;
     }
     
@@ -1339,11 +1339,11 @@ async function handleExportSelection(info, tab) {
     await downloadCompressedData(compressed, 'snippet');
     
     // Show notification
-    showNotification('LISA Core', `✅ Selection saved! ${selectedText.length} chars → ${compressed.metadata.compressionRatio}:1 ratio`);
+    showNotification('LISA', `✅ Selection saved! ${selectedText.length} chars → ${compressed.metadata.compressionRatio}:1 ratio`);
     
   } catch (error) {
     console.error('[LISA] Export selection error:', error);
-    showNotification('LISA Core', `❌ Failed: ${error.message}`);
+    showNotification('LISA', `❌ Failed: ${error.message}`);
   }
 }
 
@@ -1351,7 +1351,7 @@ async function handleCopyAsLisa(info, tab) {
   try {
     const selectedText = info.selectionText;
     if (!selectedText || selectedText.trim().length === 0) {
-      showNotification('LISA Core', '❌ No text selected');
+      showNotification('LISA', '❌ No text selected');
       return;
     }
 
@@ -1372,12 +1372,12 @@ async function handleCopyAsLisa(info, tab) {
 
     // Build LISA context wrapper
     let md = '# LISA Context Transfer — Selection\n\n';
-    md += '> Selected from ' + sourcePlatform + ' via LISA Core v' + version + '\n';
+    md += '> Selected from ' + sourcePlatform + ' via LISA v' + version + '\n';
     md += '> Paste into any AI chat to transfer this context.\n\n';
     md += '---\n\n';
     md += selectedText + '\n\n';
     md += '---\n';
-    md += '*LISA Core v' + version + ' • ' + timestamp + '*\n';
+    md += '*LISA v' + version + ' • ' + timestamp + '*\n';
 
     // Copy to clipboard via offscreen or content script
     await chrome.tabs.sendMessage(tab.id, {
@@ -1385,7 +1385,7 @@ async function handleCopyAsLisa(info, tab) {
       text: md
     });
 
-    showNotification('LISA Core', '✅ Copied! ' + selectedText.length + ' chars from ' + sourcePlatform + ' — paste into any AI chat.');
+    showNotification('LISA', '✅ Copied! ' + selectedText.length + ' chars from ' + sourcePlatform + ' — paste into any AI chat.');
 
   } catch (error) {
     // Fallback: try writing to clipboard via offscreen document
@@ -1397,10 +1397,10 @@ async function handleCopyAsLisa(info, tab) {
         justification: 'Copy LISA context to clipboard'
       });
       await chrome.runtime.sendMessage({ action: 'clipboard-write', text: selectedText });
-      showNotification('LISA Core', '✅ Selection copied! Paste into any AI chat.');
+      showNotification('LISA', '✅ Selection copied! Paste into any AI chat.');
     } catch (e2) {
       console.error('[LISA] Copy failed:', e2);
-      showNotification('LISA Core', '❌ Copy failed — try selecting text and using Ctrl+C');
+      showNotification('LISA', '❌ Copy failed — try selecting text and using Ctrl+C');
     }
   }
 }

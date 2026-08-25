@@ -1835,23 +1835,32 @@ class LISAPopup {
       return;
     }
 
-    container.innerHTML = snapshots.map(snap => `
-      <div class="snapshot-item" data-id="${snap.id}">
-          <input type="checkbox" class="snapshot-checkbox" data-id="${snap.id}" title="Select for injection">
+    container.innerHTML = snapshots.map(snap => {
+      const eId = this.escapeHtml(snap.id);
+      const eRootId = this.escapeHtml(snap.rootId || snap.id);
+      const ePlatform = this.escapeHtml(snap.platform || '');
+      const eVersion = this.escapeHtml(String(snap.version || 1));
+      const eTitle = this.escapeHtml(snap.title === snap.platform || !snap.title ? 'Untitled Conversation' : snap.title);
+      const formatLabel = snap.format === 'lisa-v' ? ' \u2022 \ud83d\udcdd LISA-V' : snap.format === 'markdown' ? ' \u2022 \ud83d\udccb MD' : snap.format === 'ai-compressed' ? ' \u2022 \ud83e\udd16 AI' : snap.format === 'compressed' ? ' \u2022 \ud83d\udddc\ufe0f Comp' : snap.source === 'floating-button' || snap.format === 'raw' ? ' \u2022 \ud83d\udcc4 Raw' : '';
+      const phoenixLabel = snap.phoenix ? ' \u2022 \ud83d\udd25 Gen ' + this.escapeHtml(String(snap.phoenix.generation)) : '';
+      return `
+      <div class="snapshot-item" data-id="${eId}">
+          <input type="checkbox" class="snapshot-checkbox" data-id="${eId}" title="Select for injection">
         <div class="snapshot-info">
-          <div class="snapshot-title">${this.escapeHtml(snap.title === snap.platform || !snap.title ? 'Untitled Conversation' : snap.title)}</div>
-          <div class="snapshot-meta">${snap.platform} • ${this.formatTimeAgo(snap.savedAt)} • v${snap.version || 1}${snap.phoenix ? ' • 🔥 Gen ' + snap.phoenix.generation : ''}${snap.format === 'lisa-v' ? ' • 📝 LISA-V' : snap.format === 'markdown' ? ' • 📋 MD' : snap.format === 'ai-compressed' ? ' • 🤖 AI' : snap.format === 'compressed' ? ' • 🗜️ Comp' : snap.source === 'floating-button' || snap.format === 'raw' ? ' • 📄 Raw' : ''}</div>
+          <div class="snapshot-title">${eTitle}</div>
+          <div class="snapshot-meta">${ePlatform} \u2022 ${this.formatTimeAgo(snap.savedAt)} \u2022 v${eVersion}${phoenixLabel}${formatLabel}</div>
         </div>
         <div class="snapshot-actions">
-          <button class="snapshot-btn history" data-root-id="${snap.rootId || snap.id}" title="Version History">🕒</button>
+          <button class="snapshot-btn history" data-root-id="${eRootId}" title="Version History">\ud83d\udd52</button>
           
-          <button class="snapshot-btn download" data-id="${snap.id}" title="Download JSON">💾</button>
-            <button class="snapshot-btn inject" data-id="${snap.id}" title="Inject context to active AI tab">📎</button>
-          <button class="snapshot-btn send" data-id="${snap.id}" title="Send to App">📤</button>
-          <button class="snapshot-btn delete" data-id="${snap.id}" title="Delete">🗑️</button>
+          <button class="snapshot-btn download" data-id="${eId}" title="Download JSON">\ud83d\udcbe</button>
+            <button class="snapshot-btn inject" data-id="${eId}" title="Inject context to active AI tab">\ud83d\udcce</button>
+          <button class="snapshot-btn send" data-id="${eId}" title="Send to App">\ud83d\udce4</button>
+          <button class="snapshot-btn delete" data-id="${eId}" title="Delete">\ud83d\uddd1\ufe0f</button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     // Add event listeners
     container.querySelectorAll('.snapshot-btn.history').forEach(btn => {

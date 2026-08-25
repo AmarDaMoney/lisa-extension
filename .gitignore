@@ -1,2 +1,8 @@
-*.zip
 public/misc/
+node_modules/
+server/node_modules/
+*.log
+*.bak
+.env
+.env.*
+*.zip

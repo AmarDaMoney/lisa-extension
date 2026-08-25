@@ -14,6 +14,7 @@ const express = require('express');
 const Stripe = require('stripe');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
@@ -29,7 +30,21 @@ if (!STRIPE_SECRET_KEY) {
 const stripe = Stripe(STRIPE_SECRET_KEY);
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'chrome-extension://dmgnookddagimdcggdlbjmaobmoofhbj'
+  ]
+}));
+
+// Rate limiting — prevent brute-force and enumeration
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,   // 1 minute
+  max: 10,               // 10 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' }
+});
+app.use('/api/', apiLimiter);
 
 // Need raw body for webhooks, JSON for everything else
 app.use((req, res, next) => {
@@ -58,9 +73,11 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
     let customer;
     if (user_id) {
       // Try to find existing customer by user_id
-      const existingCustomers = await stripe.customers.list({
-        limit: 1,
-        query: `metadata['user_id']:'${user_id}'`
+      // Escape single quotes to prevent Stripe Search Query injection
+      const safeUserId = user_id.replace(/'/g, "\\'");
+      const existingCustomers = await stripe.customers.search({
+        query: `metadata['user_id']:'${safeUserId}'`,
+        limit: 1
       }).catch(() => ({ data: [] }));
 
       if (existingCustomers.data && existingCustomers.data.length > 0) {
@@ -78,8 +95,8 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
     const sessionConfig = {
       mode: 'subscription',
       line_items: [{ price: price_id, quantity: 1 }],
-      success_url: success_url || 'https://lisa-extension.com/success?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: cancel_url || 'https://lisa-extension.com/cancel',
+      success_url: success_url || 'https://lisa-web-backend-production.up.railway.app/landing?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: cancel_url || 'https://lisa-web-backend-production.up.railway.app/landing',
       metadata: {
         user_id: user_id || 'unknown',
         billing_cycle: billing_cycle || 'month'
@@ -207,8 +224,9 @@ app.get('/api/stripe/get-subscription', async (req, res) => {
     console.log('[Stripe] Getting subscription for user:', userId);
 
     // Find customer by user_id metadata
+    const safeUserId = userId.replace(/'/g, "\\'");
     const customers = await stripe.customers.search({
-      query: `metadata['user_id']:'${userId}'`,
+      query: `metadata['user_id']:'${safeUserId}'`,
       limit: 1
     }).catch(() => ({ data: [] }));
 
@@ -277,8 +295,9 @@ app.post('/api/stripe/cancel-subscription', async (req, res) => {
     console.log('[Stripe] Cancelling subscription for user:', userId);
 
     // Find customer by user_id metadata
+    const safeUserId = userId.replace(/'/g, "\\'");
     const customers = await stripe.customers.search({
-      query: `metadata['user_id']:'${userId}'`,
+      query: `metadata['user_id']:'${safeUserId}'`,
       limit: 1
     }).catch(() => ({ data: [] }));
 
@@ -382,8 +401,9 @@ app.post('/api/validate-license', async (req, res) => {
     const licenseKey = key.trim();
 
     // Find customer by license_key metadata
+    const safeLicenseKey = licenseKey.replace(/'/g, "\\'");
     const customers = await stripe.customers.search({
-      query: `metadata['license_key']:'${licenseKey}'`,
+      query: `metadata['license_key']:'${safeLicenseKey}'`,
       limit: 1
     }).catch(() => ({ data: [] }));
 

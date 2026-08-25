@@ -71,14 +71,14 @@
 
     const threadUuid = getThreadId();
     if (!threadUuid) {
-      window.postMessage({ type: '__lisa_perplexity_api_response', success: false, error: 'No thread UUID found' }, '*');
+      window.postMessage({ type: '__lisa_perplexity_api_response', success: false, error: 'No thread UUID found' }, window.location.origin);
       return;
     }
 
     try {
       const entries = await fetchFullThread(threadUuid);
       if (!entries || entries.length === 0) {
-        window.postMessage({ type: '__lisa_perplexity_api_response', success: false, error: 'No entries returned' }, '*');
+        window.postMessage({ type: '__lisa_perplexity_api_response', success: false, error: 'No entries returned' }, window.location.origin);
         return;
       }
 
@@ -104,19 +104,19 @@
           messageCount: messages.length,
           messages: messages
         }
-      }, '*');
+      }, window.location.origin);
     } catch (e) {
-      window.postMessage({ type: '__lisa_perplexity_api_response', success: false, error: e.message }, '*');
+      window.postMessage({ type: '__lisa_perplexity_api_response', success: false, error: e.message }, window.location.origin);
     }
   });
 
   // Announce readiness — repeat every 500ms for 5 seconds
   // so the bridge catches it regardless of load order
-  window.postMessage({ type: '__lisa_perplexity_api_ready' }, '*');
+  window.postMessage({ type: '__lisa_perplexity_api_ready' }, window.location.origin);
   var readyCount = 0;
   var readyInterval = setInterval(function() {
     readyCount++;
-    window.postMessage({ type: '__lisa_perplexity_api_ready' }, '*');
+    window.postMessage({ type: '__lisa_perplexity_api_ready' }, window.location.origin);
     if (readyCount >= 10) clearInterval(readyInterval);
   }, 500);
 

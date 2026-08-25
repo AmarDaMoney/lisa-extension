@@ -934,6 +934,7 @@ class SnapshotManager {
 
   getPlatformName(url) {
     if (!url) return 'Unknown';
+    if (url.includes('claude.ai/code/')) return 'Claude Code';
     if (url.includes('claude.ai')) return 'Claude';
     if (url.includes('chatgpt.com')) return 'ChatGPT';
     if (url.includes('gemini.google.com')) return 'Gemini';

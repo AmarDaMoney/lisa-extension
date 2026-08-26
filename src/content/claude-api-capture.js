@@ -11,7 +11,7 @@
  *
  * Output: LISA standard parser format (same shape all downstream systems consume)
  *
- * VERSION: 0.52.4
+ * VERSION: 0.52.5
  * AUTHOR: SAT-CHAIN LLC / LISA
  */
 

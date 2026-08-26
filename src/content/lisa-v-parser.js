@@ -425,32 +425,34 @@ class LisaVParser {
   }
   // Claude Code-specific extraction
   async extractClaudeCodeMessages() {
-    const accumulated = new Map();
-    // Find scroller
+    const items = new Map();
     const scrollable = [...document.querySelectorAll('div')].filter(el => {
       const s = getComputedStyle(el);
       return (s.overflowY === 'auto' || s.overflowY === 'scroll')
              && el.scrollHeight > el.clientHeight + 200;
     }).sort((a, b) => b.scrollHeight - a.scrollHeight);
     const scroller = scrollable[0];
-
     const self = this;
+
     function collectVisible() {
       const allEls = document.querySelectorAll('[data-epitaxy-entry]');
       for (const el of allEls) {
         const entryId = el.getAttribute('data-epitaxy-entry');
-        if (!entryId || accumulated.has(entryId)) continue;
-        const idx = parseInt(el.getAttribute('data-epitaxy-entry-index') || '0', 10);
+        const entryIdx = parseInt(el.getAttribute('data-epitaxy-entry-index') || '0', 10);
+        const itemIdx = el.getAttribute('data-epitaxy-item-index');
+        if (!entryId) continue;
+        const key = entryId + '|' + (itemIdx || '0');
+        if (items.has(key)) continue;
         const role = entryId.startsWith('msg_') ? 'assistant' : 'user';
         const rows = el.querySelectorAll('.group\\/message-row');
         const targets = rows.length > 0 ? [...rows] : [el];
-        // Clone immediately — originals get unmounted by virtualizer during scroll
+        // Clone immediately — virtualizer recycles originals
         const clones = targets.map(t => {
           const c = t.cloneNode(true);
-          c.querySelectorAll('[class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(e => e.remove());
+          c.querySelectorAll('.sr-only, [class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(e => e.remove());
           return c;
         });
-        accumulated.set(entryId, { role, idx, clones: clones });
+        items.set(key, { entryId, entryIdx, itemIdx: parseInt(itemIdx || '0', 10), role, clones });
       }
     }
 
@@ -472,14 +474,26 @@ class LisaVParser {
       collectVisible();
     }
 
-    // Sort by entry index, extract content
-    const sorted = [...accumulated.entries()].sort((a, b) => a[1].idx - b[1].idx);
+    // Group by entryId
+    const entryGroups = new Map();
+    for (const item of items.values()) {
+      if (!entryGroups.has(item.entryId)) {
+        entryGroups.set(item.entryId, { role: item.role, entryIdx: item.entryIdx, items: [] });
+      }
+      entryGroups.get(item.entryId).items.push(item);
+    }
+
+    // Sort entries by entryIdx, items within each by itemIdx
+    const sorted = [...entryGroups.values()].sort((a, b) => a.entryIdx - b.entryIdx);
     const messages = [];
-    for (const [entryId, entry] of sorted) {
+    for (const group of sorted) {
+      group.items.sort((a, b) => a.itemIdx - b.itemIdx);
       const allBlocks = [];
-      for (const clone of entry.clones) {
-        const blocks = await this.parseMessageContent(clone, entry.role);
-        allBlocks.push(...blocks);
+      for (const item of group.items) {
+        for (const clone of item.clones) {
+          const blocks = await this.parseMessageContent(clone, group.role);
+          allBlocks.push(...blocks);
+        }
       }
       if (allBlocks.length > 0) messages.push(allBlocks);
     }

@@ -470,7 +470,9 @@ class LisaVParser {
       const allBlocks = [];
       for (const el of elements) {
         const msgRow = el.querySelector('.group\\/message-row') || el;
-        const blocks = await this.parseMessageContent(msgRow, role);
+        const clone = msgRow.cloneNode(true);
+        clone.querySelectorAll('[class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(e => e.remove());
+        const blocks = await this.parseMessageContent(clone, role);
         allBlocks.push(...blocks);
       }
       if (allBlocks.length > 0) messages.push(allBlocks);

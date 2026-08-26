@@ -18,9 +18,20 @@ class ClaudeCodeParser {
   }
 
   extractTitle() {
-    const h1 = document.querySelector('h1');
-    if (h1 && h1.textContent.trim().length > 0) {
-      return h1.textContent.trim();
+    // Claude Code uses epitaxy-titlebar for session title
+    const titlebar = document.querySelector('.epitaxy-titlebar');
+    if (titlebar) {
+      const titleDiv = titlebar.querySelector('div.flex.items-center.min-w-\\[32px\\]')
+                    || titlebar.querySelector('span.flex.min-w-0.items-center > div:first-child');
+      if (titleDiv && titleDiv.textContent.trim().length > 0) {
+        return titleDiv.textContent.trim();
+      }
+    }
+    // Fallback: first user message snippet
+    const firstEntry = document.querySelector('[data-epitaxy-entry]:not([data-epitaxy-entry^="msg_"])');
+    if (firstEntry) {
+      const text = firstEntry.textContent.trim().slice(0, 80);
+      if (text) return text + (firstEntry.textContent.trim().length > 80 ? '…' : '');
     }
     return 'Claude Code Session';
   }
@@ -119,14 +130,14 @@ class ClaudeCodeParser {
       // Concatenate text from all message-rows in this entry
       const parts = [];
       for (const el of elements) {
-        // Find the message-row content
         const msgRow = el.querySelector('.group\\/message-row') || el;
+        const clone = msgRow.cloneNode(true);
+        // Remove tool-action labels (French/English)
+        clone.querySelectorAll('[class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(e => e.remove());
         let text;
         if (converter) {
-          text = converter.extractAsMarkdown(msgRow);
+          text = converter.extractAsMarkdown(clone);
         } else {
-          const clone = msgRow.cloneNode(true);
-          clone.querySelectorAll('button, svg, [role="button"], .sr-only, [class*="opacity-0"]').forEach(e => e.remove());
           text = clone.textContent || '';
         }
         if (text && text.trim()) parts.push(text.trim());

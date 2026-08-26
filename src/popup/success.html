@@ -220,32 +220,19 @@
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session_id');
         
-        if (sessionId) {
-          console.log('[LISA Success] Verifying session:', sessionId);
-          
-          // Create stripe client and verify session
-          const client = new StripeClient(STRIPE_CONFIG.publishableKey, STRIPE_CONFIG.apiBaseUrl);
-          const result = await client.verifyCheckoutSession(sessionId);
-          
-          if (result.success) {
-            console.log('[LISA Success] Premium activated!');
-          } else {
-            console.log('[LISA Success] Verification pending, activating anyway');
-            // Activate premium even if verification is pending (webhook will confirm)
-            await chrome.storage.sync.set({
-              userTier: 'premium',
-              subscriptionStatus: 'pending_verification',
-              subscriptionUpdatedAt: new Date().toISOString()
-            });
-          }
+        if (!sessionId) {
+          console.warn('[LISA Success] No session ID — cannot verify. Webhook will activate if payment succeeded.');
+          return;
+        }
+
+        console.log('[LISA Success] Verifying session:', sessionId);
+        const client = new StripeClient(STRIPE_CONFIG.publishableKey, STRIPE_CONFIG.apiBaseUrl);
+        const result = await client.verifyCheckoutSession(sessionId);
+
+        if (result.success) {
+          console.log('[LISA Success] Premium activated via verified session!');
         } else {
-          // No session ID, but still activate (user came from successful payment)
-          console.log('[LISA Success] No session ID, setting premium from redirect');
-          await chrome.storage.sync.set({
-            userTier: 'premium',
-            subscriptionStatus: 'active',
-            subscriptionUpdatedAt: new Date().toISOString()
-          });
+          console.log('[LISA Success] Verification pending — webhook will activate when payment confirms.');
         }
         
         // Notify background script to refresh user tier
@@ -258,12 +245,8 @@
         
       } catch (error) {
         console.error('[LISA Success] Error verifying session:', error);
-        // Still activate premium on error (webhook will correct if needed)
-        await chrome.storage.sync.set({
-          userTier: 'premium',
-          subscriptionStatus: 'pending',
-          subscriptionUpdatedAt: new Date().toISOString()
-        });
+        // Do NOT activate premium on error — webhook will handle it if payment succeeded
+        console.log('[LISA Success] Waiting for webhook to confirm payment.');
       }
     }
     

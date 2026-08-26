@@ -449,7 +449,7 @@ class LisaVParser {
         // Clone immediately — virtualizer recycles originals
         const clones = targets.map(t => {
           const c = t.cloneNode(true);
-          c.querySelectorAll('.sr-only, [class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(e => e.remove());
+          c.querySelectorAll('.sr-only, [class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"], time').forEach(e => e.remove());
           return c;
         });
         items.set(key, { entryId, entryIdx, itemIdx: parseInt(itemIdx || '0', 10), role, clones });
@@ -1547,6 +1547,20 @@ class LisaVParser {
     return this.blocks;
   }
   // Flatten blocks into messages format for backend compatibility
+  getSmartTitle() {
+    const platform = this.detectPlatform();
+    if (platform === 'Claude Code') {
+      const titlebar = document.querySelector('.epitaxy-titlebar');
+      if (titlebar) {
+        const titleDiv = titlebar.querySelector('span.flex.min-w-0.items-center > div:first-child');
+        if (titleDiv && titleDiv.textContent.trim().length > 0) {
+          return titleDiv.textContent.trim();
+        }
+      }
+    }
+    return document.title;
+  }
+
   toMessages() {
     const messages = [];
     let currentRole = null;
@@ -1585,7 +1599,7 @@ class LisaVParser {
       platform: this.detectPlatform(),
       conversationId: this.conversationId,
       url: window.location.href,
-      title: document.title,
+      title: this.getSmartTitle(),
       extractedAt: new Date().toISOString(),
       messageCount: messages.length,
       messages: messages

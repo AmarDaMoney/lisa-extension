@@ -77,7 +77,7 @@ class ClaudeCodeParser {
       for (var j = 0; j < targets.length; j++) {
         var clone = targets[j].cloneNode(true);
         // Remove sr-only (duplicates visible text), tool labels, UI chrome
-        clone.querySelectorAll('.sr-only, [class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(function(e) { e.remove(); });
+        clone.querySelectorAll('.sr-only, [class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"], time').forEach(function(e) { e.remove(); });
         var text;
         if (converter) {
           text = converter.extractAsMarkdown(clone);
@@ -86,6 +86,9 @@ class ClaudeCodeParser {
         }
         if (text && text.trim()) parts.push(text.trim());
       }
+      // Dedup identical parts (user entries often contain duplicate message-rows)
+      var seen = new Set();
+      parts = parts.filter(function(p) { if (seen.has(p)) return false; seen.add(p); return true; });
       var fullText = this.cleanText(parts.join('\n'));
       if (fullText.length > 0) {
         items.set(key, {

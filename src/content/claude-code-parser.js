@@ -1,6 +1,7 @@
 // Claude Code Session Parser
 // Extracts from claude.ai/code/* pages using data-epitaxy-entry structure
 // User entries have UUID IDs, assistant entries have msg_ prefix IDs
+// DOM is aggressively virtualized — must accumulate while scrolling
 
 if (typeof ClaudeCodeParser !== 'undefined') {
   // Already loaded — skip re-declaration
@@ -18,123 +19,63 @@ class ClaudeCodeParser {
   }
 
   extractTitle() {
-    // Claude Code uses epitaxy-titlebar for session title
     const titlebar = document.querySelector('.epitaxy-titlebar');
     if (titlebar) {
-      const titleDiv = titlebar.querySelector('div.flex.items-center.min-w-\\[32px\\]')
-                    || titlebar.querySelector('span.flex.min-w-0.items-center > div:first-child');
+      const titleDiv = titlebar.querySelector('span.flex.min-w-0.items-center > div:first-child');
       if (titleDiv && titleDiv.textContent.trim().length > 0) {
         return titleDiv.textContent.trim();
       }
     }
-    // Fallback: first user message snippet
     const firstEntry = document.querySelector('[data-epitaxy-entry]:not([data-epitaxy-entry^="msg_"])');
     if (firstEntry) {
       const text = firstEntry.textContent.trim().slice(0, 80);
-      if (text) return text + (firstEntry.textContent.trim().length > 80 ? '…' : '');
+      if (text) return text;
     }
     return 'Claude Code Session';
   }
 
   cleanText(text) {
     if (!text) return '';
-    // Strip role prefixes (French and English)
     text = text.replace(/^Vous avez dit\s*:?\s*/i, '');
     text = text.replace(/^You said\s*:?\s*/i, '');
     text = text.replace(/^Claude a répondu\s*:?\s*/i, '');
     text = text.replace(/^Claude replied\s*:?\s*/i, '');
     text = text.replace(/^Afficher moins\s*/i, '');
     text = text.replace(/^Show less\s*/i, '');
-    // Strip trailing timestamps
-    text = text.replace(/\n\d{1,2}:\d{2}\s*(AM|PM)\s*$/i, '');
-    // Strip "Crédits d'utilisation épuisés" / "Usage credits exhausted" noise
     text = text.replace(/Crédits d'utilisation épuisés.*/i, '');
     text = text.replace(/Usage credits exhausted.*/i, '');
-    // Strip time-ago markers
     text = text.replace(/il y a \d+\s*(mois|jours?|heures?|minutes?|secondes?)\s*$/i, '');
     text = text.replace(/\d+\s*(months?|days?|hours?|minutes?|seconds?)\s*ago\s*$/i, '');
-    // Collapse duplicate lines
+    text = text.replace(/\n\d{1,2}:\d{2}\s*(AM|PM)\s*$/i, '');
     text = text.split('\n').filter((ln, i, a) => i === 0 || ln.trim() === '' || ln.trim() !== a[i-1].trim()).join('\n');
     return text.trim();
   }
 
-  async performScrollSweep() {
-    const scrollable = [...document.querySelectorAll('div')].filter(el => {
-      const s = getComputedStyle(el);
+  findScroller() {
+    return [...document.querySelectorAll('div')].filter(function(el) {
+      var s = getComputedStyle(el);
       return (s.overflowY === 'auto' || s.overflowY === 'scroll')
              && el.scrollHeight > el.clientHeight + 200;
-    }).sort((a, b) => b.scrollHeight - a.scrollHeight);
-
-    const scroller = scrollable[0];
-    if (!scroller) return;
-
-    // Scroll to top first
-    scroller.scrollTop = 0;
-    await new Promise(r => setTimeout(r, 500));
-
-    // Scroll down incrementally to load all virtualized entries
-    const step = scroller.clientHeight * 0.7;
-    let stableCount = 0;
-    let lastEntryCount = 0;
-
-    for (let i = 0; i < 100; i++) {
-      scroller.scrollTop += step;
-      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-      await new Promise(r => setTimeout(r, 300));
-
-      const entries = new Set([...document.querySelectorAll('[data-epitaxy-entry]')]
-        .map(el => el.getAttribute('data-epitaxy-entry')));
-
-      if (entries.size === lastEntryCount) {
-        stableCount++;
-        if (stableCount >= 3) break;
-      } else {
-        stableCount = 0;
-        lastEntryCount = entries.size;
-      }
-    }
-
-    // Scroll back to top to capture first entries
-    scroller.scrollTop = 0;
-    await new Promise(r => setTimeout(r, 500));
+    }).sort(function(a, b) { return b.scrollHeight - a.scrollHeight; })[0] || null;
   }
 
-  extractMessages() {
-    const messages = [];
-    const seenEntries = new Set();
-    const converter = window.__lisaHtmlToMarkdown;
-
-    // Collect all entry elements, group by entry ID
-    const entryMap = new Map();
-    const entryOrder = [];
-    const allEls = document.querySelectorAll('[data-epitaxy-entry]');
-
-    for (const el of allEls) {
-      const entryId = el.getAttribute('data-epitaxy-entry');
-      if (!entryId) continue;
-      if (!entryMap.has(entryId)) {
-        entryMap.set(entryId, []);
-        entryOrder.push(entryId);
-      }
-      entryMap.get(entryId).push(el);
-    }
-
-    for (const entryId of entryOrder) {
-      if (seenEntries.has(entryId)) continue;
-      seenEntries.add(entryId);
-
-      const elements = entryMap.get(entryId);
-      const isAssistant = entryId.startsWith('msg_');
-      const role = isAssistant ? 'assistant' : 'user';
-
-      // Concatenate text from all message-rows in this entry
-      const parts = [];
-      for (const el of elements) {
-        const msgRow = el.querySelector('.group\\/message-row') || el;
-        const clone = msgRow.cloneNode(true);
-        // Remove tool-action labels (French/English)
-        clone.querySelectorAll('[class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(e => e.remove());
-        let text;
+  collectVisibleEntries(accumulated) {
+    var converter = window.__lisaHtmlToMarkdown;
+    var allEls = document.querySelectorAll('[data-epitaxy-entry]');
+    for (var i = 0; i < allEls.length; i++) {
+      var el = allEls[i];
+      var entryId = el.getAttribute('data-epitaxy-entry');
+      if (!entryId || accumulated.has(entryId)) continue;
+      var idx = parseInt(el.getAttribute('data-epitaxy-entry-index') || '0', 10);
+      var isAssistant = entryId.startsWith('msg_');
+      var role = isAssistant ? 'assistant' : 'user';
+      var rows = el.querySelectorAll('.group\\/message-row');
+      var targets = rows.length > 0 ? rows : [el];
+      var parts = [];
+      for (var j = 0; j < targets.length; j++) {
+        var clone = targets[j].cloneNode(true);
+        clone.querySelectorAll('[class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(function(e) { e.remove(); });
+        var text;
         if (converter) {
           text = converter.extractAsMarkdown(clone);
         } else {
@@ -142,46 +83,50 @@ class ClaudeCodeParser {
         }
         if (text && text.trim()) parts.push(text.trim());
       }
-
-      const fullText = this.cleanText(parts.join('\n'));
+      var fullText = this.cleanText(parts.join('\n'));
       if (fullText.length > 0) {
-        messages.push({
-          role: role,
-          content: fullText,
-          index: messages.length,
-          timestamp: new Date().toISOString()
-        });
+        accumulated.set(entryId, { role: role, content: fullText, sortIdx: idx });
       }
     }
-
-    return messages;
   }
 
   async extractConversation() {
     this.conversationId = this.extractConversationId();
+    var scroller = this.findScroller();
+    var accumulated = new Map();
 
-    // Scroll sweep to load virtualized entries
-    await this.performScrollSweep();
+    if (scroller) {
+      // Scroll to top
+      scroller.scrollTop = 0;
+      await new Promise(function(r) { setTimeout(r, 500); });
+      this.collectVisibleEntries(accumulated);
 
-    // Extract after first sweep
-    let messages = this.extractMessages();
-
-    // Second pass: scroll to bottom to catch any remaining
-    const scrollable = [...document.querySelectorAll('div')].filter(el => {
-      const s = getComputedStyle(el);
-      return (s.overflowY === 'auto' || s.overflowY === 'scroll')
-             && el.scrollHeight > el.clientHeight + 200;
-    }).sort((a, b) => b.scrollHeight - a.scrollHeight);
-
-    if (scrollable[0]) {
-      scrollable[0].scrollTop = scrollable[0].scrollHeight;
-      await new Promise(r => setTimeout(r, 500));
-      // Merge any new entries
-      const secondPass = this.extractMessages();
-      if (secondPass.length > messages.length) {
-        messages = secondPass;
+      // Scroll down incrementally, collecting at each position
+      var step = scroller.clientHeight * 0.6;
+      var lastScrollTop = -1;
+      for (var i = 0; i < 200; i++) {
+        scroller.scrollTop += step;
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        await new Promise(function(r) { setTimeout(r, 250); });
+        this.collectVisibleEntries(accumulated);
+        // Stop when scroll position stops changing (hit bottom)
+        if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
+        lastScrollTop = scroller.scrollTop;
       }
+    } else {
+      this.collectVisibleEntries(accumulated);
     }
+
+    // Sort by entry index and build messages
+    var sorted = [...accumulated.values()].sort(function(a, b) { return a.sortIdx - b.sortIdx; });
+    var messages = sorted.map(function(entry, i) {
+      return {
+        role: entry.role,
+        content: entry.content,
+        index: i,
+        timestamp: new Date().toISOString()
+      };
+    });
 
     if (messages.length === 0) return null;
 
@@ -193,7 +138,7 @@ class ClaudeCodeParser {
       extractedAt: new Date().toISOString(),
       messageCount: messages.length,
       messages: messages,
-      _captureMethod: 'dom-epitaxy'
+      _captureMethod: 'dom-epitaxy-sweep'
     };
   }
 
@@ -217,7 +162,7 @@ class ClaudeCodeParser {
   }
 }
 
-const claudeCodeParser = new ClaudeCodeParser();
+var claudeCodeParser = new ClaudeCodeParser();
 claudeCodeParser.initializeListener();
 
 chrome.runtime.sendMessage({

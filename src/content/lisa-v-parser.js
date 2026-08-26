@@ -425,54 +425,60 @@ class LisaVParser {
   }
   // Claude Code-specific extraction
   async extractClaudeCodeMessages() {
-    const messages = [];
-    // Scroll sweep for virtualized entries
+    const accumulated = new Map();
+    // Find scroller
     const scrollable = [...document.querySelectorAll('div')].filter(el => {
       const s = getComputedStyle(el);
       return (s.overflowY === 'auto' || s.overflowY === 'scroll')
              && el.scrollHeight > el.clientHeight + 200;
     }).sort((a, b) => b.scrollHeight - a.scrollHeight);
     const scroller = scrollable[0];
+
+    const self = this;
+    function collectVisible() {
+      const allEls = document.querySelectorAll('[data-epitaxy-entry]');
+      for (const el of allEls) {
+        const entryId = el.getAttribute('data-epitaxy-entry');
+        if (!entryId || accumulated.has(entryId)) continue;
+        const idx = parseInt(el.getAttribute('data-epitaxy-entry-index') || '0', 10);
+        const role = entryId.startsWith('msg_') ? 'assistant' : 'user';
+        const rows = el.querySelectorAll('.group\\/message-row');
+        const targets = rows.length > 0 ? [...rows] : [el];
+        // Clone immediately — originals get unmounted by virtualizer during scroll
+        const clones = targets.map(t => {
+          const c = t.cloneNode(true);
+          c.querySelectorAll('[class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(e => e.remove());
+          return c;
+        });
+        accumulated.set(entryId, { role, idx, clones: clones });
+      }
+    }
+
     if (scroller) {
       scroller.scrollTop = 0;
       await new Promise(r => setTimeout(r, 500));
-      const step = scroller.clientHeight * 0.7;
-      let stableCount = 0;
-      let lastCount = 0;
-      for (let i = 0; i < 100; i++) {
+      collectVisible();
+      const step = scroller.clientHeight * 0.6;
+      let lastScrollTop = -1;
+      for (let i = 0; i < 200; i++) {
         scroller.scrollTop += step;
         scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(r => setTimeout(r, 300));
-        const count = new Set([...document.querySelectorAll('[data-epitaxy-entry]')]
-          .map(el => el.getAttribute('data-epitaxy-entry'))).size;
-        if (count === lastCount) { stableCount++; if (stableCount >= 3) break; }
-        else { stableCount = 0; lastCount = count; }
+        await new Promise(r => setTimeout(r, 250));
+        collectVisible();
+        if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
+        lastScrollTop = scroller.scrollTop;
       }
-      scroller.scrollTop = 0;
-      await new Promise(r => setTimeout(r, 500));
+    } else {
+      collectVisible();
     }
-    // Group elements by entry ID, preserving order
-    const entryMap = new Map();
-    const entryOrder = [];
-    for (const el of document.querySelectorAll('[data-epitaxy-entry]')) {
-      const entryId = el.getAttribute('data-epitaxy-entry');
-      if (!entryId) continue;
-      if (!entryMap.has(entryId)) { entryMap.set(entryId, []); entryOrder.push(entryId); }
-      entryMap.get(entryId).push(el);
-    }
-    const seenEntries = new Set();
-    for (const entryId of entryOrder) {
-      if (seenEntries.has(entryId)) continue;
-      seenEntries.add(entryId);
-      // Role: msg_ prefix = assistant, UUID = user
-      const role = entryId.startsWith('msg_') ? 'assistant' : 'user';
-      const elements = entryMap.get(entryId);
+
+    // Sort by entry index, extract content
+    const sorted = [...accumulated.entries()].sort((a, b) => a[1].idx - b[1].idx);
+    const messages = [];
+    for (const [entryId, entry] of sorted) {
       const allBlocks = [];
-      for (const el of elements) {
-        const msgRow = el.querySelector('.group\\/message-row') || el;
-        const clone = msgRow.cloneNode(true);
-        clone.querySelectorAll('[class*="group/tool"], button, svg, [role="button"], [class*="opacity-0"]').forEach(e => e.remove());
-        const blocks = await this.parseMessageContent(clone, role);
+      for (const clone of entry.clones) {
+        const blocks = await this.parseMessageContent(clone, entry.role);
         allBlocks.push(...blocks);
       }
       if (allBlocks.length > 0) messages.push(allBlocks);

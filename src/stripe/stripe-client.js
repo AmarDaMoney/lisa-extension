@@ -173,11 +173,13 @@ class StripeClient {
     try {
       const userID = await this.getUserID();
       
+      const userToken = await this.getUserToken();
       const response = await fetch(`${this.apiBaseUrl}/stripe/get-subscription`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': userID
+          'X-User-ID': userID,
+          'X-User-Token': userToken || ''
         }
       });
 
@@ -201,11 +203,13 @@ class StripeClient {
     try {
       const userID = await this.getUserID();
       
+      const userToken = await this.getUserToken();
       const response = await fetch(`${this.apiBaseUrl}/stripe/cancel-subscription`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': userID
+          'X-User-ID': userID,
+          'X-User-Token': userToken || ''
         }
       });
 
@@ -275,6 +279,39 @@ class StripeClient {
     } catch (error) {
       console.error('[LISA Stripe] Failed to get user ID:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get or create HMAC token for authenticated API calls
+   */
+  async getUserToken() {
+    try {
+      let result = await chrome.storage.sync.get(['userToken']);
+      if (result.userToken) return result.userToken;
+
+      // Request token from server
+      const userID = await this.getUserID();
+      const response = await fetch(`${this.apiBaseUrl}/auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userID })
+      });
+
+      if (!response.ok) {
+        console.error('[LISA Stripe] Failed to get user token:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      if (data.token) {
+        await chrome.storage.sync.set({ userToken: data.token });
+        return data.token;
+      }
+      return null;
+    } catch (error) {
+      console.error('[LISA Stripe] Failed to get user token:', error);
+      return null;
     }
   }
 

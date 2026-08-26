@@ -11,6 +11,7 @@
 */
 
 const express = require('express');
+const crypto = require('crypto');
 const Stripe = require('stripe');
 const dotenv = require('dotenv');
 const cors = require('cors');
@@ -21,6 +22,27 @@ dotenv.config();
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const PORT = process.env.PORT || 3000;
+const HMAC_SECRET = process.env.HMAC_SECRET || 'change-me-in-production';
+
+// Input format validators
+function isValidUserId(id) {
+  // Format: user_{timestamp}_{9 alphanumeric chars}
+  return typeof id === 'string' && /^user_\d+_[a-z0-9]{1,20}$/.test(id);
+}
+function isValidLicenseKey(key) {
+  // Reject anything with Stripe query operators or suspicious chars
+  return typeof key === 'string' && key.length > 0 && key.length <= 200 && !/['"\\;]/.test(key);
+}
+
+// HMAC token helpers — sign user_id so a bare ID alone can't act as identity
+function signUserId(userId) {
+  return crypto.createHmac('sha256', HMAC_SECRET).update(userId).digest('hex');
+}
+function verifyUserToken(userId, token) {
+  if (!userId || !token) return false;
+  const expected = signUserId(userId);
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token));
+}
 
 if (!STRIPE_SECRET_KEY) {
   console.error('Missing STRIPE_SECRET_KEY in environment');
@@ -65,6 +87,10 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
 
     if (!price_id) {
       return res.status(400).json({ error: 'Missing price_id' });
+    }
+
+    if (user_id && !isValidUserId(user_id)) {
+      return res.status(400).json({ error: 'Invalid user_id format' });
     }
 
     console.log('[Stripe] Creating checkout session:', { user_id, price_id, billing_cycle });
@@ -216,9 +242,16 @@ app.post('/api/stripe/create-portal-session', async (req, res) => {
 app.get('/api/stripe/get-subscription', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
+    const userToken = req.headers['x-user-token'];
     
     if (!userId) {
       return res.status(400).json({ error: 'Missing X-User-ID header', active: false });
+    }
+    if (!isValidUserId(userId)) {
+      return res.status(400).json({ error: 'Invalid user_id format', active: false });
+    }
+    if (!verifyUserToken(userId, userToken)) {
+      return res.status(403).json({ error: 'Invalid or missing user token', active: false });
     }
 
     console.log('[Stripe] Getting subscription for user:', userId);
@@ -287,9 +320,16 @@ app.get('/api/stripe/get-subscription', async (req, res) => {
 app.post('/api/stripe/cancel-subscription', async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
+    const userToken = req.headers['x-user-token'];
     
     if (!userId) {
       return res.status(400).json({ error: 'Missing X-User-ID header' });
+    }
+    if (!isValidUserId(userId)) {
+      return res.status(400).json({ error: 'Invalid user_id format' });
+    }
+    if (!verifyUserToken(userId, userToken)) {
+      return res.status(403).json({ error: 'Invalid or missing user token' });
     }
 
     console.log('[Stripe] Cancelling subscription for user:', userId);
@@ -316,6 +356,13 @@ app.post('/api/stripe/cancel-subscription', async (req, res) => {
 
     if (subscriptions.data.length === 0) {
       return res.status(404).json({ error: 'No active subscription found' });
+    }
+
+    // Defense in depth: verify customer metadata matches authenticated user
+    const customerUserId = customer.metadata && customer.metadata.user_id;
+    if (customerUserId !== userId) {
+      console.error('[Stripe] IDOR attempt: authenticated as', userId, 'but customer metadata has', customerUserId);
+      return res.status(403).json({ error: 'User mismatch' });
     }
 
     // Cancel the subscription at period end
@@ -400,6 +447,10 @@ app.post('/api/validate-license', async (req, res) => {
 
     const licenseKey = key.trim();
 
+    if (!isValidLicenseKey(licenseKey)) {
+      return res.status(400).json({ valid: false, error: 'Invalid license key format' });
+    }
+
     // Find customer by license_key metadata
     const safeLicenseKey = licenseKey.replace(/'/g, "\\'");
     const customers = await stripe.customers.search({
@@ -435,6 +486,16 @@ app.post('/api/validate-license', async (req, res) => {
     console.error('[License] Validation error:', err);
     res.status(500).json({ valid: false, error: 'Validation failed' });
   }
+});
+
+// Issue HMAC token for a user_id (called once at extension startup)
+app.post('/api/auth/token', (req, res) => {
+  const { user_id } = req.body || {};
+  if (!user_id || !isValidUserId(user_id)) {
+    return res.status(400).json({ error: 'Invalid or missing user_id' });
+  }
+  const token = signUserId(user_id);
+  res.json({ token });
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

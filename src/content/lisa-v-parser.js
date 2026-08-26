@@ -426,62 +426,56 @@ class LisaVParser {
   // Claude Code-specific extraction
   async extractClaudeCodeMessages() {
     const messages = [];
-
-    // Scroll sweep for virtual transcript
-    const progressive = window.lisaProgressive;
-    const scroller = document.querySelector('[data-testid="epitaxy-virtual-transcript"]')
-                  || document.querySelector('.epitaxy-chat-panel-body')
-                  || document.querySelector('main');
-    if (scroller && progressive) {
-      await progressive.performScrollSweep(scroller);
-    } else if (scroller) {
+    // Scroll sweep for virtualized entries
+    const scrollable = [...document.querySelectorAll('div')].filter(el => {
+      const s = getComputedStyle(el);
+      return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+             && el.scrollHeight > el.clientHeight + 200;
+    }).sort((a, b) => b.scrollHeight - a.scrollHeight);
+    const scroller = scrollable[0];
+    if (scroller) {
       scroller.scrollTop = 0;
-      await new Promise(r => setTimeout(r, 700));
-      scroller.scrollTop = scroller.scrollHeight;
+      await new Promise(r => setTimeout(r, 500));
+      const step = scroller.clientHeight * 0.7;
+      let stableCount = 0;
+      let lastCount = 0;
+      for (let i = 0; i < 100; i++) {
+        scroller.scrollTop += step;
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 300));
+        const count = new Set([...document.querySelectorAll('[data-epitaxy-entry]')]
+          .map(el => el.getAttribute('data-epitaxy-entry'))).size;
+        if (count === lastCount) { stableCount++; if (stableCount >= 3) break; }
+        else { stableCount = 0; lastCount = count; }
+      }
+      scroller.scrollTop = 0;
       await new Promise(r => setTimeout(r, 500));
     }
-
-    const entries = document.querySelectorAll('[data-epitaxy-entry]');
-    
-    for (const entry of entries) {
-      const isUser = !!entry.querySelector('.epitaxy-user-turn');
-      const role = isUser ? 'user' : 'assistant';
-
-      // For user: extract from the user turn container
-      // For assistant: extract ONLY from .epitaxy-markdown blocks to avoid
-      // tool-use button label contamination (French UI: "Mis à jour tâches", "exécuté", etc.)
-      let blocks = [];
-      if (isUser) {
-        const container = entry.querySelector('.epitaxy-user-turn') || entry;
-        blocks = await this.parseMessageContent(container, role);
-      } else {
-        const markdownBlocks = entry.querySelectorAll('.epitaxy-markdown');
-        if (markdownBlocks.length > 0) {
-          for (const mdBlock of markdownBlocks) {
-            const mdBlocks = await this.parseMessageContent(mdBlock, role);
-            blocks.push(...mdBlocks);
-          }
-        }
-      }
-      if (blocks.length > 0) {
-        messages.push(blocks);
-      }
+    // Group elements by entry ID, preserving order
+    const entryMap = new Map();
+    const entryOrder = [];
+    for (const el of document.querySelectorAll('[data-epitaxy-entry]')) {
+      const entryId = el.getAttribute('data-epitaxy-entry');
+      if (!entryId) continue;
+      if (!entryMap.has(entryId)) { entryMap.set(entryId, []); entryOrder.push(entryId); }
+      entryMap.get(entryId).push(el);
     }
-    
+    const seenEntries = new Set();
+    for (const entryId of entryOrder) {
+      if (seenEntries.has(entryId)) continue;
+      seenEntries.add(entryId);
+      // Role: msg_ prefix = assistant, UUID = user
+      const role = entryId.startsWith('msg_') ? 'assistant' : 'user';
+      const elements = entryMap.get(entryId);
+      const allBlocks = [];
+      for (const el of elements) {
+        const msgRow = el.querySelector('.group\\/message-row') || el;
+        const blocks = await this.parseMessageContent(msgRow, role);
+        allBlocks.push(...blocks);
+      }
+      if (allBlocks.length > 0) messages.push(allBlocks);
+    }
     return messages;
-
-
-
-
-
-
-
-
-
-
-
-
-
   }
 
   // ChatGPT-specific extraction

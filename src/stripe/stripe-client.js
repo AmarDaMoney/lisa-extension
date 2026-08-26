@@ -171,15 +171,14 @@ class StripeClient {
    */
   async getSubscription() {
     try {
-      const userID = await this.getUserID();
+      const storage = await chrome.storage.sync.get(['licenseKey']);
+      const licenseKey = storage.licenseKey || '';
       
-      const userToken = await this.getUserToken();
       const response = await fetch(`${this.apiBaseUrl}/stripe/get-subscription`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': userID,
-          'X-User-Token': userToken || ''
+          'X-License-Key': licenseKey
         }
       });
 
@@ -201,15 +200,14 @@ class StripeClient {
    */
   async cancelSubscription() {
     try {
-      const userID = await this.getUserID();
+      const storage = await chrome.storage.sync.get(['licenseKey']);
+      const licenseKey = storage.licenseKey || '';
       
-      const userToken = await this.getUserToken();
       const response = await fetch(`${this.apiBaseUrl}/stripe/cancel-subscription`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-ID': userID,
-          'X-User-Token': userToken || ''
+          'X-License-Key': licenseKey
         }
       });
 

@@ -495,7 +495,15 @@ class LisaVParser {
           allBlocks.push(...blocks);
         }
       }
-      if (allBlocks.length > 0) messages.push(allBlocks);
+      // Dedup identical blocks (user entries have duplicate message-rows in DOM)
+      const seen = new Set();
+      const dedupedBlocks = allBlocks.filter(b => {
+        const key = (b.v || '').trim().substring(0, 200);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (dedupedBlocks.length > 0) messages.push(dedupedBlocks);
     }
     return messages;
   }

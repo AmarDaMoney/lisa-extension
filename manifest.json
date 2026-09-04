@@ -42,7 +42,6 @@
         "https://claude.ai/code/*"
       ],
       "js": [
-        "src/utils/semantic-analyzer.js",
         "src/content/lisa-progressive.js",
         "src/content/claude-code-parser.js",
         "src/shared/html-to-markdown.js",

@@ -902,6 +902,21 @@ class LISAPopup {
           }
         }
 
+        // Semantic enrichment (anchors, actions, flow metrics)
+        if (typeof SemanticAnalyzer !== 'undefined') {
+          try {
+            const enriched = SemanticAnalyzer.analyze(response.data);
+            if (enriched && enriched.session_metadata && enriched.session_metadata.enriched) {
+              Object.assign(response.data, enriched);
+              console.debug('[LISA] Semantic enrichment applied:',
+                Object.keys(enriched.semantic_anchors || {}).length, 'anchors,',
+                Object.keys(enriched.action_vectors || {}).length, 'actions');
+            }
+          } catch (e) {
+            console.warn('[LISA] Semantic enrichment skipped:', e.message);
+          }
+        }
+
         // Update UI
         document.getElementById('messageCount').textContent = response.data.messageCount || 0;
         document.getElementById('detectedPlatform').textContent = response.data.platform || 'Unknown';

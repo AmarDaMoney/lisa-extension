@@ -1157,20 +1157,22 @@ class LISAPopup {
         const actions = aiToken.action_vectors || {};
         const anchorCount = Object.keys(anchors).length;
         const actionCount = Object.keys(actions).length;
-        const wordCountOrig = meta.word_count_original || Math.round(conversationText.length / 5);
-        const wordCountCompressed = Math.round(JSON.stringify(aiToken).length / 5);
-        const ratio = meta.compression_ratio || (wordCountOrig / Math.max(wordCountCompressed, 1)).toFixed(1) + ':1';
+        const ratio = (data.stats && data.stats.compression_ratio) || meta.compression_ratio || ((Math.round(conversationText.length / 5)) / Math.max(Math.round(JSON.stringify(aiToken).length / 5), 1)).toFixed(1) + ':1';
 
         document.getElementById('analyzedCount').textContent = messages.length + ' messages';
         document.getElementById('entityCount').textContent = anchorCount + ' anchors';
         document.getElementById('conceptCount').textContent = actionCount + ' action items';
         document.getElementById('relationshipCount').textContent = ratio + ' compression';
-        const rawTokens = Math.round(conversationText.length / 3.5);
-        const enrichedTokens = Math.round(JSON.stringify(aiToken).length / 3.5);
-        document.getElementById('rawTokens').textContent = '~' + rawTokens.toLocaleString();
-        document.getElementById('enrichedTokens').textContent = '~' + enrichedTokens.toLocaleString();
+        // Use real tiktoken counts from backend when available, fallback to estimate
+        const backendStats = data.stats || {};
+        const rawTokens = backendStats.original_tokens || Math.round(conversationText.length / 3.5);
+        const enrichedTokens = backendStats.compressed_tokens || Math.round(JSON.stringify(aiToken).length / 3.5);
+        const isExact = !!backendStats.original_tokens;
+        document.getElementById('rawTokens').textContent = (isExact ? '' : '~') + rawTokens.toLocaleString();
+        document.getElementById('enrichedTokens').textContent = (isExact ? '' : '~') + enrichedTokens.toLocaleString();
         const saved = Math.max(0, rawTokens - enrichedTokens);
-        document.getElementById('tokensSaved').textContent = '~' + saved.toLocaleString() + ' tokens (' + Math.round(saved / rawTokens * 100) + '%)';
+        const savePct = rawTokens > 0 ? Math.round(saved / rawTokens * 100) : 0;
+        document.getElementById('tokensSaved').textContent = (isExact ? '' : '~') + saved.toLocaleString() + ' tokens (' + savePct + '%)';
         document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
         document.getElementById('hashingSection').style.display = 'block';

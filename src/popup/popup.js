@@ -1001,7 +1001,20 @@ class LISAPopup {
 
       if (response.success) {
         this.compressedData = response.compressed;
-        
+
+        // Merge popup enrichment into compressed output
+        const conv = this.currentConversation || {};
+        if (conv.semantic_anchors) this.compressedData.semantic_anchors = conv.semantic_anchors;
+        if (conv.action_vectors) this.compressedData.action_vectors = conv.action_vectors;
+        if (conv.flow_metrics) this.compressedData.flow_metrics = conv.flow_metrics;
+        if (conv.reconstruction_protocol) this.compressedData.reconstruction_protocol = conv.reconstruction_protocol;
+        if (conv.localEntities) this.compressedData.localEntities = conv.localEntities;
+        if (conv.disambigStats) this.compressedData.disambigStats = conv.disambigStats;
+        if (conv.session_metadata?.enriched) {
+          this.compressedData.session_metadata = this.compressedData.session_metadata || {};
+          Object.assign(this.compressedData.session_metadata, conv.session_metadata);
+        }
+
           // Calculate semantic enrichment metrics
           const tokens = this.compressedData.semanticTokens || [];
           let entityCount = 0;
@@ -1189,6 +1202,16 @@ class LISAPopup {
         aiToken.semanticTokens = aiToken.semanticTokens || [];
         this.compressedData = aiToken;
         this.compressedData._aiCompressed = true;
+
+        // Merge popup enrichment into AI compressed output
+        const convEnrich = this.currentConversation || {};
+        if (convEnrich.semantic_anchors && !this.compressedData.semantic_anchors) this.compressedData.semantic_anchors = convEnrich.semantic_anchors;
+        if (convEnrich.action_vectors && !this.compressedData.action_vectors) this.compressedData.action_vectors = convEnrich.action_vectors;
+        if (convEnrich.flow_metrics) this.compressedData.flow_metrics = convEnrich.flow_metrics;
+        if (convEnrich.reconstruction_protocol) this.compressedData.reconstruction_protocol = convEnrich.reconstruction_protocol;
+        if (convEnrich.localEntities) this.compressedData.localEntities = convEnrich.localEntities;
+        if (convEnrich.disambigStats) this.compressedData.disambigStats = convEnrich.disambigStats;
+
         // Show compression results from AI token metadata
         const meta = aiToken.session_metadata || {};
         const anchors = aiToken.semantic_anchors || {};

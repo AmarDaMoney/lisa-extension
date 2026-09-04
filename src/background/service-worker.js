@@ -91,12 +91,31 @@ class LISACompressor {
       'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof']);
 
     // Step 1: extract candidate words (same filtering as before)
-    const rawWords = text.toLowerCase().split(/\s+/);
+    // Pre-clean: strip code blocks and inline code before concept extraction
+    const cleanedText = text
+      .replace(/```[\s\S]*?```/g, ' ')           // fenced code blocks
+      .replace(/`[^`]+`/g, ' ')                    // inline code
+      .replace(/\b\w+\([^)]*\)/g, ' ')            // function calls like foo()
+      .replace(/[{};=<>()\[\]]/g, ' ')              // code punctuation
+      .replace(/\/\//g, ' ')                        // comment slashes
+      .replace(/\bhttps?:\/\/\S+/g, ' ')            // URLs
+      .replace(/\b[a-z]+[A-Z][a-zA-Z]*/g, (m) =>  // split camelCase
+        m.replace(/([a-z])([A-Z])/g, '$1 $2'))
+      .replace(/\//g, ' ');                         // split slash-joined words
+
+    const rawWords = cleanedText.toLowerCase().split(/\s+/);
+    // Common contraction fragments and short noise
+    const contractionNoise = new Set(['ll', 've', 're', 'don', 'won', 'isn', 'didn', 'couldn',
+      'shouldn', 'wouldn', 'hasn', 'hadn', 'aren', 'weren', 'ain', 'hes', 'shes',
+      'ill', 'ive', 'youre', 'theyre', 'weve', 'youve', 'youll', 'theyll',
+      'pls', 'thx', 'gonna', 'wanna', 'gotta', 'kinda', 'sorta']);
     const candidates = [];
     for (const raw of rawWords) {
       const word = raw.replace(/[^\w]/g, '');
       if (word.length > 2 && word.length <= 25 && !stopWords.has(word)
-          && !/\d{3,}/.test(word) && !word.includes('_')) {
+          && !contractionNoise.has(word)
+          && !/\d{3,}/.test(word) && !word.includes('_')
+          && !/^[a-f0-9]{8,}$/.test(word)) {       // skip hex hashes
         candidates.push(word);
       }
     }

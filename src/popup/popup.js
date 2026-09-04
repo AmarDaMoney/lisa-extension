@@ -878,7 +878,30 @@ class LISAPopup {
       if (response.success && response.data) {
         this.currentConversation = response.data;
 
-        
+        // Local disambiguation (Tier 1 — offline, no API cost)
+        if (typeof LocalDisambiguator !== 'undefined' && response.data.messages) {
+          try {
+            const allText = response.data.messages.map(m => m.content || '').join('\n');
+            const result = LocalDisambiguator.disambiguate(allText);
+            if (result.stats.resolved) {
+              // Apply resolved text back to messages
+              const resolvedParts = result.text.split('\n');
+              let partIdx = 0;
+              for (const msg of response.data.messages) {
+                if (msg.content && partIdx < resolvedParts.length) {
+                  msg.content = resolvedParts[partIdx];
+                }
+                partIdx++;
+              }
+              console.debug('[LISA] Local disambiguation:', result.stats);
+            }
+            response.data.localEntities = result.entities;
+            response.data.disambigStats = result.stats;
+          } catch (e) {
+            console.warn('[LISA] Local disambiguation skipped:', e.message);
+          }
+        }
+
         // Update UI
         document.getElementById('messageCount').textContent = response.data.messageCount || 0;
         document.getElementById('detectedPlatform').textContent = response.data.platform || 'Unknown';

@@ -1577,7 +1577,7 @@ class LisaVParser {
     for (const block of this.blocks) {
       if (block.t === 'meta' || block.t === 'manifest' || block.t === 'sys' || 
           block.t === 'next' || block.t === 'relationship' || block.t === 'anchor' || 
-          block.t === 'instructions' || block.t === 'summary' || block.t === 'checkpoint') continue;
+          block.t === 'instructions' || block.t === 'summary' || block.t === 'checkpoint' || block.t === 'entities') continue;
       
       const role = block.t === 'u' ? 'user' : 'assistant';
       
@@ -1628,8 +1628,52 @@ class LisaVParser {
       languages: [...new Set(codeBlocks.map(b => b.lang))]
     };
   }
-}
 
+  /**
+   * Local disambiguation using compromise.js (Tier 1 — offline)
+   * Enriches blocks with entity recognition and pronoun resolution.
+   * Runs only if compromise.js (nlp) is available.
+   */
+  disambiguate() {
+    if (typeof nlp === 'undefined' || typeof LocalDisambiguator === 'undefined') return;
+    try {
+      const allText = this.blocks
+        .filter(b => b.t === 'u' || b.t === 'a_text')
+        .map(b => b.v || '')
+        .join(' ');
+      if (!allText || allText.length < 50) return;
+      const entities = LocalDisambiguator.extractEntities(allText);
+      const entityIndex = {
+        people: entities.people,
+        organizations: entities.orgs,
+        places: entities.places,
+        topics: entities.topics
+      };
+      let totalReplacements = 0;
+      for (const block of this.blocks) {
+        if (block.t !== 'u' && block.t !== 'a_text') continue;
+        if (!block.v || block.v.length < 10) continue;
+        const result = LocalDisambiguator.resolvePronouns(block.v);
+        if (result.resolved) {
+          block.v = result.text;
+          totalReplacements += result.replacements;
+        }
+      }
+      if (entities.people.length + entities.orgs.length + entities.places.length + entities.topics.length > 0) {
+        this.blocks.push({
+          t: 'entities',
+          v: entityIndex,
+          method: 'compromise-local'
+        });
+      }
+      if (totalReplacements > 0) {
+        console.debug(`[LISA] Local disambiguation: ${totalReplacements} pronoun replacements, ${Object.values(entityIndex).flat().length} entities found`);
+      }
+    } catch (err) {
+      console.warn('[LISA] Local disambiguation failed:', err.message);
+    }
+  }
+}
 // Make available globally
 window.LisaVParser = LisaVParser;
 

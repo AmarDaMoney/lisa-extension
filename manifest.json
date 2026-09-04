@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LISA - AI Chat Exporter for Claude, ChatGPT & More",
-  "version": "0.52.5",
+  "version": "0.52.6",
   "description": "Semantic compression for AI conversations. Export from 12 AI platforms. Premium features include cloud sync and integrity verification.",
   "permissions": [
     "storage",

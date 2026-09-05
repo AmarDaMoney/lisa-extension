@@ -1205,7 +1205,14 @@ class LISAPopup {
 
         // Merge popup enrichment into AI compressed output
         const convEnrich = this.currentConversation || {};
-        if (convEnrich.semantic_anchors && !this.compressedData.semantic_anchors) this.compressedData.semantic_anchors = convEnrich.semantic_anchors;
+        if (convEnrich.semantic_anchors && !this.compressedData.semantic_anchors) {
+          const leanAnchors = {};
+          for (const [k, v] of Object.entries(convEnrich.semantic_anchors)) {
+            const { content, ...rest } = v;
+            leanAnchors[k] = rest;
+          }
+          this.compressedData.semantic_anchors = leanAnchors;
+        }
         if (convEnrich.action_vectors && !this.compressedData.action_vectors) this.compressedData.action_vectors = convEnrich.action_vectors;
         if (convEnrich.flow_metrics) this.compressedData.flow_metrics = convEnrich.flow_metrics;
         if (convEnrich.reconstruction_protocol) this.compressedData.reconstruction_protocol = convEnrich.reconstruction_protocol;

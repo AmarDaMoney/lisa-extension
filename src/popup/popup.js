@@ -883,17 +883,10 @@ class LISAPopup {
           try {
             const allText = response.data.messages.map(m => m.content || '').join('\n');
             const result = LocalDisambiguator.disambiguate(allText);
+            // Coref text rewrite disabled — compromise heuristics scramble message boundaries.
+            // NER extraction kept for popup UI display.
             if (result.stats.resolved) {
-              // Apply resolved text back to messages
-              const resolvedParts = result.text.split('\n');
-              let partIdx = 0;
-              for (const msg of response.data.messages) {
-                if (msg.content && partIdx < resolvedParts.length) {
-                  msg.content = resolvedParts[partIdx];
-                }
-                partIdx++;
-              }
-              console.debug('[LISA] Local disambiguation:', result.stats);
+              console.debug('[LISA] Local disambiguation (NER only, coref rewrite disabled):', result.stats);
             }
             response.data.localEntities = result.entities;
             response.data.disambigStats = result.stats;

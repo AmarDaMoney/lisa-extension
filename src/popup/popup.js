@@ -1364,7 +1364,9 @@ class LISAPopup {
       messages: this.compressedData.semanticTokens || this.compressedData.compressed || [],
       format: 'compressed',
       exportedAt: new Date().toISOString(),
-      raw: this.compressedData
+      anchor: this.compressedData.anchor || '',
+      semantic_anchors: (this.compressedData.semantic_anchors || []).map(({ content, ...rest }) => rest),
+      session_metadata: this.compressedData.session_metadata || {}
     };
     const dataStr = JSON.stringify(downloadData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });

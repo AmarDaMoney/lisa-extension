@@ -354,9 +354,10 @@ const SemanticAnalyzer = {
         }
       });
 
-      // Sort by score, take top anchors (cap at 30 for sanity)
+      // Sort by score, adaptive anchor cap: min(8, 30% of messages)
       scored.sort((a, b) => b.score - a.score);
-      const topAnchors = scored.slice(0, 30);
+      const anchorCap = Math.min(8, Math.max(2, Math.ceil(messages.length * 0.3)));
+      const topAnchors = scored.slice(0, anchorCap);
 
       // Re-sort by conversation order for sequential reading
       topAnchors.sort((a, b) => a.idx - b.idx);
@@ -368,7 +369,7 @@ const SemanticAnalyzer = {
           role: msg.role,
           turnIndex: idx,
           score,
-          content: msg.content || '',
+          content: (msg.content || '').substring(0, 200) + ((msg.content || '').length > 200 ? '...' : ''),
           severity: severities.length > 0 ? severities[0].level : null,
           files,
           tags: severities.map(s => s.tag),

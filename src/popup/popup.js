@@ -2354,12 +2354,36 @@ class LISAPopup {
       } else if (typeof contentData === 'string') {
         rawContent = contentData;
       } else if (typeof contentData === 'object') {
-        // Compressed/AI-compressed: content is a JSON object
-        rawContent = JSON.stringify(contentData, null, 2);
+        // Compressed/AI-compressed: lean export
+        const _r = contentData;
+        const _msgs = (_r.semanticTokens || _r.compressed || []).map(t => ({
+          role: t.role, index: t.index, summary: t.summary
+        }));
+        const _sa = Object.fromEntries(Object.entries(_r.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest]));
+        rawContent = JSON.stringify({
+          _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.',
+          platform: _r.metadata?.platform || platform,
+          title: _r.metadata?.title || title,
+          messageCount: _r.metadata?.messageCount || _msgs.length,
+          messages: _msgs, format: format, anchor: _r.anchor || '',
+          semantic_anchors: _sa, session_metadata: _r.session_metadata || {}
+        }, null, 2);
       }
     } else if (snapshot.raw) {
-      // Raw or compressed — emit the full raw object as JSON
-      rawContent = JSON.stringify(snapshot.raw, null, 2);
+      // Raw or compressed — lean export
+      const _r = snapshot.raw;
+      const _msgs = (_r.semanticTokens || _r.compressed || []).map(t => ({
+        role: t.role, index: t.index, summary: t.summary
+      }));
+      const _sa = Object.fromEntries(Object.entries(_r.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest]));
+      rawContent = JSON.stringify({
+        _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.',
+        platform: _r.metadata?.platform || platform,
+        title: _r.metadata?.title || title,
+        messageCount: _r.metadata?.messageCount || _msgs.length,
+        messages: _msgs, format: format, anchor: _r.anchor || '',
+        semantic_anchors: _sa, session_metadata: _r.session_metadata || {}
+      }, null, 2);
     }
 
     if (!rawContent) return null;

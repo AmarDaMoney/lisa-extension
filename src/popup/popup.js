@@ -1039,14 +1039,9 @@ class LISAPopup {
           // that replace expensive NLP inference on the raw text
           const preComputedWork = entityCount + conceptCount + relationshipCount;
           // Measure what the user actually downloads (lean export), not the full compressedData
-          const _leanMsgs = (this.compressedData.semanticTokens || []).map(t => {
-            const tk = t.tokens || {};
-            const ln = { intent: tk.intent };
-            if (tk.entities && tk.entities.length > 0) ln.entities = tk.entities;
-            if (tk.concepts && tk.concepts.length > 0) ln.concepts = tk.concepts.map(({ weight, ...c }) => c);
-            if (tk.relationships && tk.relationships.length > 0) ln.relationships = tk.relationships;
-            return { role: t.role, index: t.index, tokens: ln, summary: t.summary };
-          });
+          const _leanMsgs = (this.compressedData.semanticTokens || []).map(t => ({
+            role: t.role, index: t.index, summary: t.summary
+          }));
           const _leanAnchors = Object.fromEntries(Object.entries(this.compressedData.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest]));
           const enrichedTokenEstimate = Math.round((JSON.stringify(_leanMsgs).length + JSON.stringify(this.compressedData.anchor || '').length + JSON.stringify(_leanAnchors).length + JSON.stringify(this.compressedData.session_metadata || {}).length) / 4);
           // Inference reduction = pre-resolved signals (entities + concepts + relationships)
@@ -1364,14 +1359,9 @@ class LISAPopup {
       url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || '',
       title: this.compressedData.metadata?.title || 'Compressed Conversation',
       messageCount: this.compressedData.metadata?.messageCount || 0,
-      messages: (this.compressedData.semanticTokens || this.compressedData.compressed || []).map(t => {
-        const lean = { intent: (t.tokens || {}).intent };
-        const tk = t.tokens || {};
-        if (tk.entities && tk.entities.length > 0) lean.entities = tk.entities;
-        if (tk.concepts && tk.concepts.length > 0) lean.concepts = tk.concepts.map(({ weight, ...c }) => c);
-        if (tk.relationships && tk.relationships.length > 0) lean.relationships = tk.relationships;
-        return { role: t.role, index: t.index, tokens: lean, summary: t.summary };
-      }),
+      messages: (this.compressedData.semanticTokens || this.compressedData.compressed || []).map(t => ({
+        role: t.role, index: t.index, summary: t.summary
+      })),
       format: 'compressed',
       exportedAt: new Date().toISOString(),
       anchor: this.compressedData.anchor || '',
@@ -2070,14 +2060,9 @@ class LISAPopup {
         // Lean export — same filtering as downloadJSON()
         const raw = snapshot.capture?.content || snapshot.raw || snapshot;
         const tokens = raw.semanticTokens || raw.compressed || [];
-        const leanMessages = tokens.map(t => {
-          const tk = t.tokens || {};
-          const lean = { intent: tk.intent };
-          if (tk.entities && tk.entities.length > 0) lean.entities = tk.entities;
-          if (tk.concepts && tk.concepts.length > 0) lean.concepts = tk.concepts.map(({ weight, ...c }) => c);
-          if (tk.relationships && tk.relationships.length > 0) lean.relationships = tk.relationships;
-          return { role: t.role, index: t.index, tokens: lean, summary: t.summary };
-        });
+        const leanMessages = tokens.map(t => ({
+          role: t.role, index: t.index, summary: t.summary
+        }));
         const data = {
           _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
           platform: raw.metadata?.platform || 'Unknown',

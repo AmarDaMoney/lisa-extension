@@ -6,3 +6,7 @@ server/node_modules/
 .env
 .env.*
 *.zip
+
+# Eval harness — local data
+eval/counts.json
+eval/out/

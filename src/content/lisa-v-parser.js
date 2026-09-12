@@ -215,6 +215,7 @@ class LisaVParser {
       id: `lisa-${Date.now()}`,
       ver: '1.0',
       platform: platform,
+      title: this.getSmartTitle(),
       url: window.location.href,
       timestamp: new Date().toISOString()
     });
@@ -1579,7 +1580,7 @@ class LisaVParser {
           block.t === 'next' || block.t === 'relationship' || block.t === 'anchor' || 
           block.t === 'instructions' || block.t === 'summary' || block.t === 'checkpoint' || block.t === 'entities') continue;
       
-      const role = block.t === 'u' ? 'user' : 'assistant';
+      const role = block.t === 'u' ? 'user' : (block.t === 'code' ? (currentRole || 'assistant') : 'assistant');
       
       if (role !== currentRole && currentRole !== null) {
         messages.push({
@@ -1591,7 +1592,13 @@ class LisaVParser {
       }
       
       currentRole = role;
-      currentContent.push(block.v || '');
+      if (block.t === 'code') {
+        const lang = block.lang || '';
+        const file = block.file ? `// ${block.file}\n` : '';
+        currentContent.push(`\n\`\`\`${lang}\n${file}${block.v || ''}\n\`\`\`\n`);
+      } else {
+        currentContent.push(block.v || '');
+      }
     }
     
     // Push last message

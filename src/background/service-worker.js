@@ -1,6 +1,6 @@
 // LISA - Semantic Compression Engine
 // Background Service Worker (Manifest V3)
-// v0.52.6 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
+// v0.52.7 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
 
 // Shared snapshot schema — one definition of where content lives.
 // Must load before any code that reads snapshots.
@@ -501,7 +501,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.52.6',
+        lisaVersion: '0.52.7',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
@@ -516,13 +516,18 @@ class LISACompressor {
       const content = message.content || message.v || '';
       const tokens = this.tokenize(content);
       
-      compressed.semanticTokens.push({
-        role: message.role,
-        index: message.index,
-        tokens: tokens,
-        summary: this.summarize(content),
-        originalLength: content.length
-      });
+      // Lean token object — drop empty arrays, context block, per-concept weight
+        const lean = { intent: tokens.intent };
+        if (tokens.entities && tokens.entities.length > 0) lean.entities = tokens.entities;
+        if (tokens.concepts && tokens.concepts.length > 0) lean.concepts = tokens.concepts.map(({ weight, ...c }) => c);
+        if (tokens.relationships && tokens.relationships.length > 0) lean.relationships = tokens.relationships;
+
+        compressed.semanticTokens.push({
+          role: message.role,
+          index: message.index,
+          tokens: lean,
+          summary: this.summarize(content)
+        });
     });
 
     const originalSize = JSON.stringify(conversation).length;
@@ -671,7 +676,7 @@ class LISACompressor {
       platform:          conversation.platform || 'unknown',
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
-      generated_by:      'LISA v0.52.6',
+      generated_by:      'LISA v0.52.7',
       key_entities:    this.extractEntities(allText).flatMap(e => e.values).slice(0, 12),
       note:              'Lightweight anchor — raw verbatim format'
     };
@@ -716,7 +721,7 @@ class LISACompressor {
       session_intent:    sessionIntent,
       session_register:  register,
       open_tasks:        tokens.filter(t => t.tokens?.intent === 'question' || t.tokens?.intent === 'request').slice(-5).map(t => (t.summary || '').substring(0, 100)),
-      generated_by:      'LISA v0.52.6'
+      generated_by:      'LISA v0.52.7'
     };
   }
 }
@@ -1599,4 +1604,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
   aiPlatformTabs.delete(tabId);
 });
-console.debug('[LISA] Core compression engine initialized v0.52.6');
+console.debug('[LISA] Core compression engine initialized v0.52.7');

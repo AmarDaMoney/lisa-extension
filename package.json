@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "compromise": "^14.16.0"
+  }
+}

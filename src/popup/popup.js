@@ -1040,11 +1040,8 @@ class LISAPopup {
           // that replace expensive NLP inference on the raw text
           const preComputedWork = entityCount + conceptCount + relationshipCount;
           // Measure what the user actually downloads (lean export), not the full compressedData
-          const _leanMsgs = (this.compressedData.semanticTokens || []).map(t => ({
-            role: t.role, index: t.index, summary: t.summary
-          }));
-          const _leanAnchors = Object.fromEntries(Object.entries(this.compressedData.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest]));
-          const enrichedTokenEstimate = Math.round((JSON.stringify(_leanMsgs).length + JSON.stringify(this.compressedData.anchor || '').length + JSON.stringify(_leanAnchors).length + JSON.stringify(this.compressedData.session_metadata || {}).length) / 4);
+          const _lean = this.buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || []);
+          const enrichedTokenEstimate = Math.round((JSON.stringify(_lean.messages).length + JSON.stringify(_lean.anchor).length + JSON.stringify(_lean.semantic_anchors).length + JSON.stringify(_lean.session_metadata).length) / 4);
           // Inference reduction = pre-resolved signals (entities + concepts + relationships)
           // Each signal replaces ~3 tokens of AI inference work (entity resolution, disambiguation, etc.)
           // Clamped to 5-95% to stay honest
@@ -1336,6 +1333,38 @@ class LISAPopup {
     });
   }
 
+  /**
+   * Build the lean export payload from compressed data.
+   * Single source of truth for download and measurement paths.
+   * Returns { messages, anchor, semantic_anchors, session_metadata, isVerbatim }
+   */
+  buildLeanExport(compressedData, rawMessages) {
+    const leanTokens = (compressedData.semanticTokens || compressedData.compressed || []);
+    const leanMsgs = leanTokens.map(t => ({ role: t.role, index: t.index, summary: t.summary }));
+
+    // Compression gate: if lean >= raw, export verbatim
+    const rawMsgs = rawMessages || [];
+    const rawStr = JSON.stringify(rawMsgs.map(m => ({ role: m.role, index: m.index, content: m.content })));
+    const leanStr = JSON.stringify(leanMsgs);
+    const isVerbatim = leanStr.length >= rawStr.length && rawMsgs.length > 0;
+
+    const messages = isVerbatim
+      ? rawMsgs.map((m, i) => ({ role: m.role, index: i, content: m.content }))
+      : leanMsgs;
+
+    const semantic_anchors = Object.fromEntries(
+      Object.entries(compressedData.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest])
+    );
+
+    return {
+      messages,
+      anchor: compressedData.anchor || '',
+      semantic_anchors,
+      session_metadata: compressedData.session_metadata || {},
+      isVerbatim
+    };
+  }
+
   downloadJSON() {
     if (!this.compressedData) {
       this.showError('No compressed data to download');
@@ -1354,28 +1383,20 @@ class LISAPopup {
     const title = (this.compressedData.metadata?.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
     const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
-    // Compression gate: if lean export >= raw, use verbatim
-      const _rawMsgs = (this.currentConversation && this.currentConversation.messages) || [];
-      const _rawStr = JSON.stringify(_rawMsgs.map(m => ({ role: m.role, index: m.index, content: m.content })));
-      const _leanTokens = (this.compressedData.semanticTokens || this.compressedData.compressed || []);
-      const _leanStr = JSON.stringify(_leanTokens.map(t => ({ role: t.role, index: t.index, summary: t.summary })));
-      const useVerbatim = _leanStr.length >= _rawStr.length && _rawMsgs.length > 0;
-      const exportMessages = useVerbatim
-        ? _rawMsgs.map((m, i) => ({ role: m.role, index: i, content: m.content }))
-        : _leanTokens.map(t => ({ role: t.role, index: t.index, summary: t.summary }));
+    const lean = this.buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || []);
 
     const downloadData = {
-      _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
+      _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensedturns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
       platform: this.compressedData.metadata?.platform || 'Unknown',
       url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || '',
       title: this.compressedData.metadata?.title || 'Compressed Conversation',
       messageCount: this.compressedData.metadata?.messageCount || 0,
-      messages: exportMessages,
-      format: 'compressed',
+      messages: lean.messages,
+      format: lean.isVerbatim ? 'verbatim' : 'compressed',
       exportedAt: new Date().toISOString(),
-      anchor: this.compressedData.anchor || '',
-      semantic_anchors: Object.fromEntries(Object.entries(this.compressedData.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest])),
-      session_metadata: this.compressedData.session_metadata || {}
+      anchor: lean.anchor,
+      semantic_anchors: lean.semantic_anchors,
+      session_metadata: lean.session_metadata
     };
     const dataStr = JSON.stringify(downloadData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });

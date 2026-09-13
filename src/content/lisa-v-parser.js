@@ -93,47 +93,60 @@ class LisaVParser {
         }];
       }
     }
-    // When code blocks exist: walk children in order, interleave text and code
+    // When code blocks exist: placeholder approach — preserve document order
     if (converter && hasCodeBlocks) {
+      const clone = element.cloneNode(true);
       const codeSelector = 'pre code, pre.code-block, [class*="code-block"], .epitaxy-codeblock, .epitaxy-diff';
-      const result = [];
-      // Collect top-level nodes into runs of text vs code
-      const children = [...element.cloneNode(true).childNodes];
-      let textBuf = document.createElement('div');
-      const flushText = () => {
-        if (textBuf.childNodes.length > 0) {
-          const md = converter.extractAsMarkdown(textBuf);
-          if (md && md.trim()) {
-            result.push({ t: role === 'user' ? 'u' : 'a_text', role: role, v: md.trim() });
-          }
-          textBuf = document.createElement('div');
-        }
-      };
-      for (const child of children) {
-        const isCode = child.nodeType === Node.ELEMENT_NODE &&
-          (child.matches?.(codeSelector) || child.querySelector?.(codeSelector));
-        if (isCode) {
-          flushText();
-          const cb = child.matches?.(codeSelector) ? child : child.querySelector(codeSelector);
-          const codeTextEl = cb.querySelector('[data-code-text]');
-          const codeContent = cb.textContent.trim() || (codeTextEl && codeTextEl.getAttribute('data-code-text')) || '';
-          if (codeContent && codeContent.length >= 25) {
-            result.push({
+      const extractedCode = [];
+      // Replace each code block with a text placeholder
+      const codeEls = [...clone.querySelectorAll(codeSelector)];
+      for (let i = 0; i < codeEls.length; i++) {
+        const cb = codeEls[i];
+        const codeTextEl = cb.querySelector('[data-code-text]');
+        const codeContent = cb.textContent.trim() || (codeTextEl && codeTextEl.getAttribute('data-code-text')) || '';
+        if (codeContent && codeContent.length >= 25) {
+          extractedCode.push({
+            marker: '%%LISA_CODE_' + i + '%%',
+            block: {
               t: 'code',
               lang: this.detectLanguage(cb),
               file: this.extractFilename(cb),
               hash: await this.sha256(codeContent),
               v: codeContent
-            });
-          }
+            }
+          });
+          // Replace code element with placeholder text node
+          const container = cb.closest('pre') || cb;
+          const placeholder = document.createTextNode('%%LISA_CODE_' + i + '%%');
+          container.parentNode.replaceChild(placeholder, container);
         } else {
-          textBuf.appendChild(child);
+          // Small code — remove so converter handles it as inline
+          const container = cb.closest('pre') || cb;
+          container.remove();
         }
       }
-      flushText();
-      if (result.length > 0) return result;
+      const fullText = converter.extractAsMarkdown(clone);
+      if (fullText && extractedCode.length > 0) {
+        // Split on markers, interleave text and code blocks
+        const result = [];
+        let remaining = fullText;
+        for (const ec of extractedCode) {
+          const parts = remaining.split(ec.marker);
+          if (parts[0] && parts[0].trim()) {
+            result.push({ t: role === 'user' ? 'u' : 'a_text', role: role, v: parts[0].trim() });
+          }
+          result.push(ec.block);
+          remaining = parts.slice(1).join(ec.marker);
+        }
+        if (remaining && remaining.trim()) {
+          result.push({ t: role === 'user' ? 'u' : 'a_text', role: role, v: remaining.trim() });
+        }
+        if (result.length > 0) return result;
+      } else if (fullText) {
+        return [{ t: role === 'user' ? 'u' : 'a_text', role: role, v: fullText }];
+      }
     }
-    // Fallback: walk DOM manually
+        // Fallback: walk DOM manually
     const blocks = [];
     
     // Walk through child nodes

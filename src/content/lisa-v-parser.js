@@ -93,32 +93,44 @@ class LisaVParser {
         }];
       }
     }
-    // When code blocks exist: extract them separately, use converter for the rest
+    // When code blocks exist: walk children in order, interleave text and code
     if (converter && hasCodeBlocks) {
-      const clone = element.cloneNode(true);
-      const codeBlocks = [];
-      for (const cb of clone.querySelectorAll('pre code, pre.code-block, [class*="code-block"], .epitaxy-codeblock, .epitaxy-diff')) {
-        const codeTextEl = cb.querySelector('[data-code-text]');
-        const codeContent = cb.textContent.trim() || (codeTextEl && codeTextEl.getAttribute('data-code-text')) || '';
-        if (codeContent && codeContent.length >= 25) {
-          codeBlocks.push({
-            t: 'code',
-            lang: this.detectLanguage(cb),
-            file: this.extractFilename(cb),
-            hash: await this.sha256(codeContent),
-            v: codeContent
-          });
-        }
-        // Remove from clone so converter handles only text
-        const container = cb.closest('pre') || cb;
-        container.remove();
-      }
-      const text = converter.extractAsMarkdown(clone);
+      const codeSelector = 'pre code, pre.code-block, [class*="code-block"], .epitaxy-codeblock, .epitaxy-diff';
       const result = [];
-      if (text) {
-        result.push({ t: role === 'user' ? 'u' : 'a_text', role: role, v: text });
+      // Collect top-level nodes into runs of text vs code
+      const children = [...element.cloneNode(true).childNodes];
+      let textBuf = document.createElement('div');
+      const flushText = () => {
+        if (textBuf.childNodes.length > 0) {
+          const md = converter.extractAsMarkdown(textBuf);
+          if (md && md.trim()) {
+            result.push({ t: role === 'user' ? 'u' : 'a_text', role: role, v: md.trim() });
+          }
+          textBuf = document.createElement('div');
+        }
+      };
+      for (const child of children) {
+        const isCode = child.nodeType === Node.ELEMENT_NODE &&
+          (child.matches?.(codeSelector) || child.querySelector?.(codeSelector));
+        if (isCode) {
+          flushText();
+          const cb = child.matches?.(codeSelector) ? child : child.querySelector(codeSelector);
+          const codeTextEl = cb.querySelector('[data-code-text]');
+          const codeContent = cb.textContent.trim() || (codeTextEl && codeTextEl.getAttribute('data-code-text')) || '';
+          if (codeContent && codeContent.length >= 25) {
+            result.push({
+              t: 'code',
+              lang: this.detectLanguage(cb),
+              file: this.extractFilename(cb),
+              hash: await this.sha256(codeContent),
+              v: codeContent
+            });
+          }
+        } else {
+          textBuf.appendChild(child);
+        }
       }
-      result.push(...codeBlocks);
+      flushText();
       if (result.length > 0) return result;
     }
     // Fallback: walk DOM manually

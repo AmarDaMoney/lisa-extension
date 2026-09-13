@@ -93,6 +93,34 @@ class LisaVParser {
         }];
       }
     }
+    // When code blocks exist: extract them separately, use converter for the rest
+    if (converter && hasCodeBlocks) {
+      const clone = element.cloneNode(true);
+      const codeBlocks = [];
+      for (const cb of clone.querySelectorAll('pre code, pre.code-block, [class*="code-block"], .epitaxy-codeblock, .epitaxy-diff')) {
+        const codeTextEl = cb.querySelector('[data-code-text]');
+        const codeContent = cb.textContent.trim() || (codeTextEl && codeTextEl.getAttribute('data-code-text')) || '';
+        if (codeContent && codeContent.length >= 25) {
+          codeBlocks.push({
+            t: 'code',
+            lang: this.detectLanguage(cb),
+            file: this.extractFilename(cb),
+            hash: await this.sha256(codeContent),
+            v: codeContent
+          });
+        }
+        // Remove from clone so converter handles only text
+        const container = cb.closest('pre') || cb;
+        container.remove();
+      }
+      const text = converter.extractAsMarkdown(clone);
+      const result = [];
+      if (text) {
+        result.push({ t: role === 'user' ? 'u' : 'a_text', role: role, v: text });
+      }
+      result.push(...codeBlocks);
+      if (result.length > 0) return result;
+    }
     // Fallback: walk DOM manually
     const blocks = [];
     

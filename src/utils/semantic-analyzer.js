@@ -192,22 +192,33 @@ const SemanticAnalyzer = {
     const lower = content.toLowerCase();
     const detectedLang = lang || this.detectLanguage(content);
     
-    // Check each topic against all language variants
+    // Score each topic by distinct keyword hits (word-boundary matching)
+    const scores = {};
+    
     for (const [topic, langKeywords] of Object.entries(this.topicKeywords)) {
-      // Check detected language first, then fall back to English
       const langsToCheck = detectedLang !== 'en' ? [detectedLang, 'en'] : ['en'];
+      let hits = 0;
       
       for (const checkLang of langsToCheck) {
         const keywords = langKeywords[checkLang] || langKeywords['en'] || [];
         for (const keyword of keywords) {
-          if (lower.includes(keyword.toLowerCase())) {
-            return topic;
+          const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const re = new RegExp('\\b' + escaped, 'i');
+          if (re.test(lower)) {
+            hits++;
           }
         }
+        if (hits > 0) break; // Don't double-count across language fallbacks
+      }
+      
+      if (hits >= 2) {
+        scores[topic] = hits;
       }
     }
     
-    return 'general';
+    // Return topic with most hits, or general if none reached threshold
+    const best = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+    return best ? best[0] : 'general';
   },
 
   // ── URL / Link extraction ──

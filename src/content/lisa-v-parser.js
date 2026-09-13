@@ -1563,6 +1563,12 @@ class LisaVParser {
     if (platform === 'Claude Code') {
       const titlebar = document.querySelector('.epitaxy-titlebar');
       if (titlebar) {
+        // Try child div first (works for extension compress/MD)
+        const titleDiv = titlebar.querySelector('span.flex.min-w-0.items-center > div:first-child');
+        if (titleDiv && titleDiv.textContent.trim().length > 0) {
+          return titleDiv.textContent.trim();
+        }
+        // Fallback: innerText first line (LISA-V / changed DOM)
         const firstLine = (titlebar.innerText || '').split('\n')[0].trim();
         if (firstLine.length > 0) {
           return firstLine;

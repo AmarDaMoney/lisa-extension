@@ -1354,15 +1354,23 @@ class LISAPopup {
     const title = (this.compressedData.metadata?.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
     const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
+    // Compression gate: if lean export >= raw, use verbatim
+      const _rawMsgs = (this.currentConversation && this.currentConversation.messages) || [];
+      const _rawStr = JSON.stringify(_rawMsgs.map(m => ({ role: m.role, index: m.index, content: m.content })));
+      const _leanTokens = (this.compressedData.semanticTokens || this.compressedData.compressed || []);
+      const _leanStr = JSON.stringify(_leanTokens.map(t => ({ role: t.role, index: t.index, summary: t.summary })));
+      const useVerbatim = _leanStr.length >= _rawStr.length && _rawMsgs.length > 0;
+      const exportMessages = useVerbatim
+        ? _rawMsgs.map((m, i) => ({ role: m.role, index: i, content: m.content }))
+        : _leanTokens.map(t => ({ role: t.role, index: t.index, summary: t.summary }));
+
     const downloadData = {
       _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
       platform: this.compressedData.metadata?.platform || 'Unknown',
       url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || '',
       title: this.compressedData.metadata?.title || 'Compressed Conversation',
       messageCount: this.compressedData.metadata?.messageCount || 0,
-      messages: (this.compressedData.semanticTokens || this.compressedData.compressed || []).map(t => ({
-        role: t.role, index: t.index, summary: t.summary
-      })),
+      messages: exportMessages,
       format: 'compressed',
       exportedAt: new Date().toISOString(),
       anchor: this.compressedData.anchor || '',
@@ -2061,9 +2069,13 @@ class LISAPopup {
         // Lean export — same filtering as downloadJSON()
         const raw = snapshot.capture?.content || snapshot.raw || snapshot;
         const tokens = raw.semanticTokens || raw.compressed || [];
-        const leanMessages = tokens.map(t => ({
-          role: t.role, index: t.index, summary: t.summary
-        }));
+        const _leanMsgsLib = tokens.map(t => ({ role: t.role, index: t.index, summary: t.summary }));
+        // Compression gate: if lean >= raw, use verbatim
+        const _rawMsgsLib = snapshot.messages || raw.messages || [];
+        const _useVerbatimLib = _rawMsgsLib.length > 0 && JSON.stringify(_leanMsgsLib).length >= JSON.stringify(_rawMsgsLib.map((m, i) => ({ role: m.role, index: i, content: m.content }))).length;
+        const leanMessages = _useVerbatimLib
+          ? _rawMsgsLib.map((m, i) => ({ role: m.role, index: i, content: m.content }))
+          : _leanMsgsLib;
         const data = {
           _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
           platform: raw.metadata?.platform || 'Unknown',

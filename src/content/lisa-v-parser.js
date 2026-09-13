@@ -111,7 +111,8 @@ class LisaVParser {
         // Skip UI noise: sr-only headings, hover bars, buttons, SVGs
         if (node.matches && node.matches('button, svg, [role="button"], .sr-only, [class*="opacity-0"]')) return;
         if (this.isCodeBlock(node)) {
-          const codeContent = node.textContent.trim();
+          const codeTextEl = node.querySelector('[data-code-text]');
+          const codeContent = node.textContent.trim() || (codeTextEl && codeTextEl.getAttribute('data-code-text')) || '';
           if (codeContent && codeContent.length >= 25) {
             blocks.push({
               t: 'code',

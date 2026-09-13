@@ -505,7 +505,7 @@ class LISAFloatingButton {
           stats: stats,
           platform: parser.detectPlatform(),
           url: window.location.href,
-          title: document.title
+          title: parser.getSmartTitle()
         }
       });
       

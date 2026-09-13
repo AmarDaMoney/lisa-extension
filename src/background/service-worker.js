@@ -54,9 +54,9 @@ class LISACompressor {
       'STATE','SNAPSHOT','MODE','ADAPTIVE','CONVERSATION','RECENT','EARLIER','CONTEXT',
       'OPEN','CLOSE','START','BLOCK','CHECK','BUILD','MATCH','ABORT','REPLACE','UPDATE']);
     const patterns = {
-      urls: /https?:\/\/[^\s]+/g,
+      urls: /https?:\/\/[^\s\"'<>)\]]+/g,
       emails: /[\w.-]+@[\w.-]+\.\w+/g,
-      mentions: /@\w+/g,
+      mentions: /@[a-zA-Z]\w{1,30}/g,
       hashtags: /#\w+/g,
       technicalTerms: /\b[A-Z][A-Za-z0-9]+(?:[A-Z][a-z]+)+\b/g,
       acronyms: /\b[A-Z]{3,}\b/g
@@ -66,6 +66,7 @@ class LISACompressor {
       if (type === 'acronyms') matches = matches.filter(m => !acronymNoise.has(m) && m.length >= 3);
       if (type === 'technicalTerms') matches = matches.filter(m => m.length <= 40);
       if (type === 'hashtags') matches = matches.filter(m => !/^#[0-9a-fA-F]{3,8}$/.test(m) && !/^#\d+$/.test(m));
+      if (type === 'mentions') matches = matches.filter(m => !/^@(?:staticmethod|classmethod|property|override|abstractmethod|dataclass|pytest|app|router|api|param|returns?|deprecated|todo|fixme|hack|suppress|noinspection)$/i.test(m));
       if (matches.length > 0) {
         entities.push({ type, values: matches.slice(0, 15) });
       }
@@ -88,7 +89,10 @@ class LISACompressor {
       'its', 'are', 'was', 'has', 'had', 'not', 'can', 'may', 'got', 'let',
       'way', 'use', 'used', 'line', 'things', 'every', 'between', 'first',
       'const', 'function', 'return', 'await', 'async', 'true', 'false', 'null', 'undefined',
-      'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof']);
+      'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof',
+      'see', 'saw', 'look', 'show', 'now', 'new', 'before', 'after', 'full', 'exact',
+      'next', 'last', 'back', 'same', 'each', 'sure', 'run', 'set', 'get', 'put',
+      'try', 'keep', 'find', 'call', 'called', 'using', 'work', 'check', 'start', 'end']);
 
     // Step 1: pre-clean code artifacts
     const cleanedText = text
@@ -712,12 +716,12 @@ class LISACompressor {
     tokens.forEach(t => { const i = t.tokens?.intent; if (i) intentCount[i] = (intentCount[i]||0)+1; });
     const sessionIntent = Object.entries(intentCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'statement';
     const hasCodeRatio = tokens.filter(t => t.tokens?.context?.hasCode).length / Math.max(tokens.length,1);
-    const techConcepts    = ['code','function','error','deploy','api','model','class','data','system'];
+    const techConcepts    = ['code','function','error','deploy','api','model','class','data','system','commit','git','bug','fix','regex','export','import','backend','frontend','endpoint','database','server','config','module','parser','pipeline','extension','popup','payload','token','schema','query','route'];
     const emotionConcepts = ['feel','love','trust','hope','care','human','understand','want','believe'];
     const techScore    = dominantConcepts.filter(c => techConcepts.includes(c)).length;
     const emotionScore = dominantConcepts.filter(c => emotionConcepts.includes(c)).length;
     let register = 'conversational';
-    if (hasCodeRatio > 0.15 || techScore > 3)     register = 'technical';
+    if (hasCodeRatio > 0.15 || techScore >= 2)    register = 'technical';
     else if (emotionScore > 2 && techScore < 2)   register = 'philosophical';
     else if (techScore > 2   && emotionScore > 2) register = 'mixed';
     const coreTopic = compressed.metadata?.title ||

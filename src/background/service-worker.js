@@ -90,8 +90,7 @@ class LISACompressor {
       'const', 'function', 'return', 'await', 'async', 'true', 'false', 'null', 'undefined',
       'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof']);
 
-    // Step 1: extract candidate words (same filtering as before)
-    // Pre-clean: strip code blocks and inline code before concept extraction
+    // Step 1: pre-clean code artifacts
     const cleanedText = text
       .replace(/```[\s\S]*?```/g, ' ')           // fenced code blocks
       .replace(/`[^`]+`/g, ' ')                    // inline code
@@ -103,43 +102,55 @@ class LISACompressor {
         m.replace(/([a-z])([A-Z])/g, '$1 $2'))
       .replace(/\//g, ' ');                         // split slash-joined words
 
-    const rawWords = cleanedText.toLowerCase().split(/\s+/);
     // Common contraction fragments and short noise
     const contractionNoise = new Set(['ll', 've', 're', 'don', 'won', 'isn', 'didn', 'couldn',
       'shouldn', 'wouldn', 'hasn', 'hadn', 'aren', 'weren', 'ain', 'hes', 'shes',
       'ill', 'ive', 'youre', 'theyre', 'weve', 'youve', 'youll', 'theyll',
       'pls', 'thx', 'gonna', 'wanna', 'gotta', 'kinda', 'sorta']);
-    const candidates = [];
-    for (const raw of rawWords) {
-      const word = raw.replace(/[^\w]/g, '');
-      if (word.length > 2 && word.length <= 25 && !stopWords.has(word)
-          && !contractionNoise.has(word)
-          && !/\d{3,}/.test(word) && !word.includes('_')
-          && !/^[a-f0-9]{8,}$/.test(word)) {       // skip hex hashes
-        candidates.push(word);
-      }
-    }
-    if (candidates.length === 0) return [];
 
-    // Step 2: build co-occurrence graph (window size = 4)
+    // Helper: extract candidate words from a text chunk
+    const extractCandidates = (chunk) => {
+      const rawWords = chunk.toLowerCase().split(/\s+/);
+      const result = [];
+      for (const raw of rawWords) {
+        const word = raw.replace(/[^\w]/g, '');
+        if (word.length > 2 && word.length <= 25 && !stopWords.has(word)
+            && !contractionNoise.has(word)
+            && !/\d{3,}/.test(word) && !word.includes('_')
+            && !/^[a-f0-9]{8,}$/.test(word)) {
+          result.push(word);
+        }
+      }
+      return result;
+    };
+
+    // Step 2: split into sentences, extract candidates per sentence
+    const sentences = cleanedText.split(/(?<=[.!?])\s+|\n+/).filter(s => s.trim().length > 0);
+    const sentenceCandidates = sentences.map(s => extractCandidates(s));
+    const allCandidates = sentenceCandidates.flat();
+    if (allCandidates.length === 0) return [];
+
+    // Step 3: build co-occurrence graph within sentence boundaries (window size = 4)
     const WINDOW = 4;
     const edges = {};   // edges[a][b] = co-occurrence count
     const degree = {};  // total edge weight per node
-    for (let i = 0; i < candidates.length; i++) {
-      const a = candidates[i];
-      for (let j = i + 1; j < Math.min(i + WINDOW, candidates.length); j++) {
-        const b = candidates[j];
-        if (a === b) continue;
-        if (!edges[a]) edges[a] = {};
-        if (!edges[b]) edges[b] = {};
-        edges[a][b] = (edges[a][b] || 0) + 1;
-        edges[b][a] = (edges[b][a] || 0) + 1;
-        degree[a] = (degree[a] || 0) + 1;
-        degree[b] = (degree[b] || 0) + 1;
+    for (const candidates of sentenceCandidates) {
+      for (let i = 0; i < candidates.length; i++) {
+        const a = candidates[i];
+        for (let j = i + 1; j < Math.min(i + WINDOW, candidates.length); j++) {
+          const b = candidates[j];
+          if (a === b) continue;
+          if (!edges[a]) edges[a] = {};
+          if (!edges[b]) edges[b] = {};
+          edges[a][b] = (edges[a][b] || 0) + 1;
+          edges[b][a] = (edges[b][a] || 0) + 1;
+          degree[a] = (degree[a] || 0) + 1;
+          degree[b] = (degree[b] || 0) + 1;
+        }
       }
     }
 
-    // Step 3: run PageRank (10 iterations, damping = 0.85)
+    // Step 4: run PageRank (10 iterations, damping = 0.85)
     const nodes = Object.keys(edges);
     if (nodes.length === 0) return [];
     const DAMPING = 0.85;
@@ -163,23 +174,24 @@ class LISACompressor {
       scores = newScores;
     }
 
-    // Step 4: detect multi-word keyphrases from adjacent high-scoring words
+    // Step 5: detect multi-word keyphrases within sentence boundaries
     const scoreValues = Object.values(scores);
     const medianScore = scoreValues.sort((a, b) => a - b)[Math.floor(scoreValues.length / 2)] || 0;
     const threshold = medianScore * 0.8;
-    // Scan candidates for adjacent pairs/triples above threshold
     const phraseCounts = {};
-    for (let i = 0; i < candidates.length - 1; i++) {
-      const a = candidates[i], b = candidates[i + 1];
-      if ((scores[a] || 0) >= threshold && (scores[b] || 0) >= threshold) {
-        const bigram = a + ' ' + b;
-        phraseCounts[bigram] = (phraseCounts[bigram] || 0) + 1;
-        // Check trigram
-        if (i + 2 < candidates.length) {
-          const c = candidates[i + 2];
-          if ((scores[c] || 0) >= threshold) {
-            const trigram = a + ' ' + b + ' ' + c;
-            phraseCounts[trigram] = (phraseCounts[trigram] || 0) + 1;
+    for (const candidates of sentenceCandidates) {
+      for (let i = 0; i < candidates.length - 1; i++) {
+        const a = candidates[i], b = candidates[i + 1];
+        if ((scores[a] || 0) >= threshold && (scores[b] || 0) >= threshold) {
+          const bigram = a + ' ' + b;
+          phraseCounts[bigram] = (phraseCounts[bigram] || 0) + 1;
+          // Check trigram
+          if (i + 2 < candidates.length) {
+            const c = candidates[i + 2];
+            if ((scores[c] || 0) >= threshold) {
+              const trigram = a + ' ' + b + ' ' + c;
+              phraseCounts[trigram] = (phraseCounts[trigram] || 0) + 1;
+            }
           }
         }
       }
@@ -200,9 +212,8 @@ class LISACompressor {
     const droppedPhraseWords = new Set();
     for (const [phrase, score] of sortedPhrases) {
       const parts = phrase.split(' ');
-      // Check if this phrase overlaps heavily with an already-kept phrase
       const overlapCount = parts.filter(p => droppedPhraseWords.has(p)).length;
-      if (overlapCount >= 2) continue; // skip — too similar to a higher-scoring phrase
+      if (overlapCount >= 2) continue;
       keptPhrases[phrase] = score;
       parts.forEach(p => droppedPhraseWords.add(p));
     }
@@ -213,11 +224,10 @@ class LISACompressor {
       if (!absorbedWords.has(word)) merged[word] = score;
     }
 
-    // Step 5: sort by score, return top 10
+    // Step 6: sort by score, return top 10
     const sorted = Object.entries(merged)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
-    // Normalize weights to 1-10 scale for readability
     const maxScore = sorted[0]?.[1] || 1;
     return sorted.map(([term, score]) => ({
       term,

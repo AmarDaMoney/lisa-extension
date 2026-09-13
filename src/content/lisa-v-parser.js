@@ -122,7 +122,7 @@ class LisaVParser {
               v: codeContent
             });
           }
-        } else if (node.tagName === 'PRE' || node.tagName === 'CODE') {
+        } else if (node.tagName === 'PRE') {
           const codeContent = node.textContent.trim();
           if (codeContent && codeContent.length >= 25) {
             blocks.push({
@@ -131,6 +131,16 @@ class LisaVParser {
               file: this.extractFilename(node),
               hash: await this.sha256(codeContent),
               v: codeContent
+            });
+          }
+        } else if (node.tagName === 'CODE') {
+          // Inline code — keep as text with backticks, don't drop
+          const codeText = node.textContent.trim();
+          if (codeText) {
+            blocks.push({
+              t: role === 'user' ? 'u' : 'a_text',
+              role: role,
+              v: '`' + codeText + '`'
             });
           }
         } else {

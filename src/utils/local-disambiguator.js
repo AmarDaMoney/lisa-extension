@@ -18,10 +18,14 @@ const LocalDisambiguator = {
 
     const doc = nlp(text);
 
-    const people = [...new Set(doc.people().out('array'))].filter(p => p.length > 1);
-    const orgs = [...new Set(doc.organizations().out('array'))].filter(o => o.length > 1);
-    const places = [...new Set(doc.places().out('array'))].filter(p => p.length > 1);
-    const topics = [...new Set(doc.topics().out('array'))].filter(t => t.length > 1);
+    // Clean punctuation/noise from compromise entity output
+    const cleanEntity = (e) => e.replace(/^[^\w]+|[^\w]+$/g, '').trim();
+    const cleanList = (arr) => [...new Set(arr.map(cleanEntity))].filter(e => e.length > 1 && !/^[^a-zA-Z\u00C0-\u024F\u0600-\u06FF]+$/.test(e));
+
+    const people = cleanList(doc.people().out('array'));
+    const orgs = cleanList(doc.organizations().out('array'));
+    const places = cleanList(doc.places().out('array'));
+    const topics = cleanList(doc.topics().out('array'));
 
     return { people, orgs, places, topics };
   },

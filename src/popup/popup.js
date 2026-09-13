@@ -1028,8 +1028,9 @@ class LISAPopup {
           // Estimate token savings
           // Raw: sum original message lengths, estimate ~4 chars per token (industry standard)
           let totalOriginalChars = 0;
-          for (const token of tokens) {
-            totalOriginalChars += token.originalLength || 0;
+          const rawMsgs = (this.currentConversation && this.currentConversation.messages) || [];
+          for (const m of rawMsgs) {
+            totalOriginalChars += (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content || '').length);
           }
           const rawTokenEstimate = Math.round(totalOriginalChars / 4);
           

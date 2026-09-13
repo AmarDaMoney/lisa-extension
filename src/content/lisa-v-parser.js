@@ -40,7 +40,9 @@ class LisaVParser {
     return element.tagName === 'PRE' || 
            element.tagName === 'CODE' ||
            element.classList?.contains('code-block') ||
-           element.classList?.contains('hljs');
+           element.classList?.contains('hljs') ||
+           element.classList?.contains('epitaxy-codeblock') ||
+           element.classList?.contains('epitaxy-diff');
   }
 
   // Extract language from code block
@@ -80,7 +82,7 @@ class LisaVParser {
     // Use shared HTML-to-markdown converter when available (all platforms)
     // Only for elements without code blocks — code needs separate t:'code' blocks for LISA-V
     const converter = window.__lisaHtmlToMarkdown;
-    const hasCodeBlocks = element.querySelector('pre code, pre.code-block, [class*="code-block"]');
+    const hasCodeBlocks = element.querySelector('pre code, pre.code-block, [class*="code-block"], .epitaxy-codeblock, .epitaxy-diff');
     if (converter && !hasCodeBlocks) {
       const text = converter.extractAsMarkdown(element);
       if (text) {
@@ -1561,9 +1563,9 @@ class LisaVParser {
     if (platform === 'Claude Code') {
       const titlebar = document.querySelector('.epitaxy-titlebar');
       if (titlebar) {
-        const titleDiv = titlebar.querySelector('span.flex.min-w-0.items-center > div:first-child');
-        if (titleDiv && titleDiv.textContent.trim().length > 0) {
-          return titleDiv.textContent.trim();
+        const firstLine = (titlebar.innerText || '').split('\n')[0].trim();
+        if (firstLine.length > 0) {
+          return firstLine;
         }
       }
     }

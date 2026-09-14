@@ -141,8 +141,8 @@ const SemanticAnalyzer = {
   ],
 
   actionPatterns: [
-    { regex: /\b(TODO|FIXME|HACK)\b:?\s*([^.;\n]{10,160})/gi, type: 'todo' },
-    { regex: /\b(SET|DELETE|RUN|DEPLOY|COMMIT|PUSH|MERGE)\b\s+([^.;\n]{5,160})/gi, type: 'command' },
+    { regex: /\b(TODO|FIXME|HACK)\b:?\s*([^.;\n]{10,160})/g, type: 'todo' },
+    { regex: /\b(SET|DELETE|RUN|DEPLOY|COMMIT|PUSH|MERGE)\b\s+([^.;\n]{5,160})/g, type: 'command' },
     { regex: /\bgit\s+(push|pull|commit|checkout|merge|rebase)\b[^.;\n]{0,40}/gi, type: 'git' },
     { regex: /\bnpm\s+(install|run|build|test)\b[^.;\n]{0,40}/gi, type: 'npm' }
   ],

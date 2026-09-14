@@ -735,7 +735,7 @@ class LISACompressor {
       key_entities:      [...entitySet].slice(0, 12),
       session_intent:    sessionIntent,
       session_register:  register,
-      open_tasks:        tokens.filter(t => t.tokens?.intent === 'question' || t.tokens?.intent === 'request').slice(-5).map(t => (t.summary || '').substring(0, 100)),
+      open_tasks:        [], // Disabled: per-message intent is not task detection. Tier 1 session-level extractor will replace this.
       generated_by:      'LISA v0.52.7'
     };
   }

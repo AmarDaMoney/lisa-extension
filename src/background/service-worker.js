@@ -77,23 +77,40 @@ class LISACompressor {
   extractConcepts(text) {
     // TextRank: graph-based keyphrase extraction (PageRank over word co-occurrence)
     // Words that co-occur with other important words rank high, not just frequent ones
-    const stopWords = new Set(['the', 'is', 'at', 'which', 'on', 'a', 'an', 'and', 'or', 'but',
-      'in', 'with', 'to', 'for', 'of', 'as', 'by', 'from', 'this', 'that', 'then', 'than',
-      'what', 'when', 'where', 'will', 'would', 'could', 'should', 'have', 'been', 'were',
-      'here', 'there', 'just', 'also', 'very', 'some', 'more', 'into',
-      'your', 'you', 'yours', 'their', 'them', 'they', 'those', 'these',
-      'done', 'being', 'like', 'only', 'already', 'about', 'many', 'much',
-      'think', 'right', 'worth', 'still', 'even', 'well', 'good', 'want',
-      'need', 'know', 'make', 'take', 'give', 'given', 'come', 'goes',
-      'dear', 'dont', 'cant', 'wont', 'isnt', 'does', 'didnt', 'thats',
-      'its', 'are', 'was', 'has', 'had', 'not', 'can', 'may', 'got', 'let',
-      'way', 'use', 'used', 'line', 'things', 'every', 'between', 'first',
-      'const', 'function', 'return', 'await', 'async', 'true', 'false', 'null', 'undefined',
-      'catch', 'throw', 'class', 'super', 'export', 'import', 'typeof', 'instanceof',
-      'see', 'saw', 'look', 'show', 'now', 'new', 'before', 'after', 'full', 'exact',
-      'next', 'last', 'back', 'same', 'each', 'sure', 'run', 'set', 'get', 'put',
-      'try', 'keep', 'find', 'call', 'called', 'using', 'work', 'check', 'start', 'end']);
-
+    const stopWords = new Set([
+      // Determiners, pronouns, prepositions
+      'the','is','at','which','on','a','an','and','or','but','in','with','to','for','of','as',
+      'by','from','this','that','then','than','what','when','where','who','how','why',
+      'will','would','could','should','have','been','were','here','there','just','also',
+      'very','some','more','into','your','you','yours','their','them','they','those','these',
+      'our','his','her','its','my','mine','we','she','he','him','myself','itself',
+      // Common verbs and adverbs
+      'done','being','like','only','already','about','many','much','think','right','worth',
+      'still','even','well','good','want','need','know','make','take','give','given','come',
+      'goes','going','went','said','says','tell','told','ask','asked','does','doing',
+      'see','saw','look','show','showed','shown','now','new','before','after','full','exact',
+      'next','last','back','same','each','sure','run','set','get','put','got','let',
+      'try','keep','find','call','called','using','work','check','start','end','turn',
+      'really','actually','basically','simply','perhaps','maybe','rather','quite','pretty',
+      'again','both','own','such','other','another','either','neither','enough','almost',
+      'always','never','often','sometimes','usually','might','must','shall','able','seem',
+      'become','became','mean','means','meant','read','wrote','write','written','send','sent',
+      'move','moved','left','leave','add','added','edit','edited','change','changed',
+      'open','close','opened','closed','pass','passed','pull','push','follow','whole',
+      'point','part','case','place','long','different','through','while','because','since',
+      'until','during','above','below','over','under','around',
+      // Chat noise
+      'dear','dont','cant','wont','isnt','didnt','thats','yeah','yes','nope',
+      'are','was','has','had','not','can','may','way','use','used',
+      'line','things','every','between','first','second','third','bit','lot','couple',
+      'ok','okay','thanks','thank','please','sorry','hey','hello','hi',
+      // JS/code keywords (survive code-block stripping as discussion terms)
+      'const','function','return','await','async','true','false','null','undefined',
+      'catch','throw','class','super','export','import','typeof','instanceof',
+      'file','files','string','number','object','array','value','result','output','input',
+      'something','anything','everything','nothing','someone','anyone','everyone',
+      'gonna','wanna','gotta','kinda','sorta','thing','stuff','went','just'
+    ]);
     // Step 1: pre-clean code artifacts
     const cleanedText = text
       .replace(/```[\s\S]*?```/g, ' ')           // fenced code blocks
@@ -133,6 +150,28 @@ class LISACompressor {
     const sentenceCandidates = sentences.map(s => extractCandidates(s));
     const allCandidates = sentenceCandidates.flat();
     if (allCandidates.length === 0) return [];
+
+    // Frequency-based stopword detection: words in >25% of sentences are generic
+    if (sentences.length >= 4) {
+      const wordSentenceCount = {};
+      for (const sc of sentenceCandidates) {
+        const unique = new Set(sc);
+        for (const w of unique) wordSentenceCount[w] = (wordSentenceCount[w] || 0) + 1;
+      }
+      const threshold = sentences.length * 0.25;
+      const freqStopWords = new Set(
+        Object.entries(wordSentenceCount).filter(([, c]) => c > threshold).map(([w]) => w)
+      );
+      if (freqStopWords.size > 0) {
+        for (let i = 0; i < sentenceCandidates.length; i++) {
+          sentenceCandidates[i] = sentenceCandidates[i].filter(w => !freqStopWords.has(w));
+        }
+        // Rebuild flat list
+        allCandidates.length = 0;
+        allCandidates.push(...sentenceCandidates.flat());
+        if (allCandidates.length === 0) return [];
+      }
+    }
 
     // Step 3: build co-occurrence graph within sentence boundaries (window size = 4)
     const WINDOW = 4;

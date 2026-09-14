@@ -175,8 +175,7 @@ const SemanticAnalyzer = {
       while ((match = re.exec(text)) !== null) {
         actions.push({
           type,
-          command: match[0].trim(),
-          detail: match[2] ? match[2].trim() : null
+          command: match[0].trim()
         });
       }
     }

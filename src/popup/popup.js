@@ -1353,7 +1353,16 @@ class LISAPopup {
       : leanMsgs;
 
     const semantic_anchors = Object.fromEntries(
-      Object.entries(compressedData.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest])
+      Object.entries(compressedData.semantic_anchors || {}).map(([k, { content, ...rest }]) => {
+        const clean = {};
+        for (const [field, val] of Object.entries(rest)) {
+          if (val === null || val === undefined) continue;
+          if (Array.isArray(val) && val.length === 0) continue;
+          if (val === 'general') continue;
+          clean[field] = val;
+        }
+        return [k, clean];
+      })
     );
 
     return {

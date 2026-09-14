@@ -133,7 +133,17 @@ function buildLeanExport(compressed, rawMessages) {
   }));
 
   const anchors = Object.fromEntries(
-    Object.entries(compressed.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest])
+    Object.entries(compressed.semantic_anchors || {}).map(([k, { content, ...rest }]) => {
+      // Strip null values and empty arrays to save tokens
+      const clean = {};
+      for (const [field, val] of Object.entries(rest)) {
+        if (val === null || val === undefined) continue;
+        if (Array.isArray(val) && val.length === 0) continue;
+        if (val === 'general') continue; // default topic adds no signal
+        clean[field] = val;
+      }
+      return [k, clean];
+    })
   );
 
   const leanPayload = {

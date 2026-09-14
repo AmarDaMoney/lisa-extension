@@ -52,7 +52,8 @@ class LISACompressor {
       'FILE','LINE','NODE','NAME','TYPE','DATA','EACH','PUSH','PULL','STEP','TEST','WAIT',
       'QUICK','INDEX','ACTIVE','WORKING','MEMORY','INJECTION','REBIRTH','SMARTER','FULL',
       'STATE','SNAPSHOT','MODE','ADAPTIVE','CONVERSATION','RECENT','EARLIER','CONTEXT',
-      'OPEN','CLOSE','START','BLOCK','CHECK','BUILD','MATCH','ABORT','REPLACE','UPDATE',
+      'OPEN','CLOSE','START','BLOCK','CHECK','BUILD','MATCH','ABORT','REPLACE','UPDATE','ALSO','MAKE','JUST',
+      'SAME','LIKE','GOOD','WANT','NEED','KEEP','LOOK','SHOW','GIVE','TAKE','COME','MANY','MUCH','VERY',
       'DELETE','DEPLOY','COMMIT','MERGE','FETCH','PATCH','RESET','DEBUG','PARSE','PRINT',
       'THROW','CATCH','BREAK','RETURN','SELECT','CREATE','INSERT','REMOVE','EXPORT','IMPORT',
       'TODO','FIXME','HACK','NOTE','ERROR','WARN','INFO',
@@ -113,7 +114,8 @@ class LISACompressor {
       'catch','throw','class','super','export','import','typeof','instanceof',
       'file','files','string','number','object','array','value','result','output','input',
       'something','anything','everything','nothing','someone','anyone','everyone',
-      'gonna','wanna','gotta','kinda','sorta','thing','stuff','went','just'
+      'gonna','wanna','gotta','kinda','sorta','thing','stuff','went','just',
+      'all','real','two','per','one','three','four','five','big','small','few','little'
     ]);
     // Step 1: pre-clean code artifacts
     const cleanedText = text
@@ -796,7 +798,9 @@ class LISACompressor {
     // ── Proposal → Confirmation detection ──
     const proposalPatterns = [
       // English
-      /\b(?:let'?s|should|recommend|suggest|propose|the fix|going with|switch to|use|try|go with|pick|choose|set .* to)\b/i,
+      /\b(?:let'?s|should|recommend|suggest|propose|going with|switch to|go with|pick|choose)\b/i,
+      // English — imperative/technical proposals
+      /^(?:the fix|fix:|need to|two edits|three edits|edit \d|add |remove |replace |drop |change |wire |apply )/i,
       // French
       /\b(?:on (?:fait|va|devrait|pourrait)|je (?:propose|sugg\u00e8re|recommande)|utilisons|essayons|passons \u00e0|choisissons)\b/i
     ];
@@ -804,6 +808,7 @@ class LISACompressor {
       // English
       /\b(?:yes|yeah|yep|ok|okay|agreed|perfect|done|sounds good|that works|go ahead|confirmed|exactly|right|correct|makes sense|good call|ship it|lgtm)\b/i,
       /^✅|^👍|^\+1/,
+      /\b(?:committed|pushed|committed and pushed|passes|it works|working now|merged)\b/i,
       // French
       /\b(?:oui|d'accord|parfait|exactement|on fait [\u00e7c]a|c'est bon|entendu|valid\u00e9|correct|bonne id\u00e9e)\b/i
     ];
@@ -863,7 +868,7 @@ class LISACompressor {
         while ((match = re.exec(s.text)) !== null) {
           const text = match[0].trim();
           const narrativeNoise = /\b(was|were|been|did|because|since|when|verified|showed|found|noticed|returned|produced)\b/i;
-          if (text.length > 20 && !narrativeNoise.test(text) && !/[|]/.test(text) && !constraints.some(c => c.text === text)) {
+          if (text.length > 20 && !narrativeNoise.test(text) && !/[|"\\]/.test(text) && !constraints.some(c => c.text === text)) {
             constraints.push({ text, at: s.index, by: s.role });
           }
         }

@@ -17,7 +17,7 @@ const path = require('path');
 const { loadLisa, pipeline, buildLeanExport } = require('./load-lisa');
 const { count, MODEL } = require('./count');
 
-const TARGET = parseFloat(process.env.LISA_EVAL_TARGET || '0.9');
+const TARGET = parseFloat(process.env.LISA_EVAL_TARGET || '0.95');
 const CORPUS = path.join(__dirname, 'corpus');
 const OUT = path.join(__dirname, 'out');
 const JUDGE = process.argv.includes('--judge');

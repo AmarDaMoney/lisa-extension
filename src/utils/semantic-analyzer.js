@@ -410,7 +410,7 @@ const SemanticAnalyzer = {
       const topics = [...new Set(Object.values(semanticAnchors).map(a => a.topic))];
       const reconstructionProtocol = {
         method: 'semantic_anchoring',
-        captureMethod: rawExtraction._captureMethod || 'unknown',
+        captureMethod: rawExtraction._captureMethod || 'dom',
         anchor_count: Object.keys(semanticAnchors).length,
         action_count: Object.keys(actionVectors).length,
         key_themes: topics,
@@ -434,7 +434,7 @@ const SemanticAnalyzer = {
           enriched: true,
           language: detectedLanguage,
           rtl: isRTL,
-          captureMethod: rawExtraction._captureMethod || 'unknown'
+          captureMethod: rawExtraction._captureMethod || 'dom'
         },
         flow_metrics: flow,
         semantic_anchors: semanticAnchors,

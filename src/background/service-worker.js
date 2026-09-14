@@ -769,6 +769,7 @@ class LISACompressor {
     else if (techScore > 2   && emotionScore > 2) register = 'mixed';
     const coreTopic = compressed.metadata?.title ||
       (userTokens[0]?.summary || '').substring(0, 100).trim();
+    const sessionEvents = this.extractSessionEvents(tokens);
     return {
       core_topic:        coreTopic,
       platform:          compressed.metadata?.platform || 'unknown',
@@ -777,8 +778,102 @@ class LISACompressor {
       key_entities:      [...entitySet].slice(0, 12),
       session_intent:    sessionIntent,
       session_register:  register,
-      open_tasks:        [], // Disabled: per-message intent is not task detection. Tier 1 session-level extractor will replace this.
+      open_tasks:        sessionEvents.open_tasks,
+      decisions:         sessionEvents.decisions,
+      files_changed:     sessionEvents.files_changed,
+      constraints:       sessionEvents.constraints,
       generated_by:      'LISA v0.52.7'
+    };
+  }
+
+  // ── Session-Level Event Extractor (Tier 1) ──
+  // Reads all summaries as a sequence and extracts structured events.
+  // Universal: works across technical, support, research, and business sessions.
+  extractSessionEvents(tokens) {
+    const summaries = tokens.map(t => ({ role: t.role, index: t.index, text: t.summary || t.content || '' }));
+
+    // ── Proposal → Confirmation detection ──
+    const proposalPatterns = [
+      // English
+      /\b(?:let'?s|should|recommend|suggest|propose|the fix|going with|switch to|use|try|go with|pick|choose|set .* to)\b/i,
+      // French
+      /\b(?:on (?:fait|va|devrait|pourrait)|je (?:propose|sugg\u00e8re|recommande)|utilisons|essayons|passons \u00e0|choisissons)\b/i
+    ];
+    const confirmPatterns = [
+      // English
+      /\b(?:yes|yeah|yep|ok|okay|agreed|perfect|done|sounds good|that works|go ahead|confirmed|exactly|right|correct|makes sense|good call|ship it|lgtm)\b/i,
+      /^✅|^👍|^\+1/,
+      // French
+      /\b(?:oui|d'accord|parfait|exactement|on fait [\u00e7c]a|c'est bon|entendu|valid\u00e9|correct|bonne id\u00e9e)\b/i
+    ];
+
+    const decisions = [];
+    const openProposals = [];
+
+    for (let i = 0; i < summaries.length; i++) {
+      const turn = summaries[i];
+      // Extract first meaningful sentence for testing AND capture
+      const firstSentence = (turn.text.match(/^[^.!?\n]+[.!?]?/) || [turn.text])[0].substring(0, 120).trim();
+      if (firstSentence.length < 30) continue; // Skip fragments
+      const isProposal = proposalPatterns.some(p => p.test(firstSentence));
+      if (isProposal) {
+        const nextTurn = summaries[i + 1];
+        const isConfirmed = nextTurn && confirmPatterns.some(p => p.test(nextTurn.text));
+        if (isConfirmed) {
+          decisions.push({
+            proposal: firstSentence,
+            confirmed_at: nextTurn.index,
+            by: nextTurn.role
+          });
+        } else {
+          openProposals.push({
+            proposal: firstSentence,
+            at: turn.index,
+            by: turn.role
+          });
+        }
+      }
+    }
+
+    // Open tasks: proposals in the last 5 turns with no confirmation
+    const lastFiveTurnIndex = summaries.length >= 5 ? summaries[summaries.length - 5].index : 0;
+    const open_tasks = openProposals.filter(p => p.at >= lastFiveTurnIndex).slice(0, 5);
+
+    // ── Files changed: reuse filePattern across all summaries ──
+    const filePattern = /(?:^|\s)((?:src|lib|app|pages|components|utils|server|public|eval|templates|static)\/[\w\-\/]+\.(?:js|ts|jsx|tsx|json|css|html|py|md|txt|yaml|yml))/gm;
+    const fileSet = new Set();
+    summaries.forEach(s => {
+      const matches = s.text.match(filePattern);
+      if (matches) matches.forEach(m => fileSet.add(m.trim()));
+    });
+
+    // ── Constraints: universal markers ──
+    const constraintPatterns = [
+      // English
+      /\b(?:always|never|must|don'?t forget|non-negotiable|required|mandatory|critical)\b[^.;\n]{3,80}/gi,
+      // French
+      /\b(?:toujours|jamais|il faut|obligatoire|ne pas oublier|imp\u00e9ratif|critique)\b[^.;\n]{3,80}/gi
+    ];
+    const constraints = [];
+    summaries.forEach(s => {
+      constraintPatterns.forEach(p => {
+        const re = new RegExp(p.source, p.flags);
+        let match;
+        while ((match = re.exec(s.text)) !== null) {
+          const text = match[0].trim();
+          const narrativeNoise = /\b(was|were|been|did|because|since|when|verified|showed|found|noticed|returned|produced)\b/i;
+          if (text.length > 20 && !narrativeNoise.test(text) && !/[|]/.test(text) && !constraints.some(c => c.text === text)) {
+            constraints.push({ text, at: s.index, by: s.role });
+          }
+        }
+      });
+    });
+
+    return {
+      decisions: decisions.slice(0, 10),
+      open_tasks,
+      files_changed: [...fileSet].slice(0, 20),
+      constraints: constraints.slice(0, 8)
     };
   }
 }

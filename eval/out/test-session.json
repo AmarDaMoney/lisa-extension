@@ -1,116 +1,67 @@
 {
-  "_instructions": "LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.",
+  "_instructions": "LISA verbatim export. Compression skipped — original shorter than compressed.",
   "platform": "Claude",
   "title": "Test Session",
   "messageCount": 11,
   "messages": [
     {
       "role": "user",
-      "summary": "I need to fix the downloadJSON function in popup.js."
+      "index": 0,
+      "content": "I need to fix the downloadJSON function in popup.js. It's duplicating the entire compressedData object under a raw key, which doubles the export size."
     },
     {
       "role": "assistant",
-      "summary": "Line 1367 is the smoking gun.. The raw: this.compressedData dumps everything including semanticTokens a second time.. The fix is to replace it with only the fields a receiving AI needs: anchor, lean semantic_anchors without content, and session_metadata."
+      "index": 1,
+      "content": "Line 1367 is the smoking gun. The raw: this.compressedData dumps everything including semanticTokens a second time. The fix is to replace it with only the fields a receiving AI needs: anchor, lean semantic_anchors without content, and session_metadata."
     },
     {
       "role": "user",
-      "summary": "Makes sense. Run the script."
+      "index": 2,
+      "content": "Makes sense. Run the script."
     },
     {
       "role": "assistant",
-      "summary": "OK — replaced raw dump with lean export fields. Let me verify syntax."
+      "index": 3,
+      "content": "OK — replaced raw dump with lean export fields. Let me verify syntax."
     },
     {
       "role": "user",
-      "summary": "SYNTAX OK"
+      "index": 4,
+      "content": "SYNTAX OK"
     },
     {
       "role": "assistant",
-      "summary": "The export now has only the fields that matter.. For your 78-turn conversation, this eliminates roughly 84K chars of duplication.. Let's commit: git add src/popup/popup.js && git commit -m 'Kill raw duplication in downloadJSON'"
+      "index": 5,
+      "content": "Clean. The export now has only the fields that matter. For your 78-turn conversation, this eliminates roughly 84K chars of duplication. Let's commit: git add src/popup/popup.js && git commit -m 'Kill raw duplication in downloadJSON'"
     },
     {
       "role": "user",
-      "summary": "Done and pushed"
+      "index": 6,
+      "content": "Done and pushed"
     },
     {
       "role": "assistant",
-      "summary": "Now let's fix the adaptive anchor count.. Currently it's a flat 30 in semantic-analyzer.js.. For a 78-turn conversation that's way too many.. The formula should be min(8, max(2, ceil(messages * 0.3)))."
+      "index": 7,
+      "content": "Now let's fix the adaptive anchor count. Currently it's a flat 30 in semantic-analyzer.js. For a 78-turn conversation that's way too many. The formula should be min(8, max(2, ceil(messages * 0.3)))."
     },
     {
       "role": "user",
-      "summary": "OK go ahead"
+      "index": 8,
+      "content": "OK go ahead"
     },
     {
       "role": "assistant",
-      "summary": "For 78 turns: min(8, ceil(78*0.3)) = 8 anchors instead of 30.. For a 6-turn chat: max(2, ceil(6*0.3)) = 2.. Committed as 'Adaptive anchor cap'."
+      "index": 9,
+      "content": "Applied. For 78 turns: min(8, ceil(78*0.3)) = 8 anchors instead of 30. For a 6-turn chat: max(2, ceil(6*0.3)) = 2. Committed as 'Adaptive anchor cap'."
     },
     {
       "role": "user",
-      "summary": "Al Hamdoulillah. Done and pushed."
+      "index": 10,
+      "content": "Al Hamdoulillah. Done and pushed."
     }
   ],
-  "format": "compressed",
-  "anchor": {
-    "core_topic": "Test Session",
-    "platform": "Claude",
-    "message_count": {
-      "user": 6,
-      "assistant": 5
-    },
-    "dominant_concepts": [
-      "anchor",
-      "fields",
-      "raw",
-      "data",
-      "78turn",
-      "conversation",
-      "adaptive",
-      "popupjs"
-    ],
-    "key_entities": [
-      "SYNTAX"
-    ],
-    "session_intent": "statement",
-    "session_register": "conversational",
-    "open_tasks": [
-      "Now let's fix the adaptive anchor count.. Currently it's a flat 30 in semantic-analyzer.js.. For a 7"
-    ],
-    "generated_by": "LISA v0.52.6"
-  },
-  "semantic_anchors": {
-    "SA001": {
-      "topic": "bugfix",
-      "role": "assistant",
-      "turnIndex": 1,
-      "score": 25,
-      "severity": null,
-      "files": [],
-      "tags": []
-    },
-    "SA002": {
-      "topic": "refactor",
-      "role": "assistant",
-      "turnIndex": 5,
-      "score": 45,
-      "severity": null,
-      "files": [
-        "src/popup/popup.js"
-      ],
-      "tags": [],
-      "actions": [
-        {
-          "type": "command",
-          "command": "commit -m 'Kill raw duplication in downloadJSON'",
-          "detail": "-m 'Kill raw duplication in downloadJSON'"
-        },
-        {
-          "type": "git",
-          "command": "git commit -m 'Kill raw duplication in downloadJSO",
-          "detail": null
-        }
-      ]
-    }
-  },
+  "format": "verbatim",
+  "isVerbatim": true,
   "session_metadata": {
     "platform": "Claude",
     "enriched": true,

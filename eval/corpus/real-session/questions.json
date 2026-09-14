@@ -1,0 +1,7 @@
+[
+  {"q": "What was the main problem discovered in this session?", "a": "The compressed export was 2.1x larger than raw — raw: this.compressedData in downloadJSON dumped the entire object including semanticTokens a second time"},
+  {"q": "Which files were changed?", "a": "src/popup/popup.js, src/utils/semantic-analyzer.js, eval/run.js, eval/load-lisa.js, eval/count.js, eval/judge.js"},
+  {"q": "What is the eval harness and what does it measure?", "a": "A Node.js tool that loads the extension pipeline in a VM, runs compression on corpus cases, and measures token ratio of lean export vs raw transcript"},
+  {"q": "What was the final compression ratio on the real session corpus case?", "a": "0.562 — 36,500 raw tokens compressed to 20,525 lean tokens, 44% reduction"},
+  {"q": "What fields were stripped from per-turn token objects in exports?", "a": "concepts, entities, relationships, intent, context — only role, index, and summary remain per turn"}
+]

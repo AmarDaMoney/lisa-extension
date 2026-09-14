@@ -1,0 +1,7 @@
+[
+  {"q": "What was the root cause of the Stripe webhook failure?", "a": "request.json() parsed the body before signature verification — Stripe needs raw bytes"},
+  {"q": "Which file was changed?", "a": "main.py"},
+  {"q": "What safety pattern was enforced for Stripe objects?", "a": "Use getattr() instead of dict access — getattr(session, 'customer_details', None)"},
+  {"q": "What happens if customer_email is None?", "a": "A warning is logged with the session ID, license generation and welcome email are skipped"},
+  {"q": "What was the final commit message?", "a": "fix: webhook signature verification — use raw body, getattr on Stripe objects, null-guard customer email"}
+]

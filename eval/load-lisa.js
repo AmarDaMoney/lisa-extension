@@ -124,7 +124,7 @@ function pipeline(lisa, raw) {
  * buildLeanExport() — Produce the same lean export as downloadJSON().
  * This is what the user actually downloads / hands off.
  */
-function buildLeanExport(compressed) {
+function buildLeanExport(compressed, rawMessages) {
   const tokens = compressed.semanticTokens || compressed.compressed || [];
   const messages = tokens.map(t => ({
     role: t.role,
@@ -136,7 +136,7 @@ function buildLeanExport(compressed) {
     Object.entries(compressed.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest])
   );
 
-  return {
+  const leanPayload = {
     _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.',
     platform: compressed.metadata?.platform || 'Unknown',
     title: compressed.metadata?.title || '',
@@ -147,6 +147,25 @@ function buildLeanExport(compressed) {
     semantic_anchors: anchors,
     session_metadata: compressed.session_metadata || {}
   };
+
+  // Compression gate: compare compressed vs verbatim, pick smaller
+  if (rawMessages) {
+    const verbatimPayload = {
+      _instructions: 'LISA verbatim export. Compression skipped — original shorter than compressed.',
+      platform: leanPayload.platform,
+      title: leanPayload.title,
+      messageCount: rawMessages.length,
+      messages: rawMessages.map((m, i) => ({ role: m.role, index: i, content: m.content })),
+      format: 'verbatim',
+      isVerbatim: true,
+      session_metadata: leanPayload.session_metadata
+    };
+    if (JSON.stringify(verbatimPayload).length < JSON.stringify(leanPayload).length) {
+      return verbatimPayload;
+    }
+  }
+
+  return leanPayload;
 }
 
 module.exports = { loadLisa, pipeline, buildLeanExport };

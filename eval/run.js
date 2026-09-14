@@ -43,7 +43,7 @@ async function runCase(lisa, caseName) {
 
   // Run pipeline
   const compressed = pipeline(lisa, raw);
-  const lean = buildLeanExport(compressed);
+  const lean = buildLeanExport(compressed, raw.messages);
   const leanText = JSON.stringify(lean, null, 2);
 
   // Save output for git-diff

@@ -55,7 +55,8 @@ class LISACompressor {
       'OPEN','CLOSE','START','BLOCK','CHECK','BUILD','MATCH','ABORT','REPLACE','UPDATE',
       'DELETE','DEPLOY','COMMIT','MERGE','FETCH','PATCH','RESET','DEBUG','PARSE','PRINT',
       'THROW','CATCH','BREAK','RETURN','SELECT','CREATE','INSERT','REMOVE','EXPORT','IMPORT',
-      'TODO','FIXME','HACK','NOTE','ERROR','WARN','INFO']);
+      'TODO','FIXME','HACK','NOTE','ERROR','WARN','INFO',
+      'EOF','PYEOF','RAWEOF','HEREDOC','ENDIF','ENDFOR','STDOUT','STDERR','ARGV']);
     const patterns = {
       urls: /https?:\/\/[^\s\"'<>)\]]+/g,
       emails: /[\w.-]+@[\w.-]+\.\w+/g,

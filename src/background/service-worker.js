@@ -605,11 +605,24 @@ class LISACompressor {
     }
     // Strip ChatGPT citation syntax
     text = text.replace(/filecite\w+/g, '');
+    // Extract commit messages from code blocks before stripping.
+    // "git commit -m 'fix: webhook verification'" carries resolution
+    // signal that the fence-strip regex below would destroy.
+    const commitPattern = /git\s+(?:-c\s+\S+\s+)?commit\s+(?:-[a-z]\s+)*-m\s+["']([^"']{10,}?)["']/gi;
+    let cmMatch;
+    const extractedCommits = [];
+    while ((cmMatch = commitPattern.exec(text)) !== null) {
+      extractedCommits.push(cmMatch[1].trim());
+    }
     // Fences must open and close a line of their own. Matching them
     // inline let a sentence that merely mentions two fence sequences
     // delete itself and everything between - which corrupted the
     // State Snapshot whenever this code was discussed with an AI.
     text = text.replace(/^[ \t]*```[a-z0-9]*[ \t]*\r?$[\s\S]*?^[ \t]*```[ \t]*\r?$/gmi, ' ');
+    // Re-inject extracted commit messages as scorable sentences
+    if (extractedCommits.length > 0) {
+      text = text + ' ' + extractedCommits.join('. ') + '.';
+    }
     // Unwrap inline spans - keep the text, drop the delimiters.
     // These carry the technical nouns of the sentence (identifiers,
     // filenames, field names); deleting them left fluent summaries

@@ -737,22 +737,27 @@ class LISACompressor {
       return { text: s.trim(), score, index: i };
     });
     
-    // Take top 4 sentences by score, maintain original order
-    const top = scored.sort((a, b) => b.score - a.score).slice(0, 4);
+    // Adaptive sentence budget — "Got it" gets 1 sentence,
+    // a 4000-char design turn gets 6. Flat 4 wasted slots on
+    // trivial turns and starved substantive ones.
+    const n = sentences.length;
+    const slots = n <= 3 ? Math.min(n, 2) : n <= 8 ? 3 : n <= 20 ? 4 : 6;
+    const charLimit = slots <= 2 ? 400 : slots <= 4 ? 800 : 1200;
+    const top = scored.sort((a, b) => b.score - a.score).slice(0, slots);
     top.sort((a, b) => a.index - b.index);
     
-    // Join selected sentences — respect 800 char limit at sentence boundaries, never mid-sentence
+    // Join selected sentences — never cut mid-sentence
     // Strip trailing sentence-enders before joining to avoid '..' artifacts
     let result = '';
     for (const s of top) {
       const clean = s.text.replace(/[.!?]+$/, '');
       const next = result ? result + '. ' + clean : clean;
-      if (next.length > 800) break;
+      if (next.length > charLimit) break;
       result = next;
     }
     // Ensure final sentence ends with a period
     if (result && !/[.!?]$/.test(result)) result += '.';
-    return result || top[0].text.substring(0, 800);
+    return result || top[0].text.substring(0, charLimit);
   }
 
   reconstruct(compressed) {

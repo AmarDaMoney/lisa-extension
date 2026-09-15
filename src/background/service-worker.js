@@ -792,7 +792,12 @@ class LISACompressor {
     const coreTopic = compressed.metadata?.title ||
       (userTokens[0]?.summary || '').substring(0, 100).trim();
     const sessionEvents = this.extractSessionEvents(tokens);
-    return {
+    // Shape session events by register — include only what's
+    // meaningful for this conversation type.
+    // Technical: files/decisions/open_tasks/constraints (full set)
+    // Conversational: resolutions + follow_ups (no files)
+    // Philosophical/research: conclusions + open_questions (no files)
+    const anchor = {
       core_topic:        coreTopic,
       platform:          compressed.metadata?.platform || 'unknown',
       message_count:     { user: userTokens.length, assistant: assistantTokens.length },
@@ -800,12 +805,24 @@ class LISACompressor {
       key_entities:      [...entitySet].slice(0, 12),
       session_intent:    sessionIntent,
       session_register:  register,
-      open_tasks:        sessionEvents.open_tasks,
-      decisions:         sessionEvents.decisions,
-      files_changed:     sessionEvents.files_changed,
-      constraints:       sessionEvents.constraints,
       generated_by:      'LISA v0.52.7'
     };
+    if (register === 'technical') {
+      anchor.files_changed = sessionEvents.files_changed;
+      anchor.decisions     = sessionEvents.decisions;
+      anchor.open_tasks    = sessionEvents.open_tasks;
+      anchor.constraints   = sessionEvents.constraints;
+    } else if (register === 'philosophical') {
+      anchor.conclusions    = sessionEvents.decisions;
+      anchor.open_questions = sessionEvents.open_tasks;
+      anchor.constraints    = sessionEvents.constraints;
+    } else {
+      // conversational, mixed, support
+      anchor.resolutions = sessionEvents.decisions;
+      anchor.follow_ups  = sessionEvents.open_tasks;
+      anchor.constraints = sessionEvents.constraints;
+    }
+    return anchor;
   }
 
   // ── Session-Level Event Extractor (Tier 1) ──

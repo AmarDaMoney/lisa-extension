@@ -742,12 +742,16 @@ class LISACompressor {
     top.sort((a, b) => a.index - b.index);
     
     // Join selected sentences — respect 800 char limit at sentence boundaries, never mid-sentence
+    // Strip trailing sentence-enders before joining to avoid '..' artifacts
     let result = '';
     for (const s of top) {
-      const next = result ? result + '. ' + s.text : s.text;
+      const clean = s.text.replace(/[.!?]+$/, '');
+      const next = result ? result + '. ' + clean : clean;
       if (next.length > 800) break;
       result = next;
     }
+    // Ensure final sentence ends with a period
+    if (result && !/[.!?]$/.test(result)) result += '.';
     return result || top[0].text.substring(0, 800);
   }
 

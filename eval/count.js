@@ -54,9 +54,15 @@ function countTokensFallback(text) {
 }
 
 /**
- * count(text) — Auto-selects API or fallback based on env.
+ * count(text) — Uses cached API counts when available, API when
+ * key is set, fallback only as last resort. This ensures eval
+ * results are consistent regardless of whether the key is set
+ * in this particular run — once a count is cached, it's always used.
  */
 async function count(text) {
+  const hash = crypto.createHash('sha256').update(text).digest('hex');
+  const key = MODEL + ':' + hash;
+  if (key in cache) return cache[key];
   if (process.env.ANTHROPIC_API_KEY) {
     return countTokens(text);
   }

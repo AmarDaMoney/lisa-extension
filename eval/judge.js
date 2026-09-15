@@ -38,15 +38,27 @@ async function ask(payload, question) {
 }
 
 async function grade(question, expected, got) {
-  const r = await client().messages.create({
-    model: MODEL,
-    max_tokens: 64,
-    messages: [{
-      role: 'user',
-      content: `Question: ${question}\nExpected: ${expected}\nAnswer: ${got}\nReply with one word: CORRECT, WRONG, or MISSING (if answer was NOT IN FILE).`
-    }]
-  });
-  return r.content.map(b => b.text || '').join('').trim().toUpperCase();
+  // 3-run majority vote — single grades swing ±20% between runs.
+  // Grading calls are 64 tokens each, so tripling is cheap.
+  const votes = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await client().messages.create({
+      model: MODEL,
+      max_tokens: 64,
+      messages: [{
+        role: 'user',
+        content: `Question: ${question}\nExpected: ${expected}\nAnswer: ${got}\nReply with one word: CORRECT, WRONG, or MISSING (if answer was NOT IN FILE).`
+      }]
+    });
+    const v = r.content.map(b => b.text || '').join('').trim().toUpperCase();
+    if (v.includes('CORRECT')) votes.push('CORRECT');
+    else if (v.includes('WRONG')) votes.push('WRONG');
+    else votes.push('MISSING');
+  }
+  // Majority wins
+  const counts = { CORRECT: 0, WRONG: 0, MISSING: 0 };
+  votes.forEach(v => counts[v]++);
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
 }
 
 /**

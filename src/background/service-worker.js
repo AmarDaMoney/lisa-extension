@@ -858,12 +858,26 @@ class LISACompressor {
     const lastFiveTurnIndex = summaries.length >= 5 ? summaries[summaries.length - 5].index : 0;
     const open_tasks = openProposals.filter(p => p.at >= lastFiveTurnIndex).slice(0, 5);
 
-    // ── Files changed: reuse filePattern across all summaries ──
+    // ── Files changed: directory-prefixed + root-level files ──
     const filePattern = /(?:^|\s)((?:src|lib|app|pages|components|utils|server|public|eval|templates|static)\/[\w\-\/]+\.(?:js|ts|jsx|tsx|json|css|html|py|md|txt|yaml|yml))/gm;
+    // Root-level files: common names only — avoids false positives from
+    // package names or variable references in prose. Whitelist approach
+    // is safer than a broad regex.
+    const rootFilePattern = /(?:^|\s)((?:main|app|index|server|manage|setup|config|settings|wsgi|asgi|Makefile|Dockerfile|Procfile|nixpacks|requirements|package|package-lock|tsconfig|manifest|README|CHANGELOG|LICENSE|Gemfile|Cargo|Pipfile)\.(?:py|js|ts|json|toml|txt|yaml|yml|lock|md|cfg))/gm;
+    // Bare filenames in markdown context: **popup.js**, `service-worker.js`
+    // Summaries often strip directory prefixes but keep bold/backtick markers.
+    const bareFilePattern = /(?:\*\*|`)([\w][\w.-]*\.(?:js|ts|jsx|tsx|py|json|css|html|md|txt|yaml|yml))(?:\*\*|`)/gm;
     const fileSet = new Set();
     summaries.forEach(s => {
       const matches = s.text.match(filePattern);
       if (matches) matches.forEach(m => fileSet.add(m.trim()));
+      const rootMatches = s.text.match(rootFilePattern);
+      if (rootMatches) rootMatches.forEach(m => fileSet.add(m.trim()));
+      let bareMatch;
+      const bareRe = new RegExp(bareFilePattern.source, bareFilePattern.flags);
+      while ((bareMatch = bareRe.exec(s.text)) !== null) {
+        fileSet.add(bareMatch[1]);
+      }
     });
 
     // ── Constraints: universal markers ──

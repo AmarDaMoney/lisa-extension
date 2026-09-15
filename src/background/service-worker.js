@@ -592,7 +592,7 @@ class LISACompressor {
     const originalSize = JSON.stringify(conversation).length;
     const compressedSize = JSON.stringify(compressed).length;
     compressed.metadata.compressionRatio = (originalSize / compressedSize).toFixed(2);
-    compressed.anchor = this.generateSemanticAnchor(compressed);
+    compressed.anchor = this.generateSemanticAnchor(compressed, conversation.messages);
     compressed._instructions = 'LISA semantic export. Each semanticTokens entry = one conversation turn with entities, weighted concepts, relationships, and intent. Read anchor for session context. Use semanticTokens[].summary for condensed turns. Upload to any AI and say: read this LISA file and continue the conversation.';
 
     return compressed;
@@ -754,8 +754,9 @@ class LISACompressor {
     };
   }
 
-  generateSemanticAnchor(compressed) {
+  generateSemanticAnchor(compressed, rawMessages) {
     const tokens = compressed.semanticTokens || [];
+    const msgs = rawMessages || [];
     const userTokens      = tokens.filter(t => t.role === 'user');
     const assistantTokens = tokens.filter(t => t.role === 'assistant');
     const conceptMap = {};
@@ -773,8 +774,13 @@ class LISACompressor {
     const intentCount = {};
     tokens.forEach(t => { const i = t.tokens?.intent; if (i) intentCount[i] = (intentCount[i]||0)+1; });
     const sessionIntent = Object.entries(intentCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'statement';
-    const codePattern = /```|`\w+`|\bfunction\b|\bconst\b|=>|\bimport\b|\brequire\(/;
-    const hasCodeRatio = tokens.filter(t => (t.tokens?.context?.hasCode) || codePattern.test(t.summary || t.content || '')).length / Math.max(tokens.length,1);
+    // Check raw messages for code — summaries strip code blocks, so
+    // t.tokens.context.hasCode and codePattern on summary both fail.
+    // Raw message content is the reliable source of truth.
+    const codePattern = /\`\`\`|\bfunction\b|\bconst\b|=>|\bimport\b|\brequire\(/;
+    const rawCodeCount = msgs.filter(m => codePattern.test(m.content || m.v || '')).length;
+    const summaryCodeCount = tokens.filter(t => codePattern.test(t.summary || '')).length;
+    const hasCodeRatio = Math.max(rawCodeCount, summaryCodeCount) / Math.max(tokens.length, 1);
     const techConcepts    = ['code','function','error','deploy','api','model','class','data','system','commit','git','bug','fix','regex','export','import','backend','frontend','endpoint','database','server','config','module','parser','pipeline','extension','popup','payload','token','schema','query','route'];
     const emotionConcepts = ['feel','love','trust','hope','care','human','understand','want','believe'];
     const techScore    = dominantConcepts.filter(c => techConcepts.includes(c)).length;

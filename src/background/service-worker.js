@@ -624,6 +624,25 @@ class LISACompressor {
     while ((cmMatch = commitPattern.exec(text)) !== null) {
       extractedCommits.push(cmMatch[1].trim());
     }
+    // Extract code deltas from patch-shaped blocks before fence strip.
+    // Heredoc edits, content.replace, sed, unified-diff + lines, str_replace.
+    // Preserves the NEW side capped at ~6 lines / 300 chars.
+    const extractedDeltas = [];
+    // Python heredoc: new = """...""" or new_content = """..."""
+    const heredocNew = /(?:new(?:_\w+)?\s*=\s*(?:"""|'''))([\s\S]*?)(?:"""|''')/gi;
+    let hdMatch;
+    while ((hdMatch = heredocNew.exec(text)) !== null) {
+      const delta = hdMatch[1].trim().split('\n').slice(0, 6).join('\n').substring(0, 300);
+      if (delta.length > 20) extractedDeltas.push('Change applied: ' + delta);
+    }
+    // Unified diff + lines (consecutive lines starting with +)
+    const diffPattern = /(?:^\+(?!\+\+).*(?:\n|$)){2,}/gm;
+    let diffMatch;
+    while ((diffMatch = diffPattern.exec(text)) !== null) {
+      const lines = diffMatch[0].split('\n').filter(l => l.startsWith('+')).map(l => l.substring(1));
+      const delta = lines.slice(0, 6).join('\n').substring(0, 300);
+      if (delta.length > 20) extractedDeltas.push('Diff applied: ' + delta);
+    }
     // Fences must open and close a line of their own. Matching them
     // inline let a sentence that merely mentions two fence sequences
     // delete itself and everything between - which corrupted the
@@ -636,6 +655,10 @@ class LISACompressor {
     // Re-inject extracted commit messages as scorable sentences
     if (extractedCommits.length > 0) {
       text = text + ' ' + extractedCommits.join('. ') + '.';
+    }
+    // Re-inject extracted code deltas as scorable sentences
+    if (extractedDeltas.length > 0) {
+      text = text + ' ' + extractedDeltas.join('. ') + '.';
     }
     // Unwrap inline spans - keep the text, drop the delimiters.
     // These carry the technical nouns of the sentence (identifiers,
@@ -716,12 +739,16 @@ class LISACompressor {
       return { text: s.trim(), score, index: i };
     });
     
+    // Recap-turn detection: turns with ≥3 numbered items hold consolidated
+    // answers/decisions. Retain all items instead of applying the normal budget.
+    const numberedItems = (text.match(/(?:^|\n)\s*\d+[.)]/g) || []).length;
+    const isRecap = numberedItems >= 3;
     // Adaptive sentence budget — "Got it" gets 1 sentence,
     // a 4000-char design turn gets 6. Flat 4 wasted slots on
     // trivial turns and starved substantive ones.
     const n = sentences.length;
-    const slots = n <= 3 ? Math.min(n, 2) : n <= 8 ? 3 : n <= 20 ? 4 : 6;
-    const charLimit = slots <= 2 ? 400 : slots <= 4 ? 800 : 1200;
+    const slots = isRecap ? Math.min(n, 12) : (n <= 3 ? Math.min(n, 2) : n <= 8 ? 3 : n <= 20 ? 4 : 6);
+    const charLimit = isRecap ? 2400 : (slots <= 2 ? 400 : slots <= 4 ? 800 : 1200);
     const top = scored.sort((a, b) => b.score - a.score).slice(0, slots);
     top.sort((a, b) => a.index - b.index);
     

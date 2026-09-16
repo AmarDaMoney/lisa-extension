@@ -29,9 +29,9 @@ const SemanticAnalyzer = {
   // Multilingual topic keywords
   topicKeywords: {
     security: {
-      en: ['security', 'vulnerab', 'exploit', 'attack', 'breach', 'auth', 'permission'],
-      fr: ['sécurité', 'vulnérab', 'exploit', 'attaque', 'faille', 'auth', 'permission'],
-      es: ['seguridad', 'vulnerab', 'exploit', 'ataque', 'brecha', 'auth', 'permiso'],
+      en: ['security', 'vulnerab', 'exploit', 'attack', 'breach'],
+      fr: ['sécurité', 'vulnérab', 'exploit', 'attaque', 'faille'],
+      es: ['seguridad', 'vulnerab', 'exploit', 'ataque', 'brecha'],
       ar: ['أمن', 'أمان', 'ثغرة', 'هجوم', 'اختراق'],
       de: ['sicherheit', 'schwachstelle', 'angriff', 'exploit'],
       zh: ['安全', '漏洞', '攻击', '入侵']
@@ -202,7 +202,7 @@ const SemanticAnalyzer = {
         const keywords = langKeywords[checkLang] || langKeywords['en'] || [];
         for (const keyword of keywords) {
           const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const re = new RegExp('\\b' + escaped, 'i');
+          const re = new RegExp('\\b' + escaped + '\\b', 'i');
           if (re.test(lower)) {
             hits++;
           }

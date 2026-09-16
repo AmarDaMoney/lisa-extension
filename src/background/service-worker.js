@@ -849,7 +849,7 @@ class LISACompressor {
     else if (techScore > 2   && emotionScore > 2) register = 'mixed';
     const coreTopic = compressed.metadata?.title ||
       (userTokens[0]?.summary || '').substring(0, 100).trim();
-    const sessionEvents = this.extractSessionEvents(tokens);
+    const sessionEvents = this.extractSessionEvents(tokens, rawMessages);
     // Shape session events by register — include only what's
     // meaningful for this conversation type.
     // Technical: files/decisions/open_tasks/constraints (full set)
@@ -886,7 +886,7 @@ class LISACompressor {
   // ── Session-Level Event Extractor (Tier 1) ──
   // Reads all summaries as a sequence and extracts structured events.
   // Universal: works across technical, support, research, and business sessions.
-  extractSessionEvents(tokens) {
+  extractSessionEvents(tokens, rawMessages) {
     const summaries = tokens.map(t => ({ role: t.role, index: t.index, text: t.summary || t.content || '' }));
 
     // ── Proposal → Confirmation detection ──
@@ -940,14 +940,14 @@ class LISACompressor {
     const open_tasks = openProposals.filter(p => p.at >= lastFiveTurnIndex).slice(0, 5);
 
     // ── Files changed: directory-prefixed + root-level files ──
-    const filePattern = /(?:^|\s)((?:src|lib|app|pages|components|utils|server|public|eval|templates|static)\/[\w\-\/]+\.(?:js|ts|jsx|tsx|json|css|html|py|md|txt|yaml|yml))/gm;
+    const filePattern = /(?:^|\s)((?:src|lib|app|pages|components|utils|server|public|eval|templates|static)\/[\w\-\/]+\.(?:json|jsx|tsx|js|ts|css|html|py|md|txt|yaml|yml)\b)/gm;
     // Root-level files: common names only — avoids false positives from
     // package names or variable references in prose. Whitelist approach
     // is safer than a broad regex.
-    const rootFilePattern = /(?:^|\s)((?:main|app|index|server|manage|setup|config|settings|wsgi|asgi|Makefile|Dockerfile|Procfile|nixpacks|requirements|package|package-lock|tsconfig|manifest|README|CHANGELOG|LICENSE|Gemfile|Cargo|Pipfile)\.(?:py|js|ts|json|toml|txt|yaml|yml|lock|md|cfg))/gm;
+    const rootFilePattern = /(?:^|\s)((?:main|app|index|server|manage|setup|config|settings|wsgi|asgi|Makefile|Dockerfile|Procfile|nixpacks|requirements|package|package-lock|tsconfig|manifest|README|CHANGELOG|LICENSE|Gemfile|Cargo|Pipfile)\.(?:json|py|js|ts|toml|txt|yaml|yml|lock|md|cfg)\b)/gm;
     // Bare filenames in markdown context: **popup.js**, `service-worker.js`
     // Summaries often strip directory prefixes but keep bold/backtick markers.
-    const bareFilePattern = /(?:\*\*|`)([\w][\w.-]*\.(?:js|ts|jsx|tsx|py|json|css|html|md|txt|yaml|yml))(?:\*\*|`)/gm;
+    const bareFilePattern = /(?:\*\*|`)([\w][\w.-]*\.(?:json|jsx|tsx|js|ts|py|css|html|md|txt|yaml|yml)\b)(?:\*\*|`)/gm;
     const fileSet = new Set();
     summaries.forEach(s => {
       const matches = s.text.match(filePattern);
@@ -960,6 +960,13 @@ class LISACompressor {
         fileSet.add(bareMatch[1]);
       }
     });
+
+    // Files from raw text (code blocks survive here but not in summaries)
+    if (rawMessages && typeof SemanticAnalyzer !== 'undefined') {
+      const allRawText = rawMessages.map(m => m.content || '').join('\n');
+      const rawFiles = SemanticAnalyzer.extractFilePaths(allRawText);
+      rawFiles.forEach(f => fileSet.add(f));
+    }
 
     // ── Constraints: universal markers ──
     const constraintPatterns = [

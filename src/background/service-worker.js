@@ -589,54 +589,15 @@ class LISACompressor {
         });
     });
 
-    // ── Entity aliasing: shorten repeated terms across summaries ──
-    // Scan all summaries for repeated identifiers (filenames, multi-word
-    // terms). Terms appearing 3+ times get aliased after first mention.
-    // Glossary travels with the export so the receiver can expand.
-    const aliasCounts = {};
-    compressed.semanticTokens.forEach(t => {
-      if (!t.summary) return;
-      // Filenames
-      const files = t.summary.match(/\b[\w][\w.-]*\.(?:js|ts|jsx|tsx|py|json|css|html|md|txt|yaml|yml)\b/g);
-      if (files) files.forEach(f => aliasCounts[f] = (aliasCounts[f] || 0) + 1);
-    });
-    // Build glossary for 3+ occurrence terms
-    const glossary = {};
-    const aliasMap = {};
-    Object.entries(aliasCounts)
-      .filter(([, c]) => c >= 3)
-      .sort((a, b) => b[1] - a[1])
-      .forEach(([term]) => {
-        // Generate short alias: first letter of each segment + extension
-        // service-worker.js → sw.js, semantic-analyzer.js → sa.js
-        const ext = term.match(/\.\w+$/)?.[0] || '';
-        const base = term.replace(/\.\w+$/, '');
-        const short = base.split(/[-_.]/).map(p => p[0] || '').join('') + ext;
-        // Only alias if short form is actually shorter and unambiguous
-        if (short.length < term.length - 2 && !glossary[short]) {
-          glossary[short] = term;
-          aliasMap[term] = short;
-        }
-      });
-    // Apply aliases to summaries — skip first mention of each term
-    if (Object.keys(aliasMap).length > 0) {
-      const seen = {};
-      compressed.semanticTokens.forEach(t => {
-        if (!t.summary) return;
-        Object.entries(aliasMap).forEach(([full, short]) => {
-          if (!seen[full]) {
-            // First occurrence: keep full, mark as seen
-            if (t.summary.includes(full)) seen[full] = true;
-          } else {
-            // Subsequent: replace with alias
-            t.summary = t.summary.split(full).join(short);
-          }
-        });
-      });
-    }
-    if (Object.keys(glossary).length > 0) {
-      compressed.glossary = glossary;
-    }
+    // ── Entity aliasing: PARKED (Sep 16 2026) ──
+    // Claude Code audit found aliasing actively harmful:
+    // - request.json() matched as filename → glossary entry r.json = request.json
+    // - Rewrites commands: python3 -m py_compile m.py
+    // - Runs before generateSemanticAnchor → corrupts files_changed
+    // - On current corpus, glossary lines cost more tokens than substitutions save
+    // Revisit only after: run after anchor; exclude code spans/commands/method calls;
+    // only alias when (mentions-1)*(fullLen-shortLen) > glossary line cost;
+    // only for NER entities or multi-word phrases >=12 chars.
 
     const originalSize = JSON.stringify(conversation).length;
     const compressedSize = JSON.stringify(compressed).length;

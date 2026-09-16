@@ -629,6 +629,10 @@ class LISACompressor {
     // delete itself and everything between - which corrupted the
     // State Snapshot whenever this code was discussed with an AI.
     text = text.replace(/^[ \t]*```[a-z0-9]*[ \t]*\r?$[\s\S]*?^[ \t]*```[ \t]*\r?$/gmi, ' ');
+    // Clean fence residue — orphan opening fences that had no closing pair,
+    // and blank-line runs left behind by stripped blocks.
+    text = text.replace(/^[ \t]*```[a-z0-9]*[ \t]*$/gm, '');
+    text = text.replace(/\n{3,}/g, '\n\n');
     // Re-inject extracted commit messages as scorable sentences
     if (extractedCommits.length > 0) {
       text = text + ' ' + extractedCommits.join('. ') + '.';
@@ -649,11 +653,25 @@ class LISACompressor {
     // "git handles this differently" is a sentence, not a command. Require
     // something command-shaped after it: a flag, a path, or a quoted arg.
     text = text.replace(/^\s*(?:sed|grep|python3?|node|git|cat|head|tail|wc|cd|bash)\s+(?:-{1,2}[a-z]|[.~/]|["'][^"']*["']|[a-z0-9_.-]+\.[a-z0-9]{1,4}\b).*/gmi, '');
+    // Collapse unfenced code/log dumps that bypass fence stripping.
+    // Grep output (Line NNN: / NNN:), tracebacks, raw code lines.
+    // Replace consecutive dump lines with a one-line description.
+    text = text.replace(/(?:^\s*(?:Line \d+:|\d+[:|]\s|\s{4,}\S|Traceback|File "|>>>).*(?:\n|$)){2,}/gm, (match) => {
+      const lines = match.trim().split('\n').filter(l => l.trim());
+      const first = lines[0].trim().substring(0, 60);
+      return '(showed ' + lines.length + ' lines: ' + first + '...). ';
+    });
     text = text.trim();
     // Deduplicate before scoring. A sentence repeated in the source -
     // a draft and its revision, a quoted reply - scores identically
     // twice and lands in the output twice, side by side.
     const seenSentence = new Set();
+    // Normalize list items and headings into sentence boundaries
+    // so the splitter treats each item as a separate sentence.
+    // Strip item markers (1. / - / * / ##) — they glue to the previous sentence otherwise.
+    text = text.replace(/\n\s*\d+[.)]+\s+/g, '. ');
+    text = text.replace(/\n\s*[-*•]\s+/g, '. ');
+    text = text.replace(/\n\s*#{1,4}\s+/g, '. ');
     // Split on sentence boundaries — not inside numbers (v0.51), abbreviations, or markdown
     const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z"*\[(`])/).filter(s => {
       const t = s.trim();

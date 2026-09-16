@@ -1994,11 +1994,18 @@ class LISAPopup {
 
       // Convert all selected to markdown and combine
       const markdownFiles = snapshots.map(snap => {
-        const md = (snap.rebirthHandoff || snap.raw?.rebirthHandoff)
-          ? (snap.rebirthHandoff || snap.raw.rebirthHandoff)
-          : snap.derived?.markdown
-          ? snap.derived.markdown
-          : (this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap));
+        let md;
+        if (snap.rebirthHandoff || snap.raw?.rebirthHandoff) {
+          md = snap.rebirthHandoff || snap.raw.rebirthHandoff;
+        } else if (snap.derived?.markdown) {
+          md = snap.derived.markdown;
+        } else if (snap.raw?.semanticTokens || snap.content?.semanticTokens || snap.semanticTokens) {
+          const compressed = snap.raw || snap.content || snap;
+          const rawMsgs = snap.capture?.messages || snap.messages || [];
+          md = buildMarkdownExport(compressed, rawMsgs);
+        } else {
+          md = this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
+        }
         const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
         return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.md', content: md };
       });
@@ -2281,10 +2288,10 @@ class LISAPopup {
       } else if (snapshot.derived?.markdown) {
         // Schema v2: use derived markdown directly
         markdown = snapshot.derived.markdown;
-      } else if (snapshot.raw?.semanticTokens || snapshot.semanticTokens) {
+      } else if (snapshot.raw?.semanticTokens || snapshot.content?.semanticTokens || snapshot.semanticTokens) {
         // Compressed snapshot: use optimized markdown builder.
         // 30-67% fewer tokens than JSON, same recall from receiving AI.
-        const compressed = snapshot.raw || snapshot;
+        const compressed = snapshot.raw || snapshot.content || snapshot;
         const rawMsgs = snapshot.capture?.messages || snapshot.messages || [];
         markdown = buildMarkdownExport(compressed, rawMsgs);
       } else {

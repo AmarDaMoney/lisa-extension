@@ -1040,7 +1040,7 @@ class LISAPopup {
           // that replace expensive NLP inference on the raw text
           const preComputedWork = entityCount + conceptCount + relationshipCount;
           // Measure what the user actually downloads (lean export), not the full compressedData
-          const _lean = this.buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || []);
+          const _lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || []);
           const enrichedTokenEstimate = Math.round((JSON.stringify(_lean.messages).length + JSON.stringify(_lean.anchor).length + JSON.stringify(_lean.semantic_anchors).length + JSON.stringify(_lean.session_metadata).length) / 4);
           // Inference reduction = pre-resolved signals (entities + concepts + relationships)
           // Each signal replaces ~3 tokens of AI inference work (entity resolution, disambiguation, etc.)
@@ -1333,126 +1333,7 @@ class LISAPopup {
     });
   }
 
-  /**
-   * Build the lean export payload from compressed data.
-   * Single source of truth for download and measurement paths.
-   * Returns { messages, anchor, semantic_anchors, session_metadata, isVerbatim }
-   */
-  buildLeanExport(compressedData, rawMessages) {
-    const leanTokens = (compressedData.semanticTokens || compressedData.compressed || []);
-    const leanMsgs = leanTokens.map(t => ({ role: t.role, index: t.index, summary: t.summary }));
 
-    // Compression gate: if lean >= raw, export verbatim
-    const rawMsgs = rawMessages || [];
-    const rawStr = JSON.stringify(rawMsgs.map(m => ({ role: m.role, index: m.index, content: m.content })));
-    const leanStr = JSON.stringify(leanMsgs);
-    const isVerbatim = leanStr.length >= rawStr.length && rawMsgs.length > 0;
-
-    const messages = isVerbatim
-      ? rawMsgs.map((m, i) => ({ role: m.role, index: i, content: m.content }))
-      : leanMsgs;
-
-    const semantic_anchors = Object.fromEntries(
-      Object.entries(compressedData.semantic_anchors || {}).map(([k, { content, ...rest }]) => {
-        const clean = {};
-        for (const [field, val] of Object.entries(rest)) {
-          if (val === null || val === undefined) continue;
-          if (Array.isArray(val) && val.length === 0) continue;
-          if (val === 'general') continue;
-          clean[field] = val;
-        }
-        return [k, clean];
-      })
-    );
-
-    return {
-      messages,
-      anchor: compressedData.anchor || '',
-      semantic_anchors,
-      session_metadata: compressedData.session_metadata || {},
-      isVerbatim
-    };
-  }
-
-  buildMarkdownExport(compressedData, rawMessages) {
-    const tokens = compressedData.semanticTokens || compressedData.compressed || [];
-    const anchor = compressedData.anchor || {};
-    const glossary = compressedData.glossary || {};
-
-    const lines = [];
-    lines.push('# LISA Handoff');
-    lines.push('');
-    const platform = compressedData.metadata?.platform || 'Unknown';
-    const title = compressedData.metadata?.title || '';
-    if (title) lines.push('> ' + title);
-    lines.push('> Platform: ' + platform + ' | Messages: ' + tokens.length);
-    lines.push('');
-
-    // Anchor — session context
-    lines.push('## Session Context');
-    if (anchor.core_topic) lines.push('- Topic: ' + anchor.core_topic);
-    if (anchor.session_register) lines.push('- Register: ' + anchor.session_register);
-    if (anchor.dominant_concepts) lines.push('- Key concepts: ' + anchor.dominant_concepts.join(', '));
-    if (anchor.key_entities) lines.push('- Entities: ' + anchor.key_entities.join(', '));
-
-    // Register-shaped events
-    const eventKeys = ['files_changed','decisions','open_tasks','constraints','conclusions','open_questions','resolutions','follow_ups'];
-    eventKeys.forEach(k => {
-      if (anchor[k] && (Array.isArray(anchor[k]) ? anchor[k].length > 0 : true)) {
-        const label = k.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
-        if (Array.isArray(anchor[k]) && typeof anchor[k][0] === 'string') {
-          lines.push('- ' + label + ': ' + anchor[k].join(', '));
-        } else if (Array.isArray(anchor[k])) {
-          lines.push('- ' + label + ':');
-          anchor[k].forEach(item => {
-            if (typeof item === 'object' && item.proposal) {
-              lines.push('  - ' + item.proposal);
-            } else if (typeof item === 'object' && item.text) {
-              lines.push('  - ' + item.text);
-            }
-          });
-        }
-      }
-    });
-    lines.push('');
-
-    // Glossary
-    if (Object.keys(glossary).length > 0) {
-      lines.push('## Glossary');
-      Object.entries(glossary).forEach(([short, full]) => {
-        lines.push('- ' + short + ' = ' + full);
-      });
-      lines.push('');
-    }
-
-    // Conversation
-    lines.push('## Conversation');
-    lines.push('');
-    tokens.forEach(t => {
-      const role = (t.role || 'user').charAt(0).toUpperCase() + (t.role || 'user').slice(1);
-      lines.push('### ' + role);
-      lines.push(t.summary || '');
-      lines.push('');
-    });
-
-    const md = lines.join('\n');
-
-    // Compression gate: compare vs verbatim markdown
-    const rawMsgs = rawMessages || [];
-    if (rawMsgs.length > 0) {
-      const verbatimLines = ['# LISA Handoff (verbatim)', ''];
-      rawMsgs.forEach(m => {
-        const role = (m.role || 'user').charAt(0).toUpperCase() + (m.role || 'user').slice(1);
-        verbatimLines.push('### ' + role);
-        verbatimLines.push(m.content || '');
-        verbatimLines.push('');
-      });
-      const verbatim = verbatimLines.join('\n');
-      if (verbatim.length < md.length) return verbatim;
-    }
-
-    return md;
-  }
 
   downloadJSON() {
     if (!this.compressedData) {
@@ -1472,7 +1353,7 @@ class LISAPopup {
     const title = (this.compressedData.metadata?.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
     const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
-    const lean = this.buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || []);
+    const lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || []);
 
     const downloadData = {
       _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensedturns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
@@ -2405,7 +2286,7 @@ class LISAPopup {
         // 30-67% fewer tokens than JSON, same recall from receiving AI.
         const compressed = snapshot.raw || snapshot;
         const rawMsgs = snapshot.capture?.messages || snapshot.messages || [];
-        markdown = this.buildMarkdownExport(compressed, rawMsgs);
+        markdown = buildMarkdownExport(compressed, rawMsgs);
       } else {
         // All other formats: wrap with structured header for AI consumption
         markdown = this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);

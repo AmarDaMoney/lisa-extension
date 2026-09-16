@@ -14,7 +14,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { loadLisa, pipeline, buildLeanExport } = require('./load-lisa');
+const { loadLisa, pipeline, buildLeanExport, buildMarkdownExport } = require('./load-lisa');
 const { count, MODEL } = require('./count');
 
 const TARGET = parseFloat(process.env.LISA_EVAL_TARGET || '0.95');
@@ -45,31 +45,31 @@ async function runCase(lisa, caseName) {
   const compressed = pipeline(lisa, raw);
   const lean = buildLeanExport(compressed, raw.messages);
   const leanText = JSON.stringify(lean, null, 2);
+  const mdText = buildMarkdownExport(compressed, raw.messages);
 
   // Save output for git-diff
   fs.writeFileSync(path.join(OUT, `${caseName}.json`), leanText);
+  fs.writeFileSync(path.join(OUT, `${caseName}.md`), mdText);
 
   // Count tokens
   const rawTokens = await count(rawText);
   const leanTokens = await count(leanText);
-  const ratio = (leanTokens / rawTokens).toFixed(3);
+  const mdTokens = await count(mdText);
+  const jsonRatio = (leanTokens / rawTokens).toFixed(3);
+  const mdRatio = (mdTokens / rawTokens).toFixed(3);
 
-  // Section breakdown
-  const sections = {};
-  sections.messages = await count(JSON.stringify(lean.messages || []));
-  sections.anchor = await count(JSON.stringify(lean.anchor || ''));
-  sections.semantic_anchors = await count(JSON.stringify(lean.semantic_anchors || {}));
-  sections.session_metadata = await count(JSON.stringify(lean.session_metadata || {}));
-  sections.other = leanTokens - Object.values(sections).reduce((a, b) => a + b, 0);
+  // TARGET gates on markdown — the actual handoff format
+  const ratio = parseFloat(mdRatio);
 
   const result = {
     case: caseName,
     messages: raw.messages.length,
     rawTokens,
     leanTokens,
-    ratio: parseFloat(ratio),
-    pass: parseFloat(ratio) <= TARGET,
-    sections
+    mdTokens,
+    jsonRatio: parseFloat(jsonRatio),
+    ratio,
+    pass: ratio <= TARGET,
   };
 
   // Reconstruction quality (opt-in)
@@ -78,7 +78,7 @@ async function runCase(lisa, caseName) {
     if (fs.existsSync(questionsPath)) {
       const judge = require('./judge');
       const questions = JSON.parse(fs.readFileSync(questionsPath, 'utf8'));
-      result.quality = await judge.evaluate(leanText, questions);
+      result.quality = await judge.evaluate(mdText, questions);
     } else {
       result.quality = { note: 'no questions.json' };
     }
@@ -128,11 +128,7 @@ async function main() {
       if (r) {
         results.push(r);
         const status = r.pass ? '✓' : '✗';
-        console.log(`${status} ${r.messages} msgs | ${r.rawTokens} raw → ${r.leanTokens} lean | ratio ${r.ratio}`);
-
-        // Section breakdown
-        const s = r.sections;
-        console.log(`    messages: ${s.messages}  anchor: ${s.anchor}  anchors: ${s.semantic_anchors}  meta: ${s.session_metadata}`);
+        console.log(`${status} ${r.messages} msgs | ${r.rawTokens} raw → ${r.mdTokens} md (${r.ratio}) | json ${r.leanTokens} (${r.jsonRatio})`);
 
         if (r.quality && r.quality.recall !== undefined) {
           console.log(`    quality: recall=${r.quality.recall} hallucination=${r.quality.hallucination} missing=${r.quality.missing}`);

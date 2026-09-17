@@ -1999,8 +1999,8 @@ class LISAPopup {
           md = snap.rebirthHandoff || snap.raw.rebirthHandoff;
         } else if (snap.derived?.markdown) {
           md = snap.derived.markdown;
-        } else if (snap.raw?.semanticTokens || snap.content?.semanticTokens || snap.semanticTokens) {
-          const compressed = snap.raw || snap.content || snap;
+        } else if (snap.raw?.content?.semanticTokens || snap.raw?.semanticTokens || snap.content?.semanticTokens || snap.semanticTokens) {
+          const compressed = snap.raw?.content || snap.raw || snap.content || snap;
           const rawMsgs = snap.capture?.messages || snap.messages || [];
           md = buildMarkdownExport(compressed, rawMsgs);
         } else {
@@ -2280,6 +2280,13 @@ class LISAPopup {
         return;
       }
 
+      // DEBUG: remove after investigating inject path
+      console.log('[LISA DEBUG inject] snapshot keys:', Object.keys(snapshot));
+      console.log('[LISA DEBUG inject] snapshot.format:', snapshot.format);
+      console.log('[LISA DEBUG inject] has raw?', !!snapshot.raw, snapshot.raw ? Object.keys(snapshot.raw) : 'N/A');
+      console.log('[LISA DEBUG inject] has content?', !!snapshot.content, snapshot.content ? Object.keys(snapshot.content) : 'N/A');
+      console.log('[LISA DEBUG inject] has semanticTokens?', !!snapshot.semanticTokens);
+      console.log('[LISA DEBUG inject] has derived?', !!snapshot.derived, snapshot.derived ? Object.keys(snapshot.derived) : 'N/A');
       // Use format-appropriate markdown for injection
       let markdown;
       if (snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff) {
@@ -2288,10 +2295,10 @@ class LISAPopup {
       } else if (snapshot.derived?.markdown) {
         // Schema v2: use derived markdown directly
         markdown = snapshot.derived.markdown;
-      } else if (snapshot.raw?.semanticTokens || snapshot.content?.semanticTokens || snapshot.semanticTokens) {
+      } else if (snapshot.raw?.content?.semanticTokens || snapshot.raw?.semanticTokens || snapshot.content?.semanticTokens || snapshot.semanticTokens) {
         // Compressed snapshot: use optimized markdown builder.
         // 30-67% fewer tokens than JSON, same recall from receiving AI.
-        const compressed = snapshot.raw || snapshot.content || snapshot;
+        const compressed = snapshot.raw?.content || snapshot.raw || snapshot.content || snapshot;
         const rawMsgs = snapshot.capture?.messages || snapshot.messages || [];
         markdown = buildMarkdownExport(compressed, rawMsgs);
       } else {

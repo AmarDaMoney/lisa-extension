@@ -1983,9 +1983,14 @@ class LISAPopup {
     if (checked.length === 0) return;
 
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'getSnapshots' });
       const ids = [...checked].map(cb => cb.dataset.id);
-      const snapshots = ids.map(id => response.snapshots.find(s => s.id === id)).filter(Boolean);
+      // Fetch full snapshots — getSnapshots returns lightweight objects
+      // without raw.content, so buildMarkdownExport would get empty data.
+      const snapshots = [];
+      for (const id of ids) {
+        const resp = await chrome.runtime.sendMessage({ action: 'getFullSnapshot', id });
+        if (resp?.snapshot) snapshots.push(resp.snapshot);
+      }
 
       if (snapshots.length === 0) {
         alert('No matching snapshots found');

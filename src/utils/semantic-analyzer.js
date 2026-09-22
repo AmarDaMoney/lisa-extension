@@ -147,7 +147,7 @@ const SemanticAnalyzer = {
     { regex: /\bnpm\s+(install|run|build|test)\b[^.;\n]{0,40}/gi, type: 'npm' }
   ],
 
-  filePattern: /(?:^|\s)((?:src|lib|app|pages|components|utils|server|public)\/[\w\-\/]+\.(?:js|ts|jsx|tsx|json|css|html|py|md))/gm,
+  filePattern: /(?:^|\s)((?:src|lib|app|pages|components|utils|server|public)\/[\w\-\/]+\.(?:json|jsx|tsx|js|ts|css|html|py|md)\b)/gm,
 
   gitRefPattern: /\b(?:branch|commit|origin\/)([\w\-\/]+)\b/gi,
 

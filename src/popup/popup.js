@@ -2298,6 +2298,9 @@ class LISAPopup {
       console.log('[LISA inject-debug] raw.content keys:', snapshot.raw?.content ? Object.keys(snapshot.raw.content) : 'no raw.content');
       console.log('[LISA inject-debug] has derived.markdown:', !!snapshot.derived?.markdown);
       console.log('[LISA inject-debug] has semanticTokens at any path:', !!(snapshot.raw?.content?.semanticTokens || snapshot.raw?.semanticTokens || snapshot.content?.semanticTokens || snapshot.semanticTokens));
+      console.log('[LISA inject-debug] format:', snapshot.format);
+      console.log('[LISA inject-debug] has .messages?', !!(snapshot.messages), snapshot.messages?.length);
+      console.log('[LISA inject-debug] has .metadata?', !!(snapshot.metadata), snapshot.metadata ? Object.keys(snapshot.metadata) : '-');
       let markdown;
       if (snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff) {
         // Rebirth: use the handoff markdown directly

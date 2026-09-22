@@ -1230,13 +1230,17 @@ class LISAPopup {
         // Use real tiktoken counts from backend when available, fallback to estimate
         const backendStats = data.stats || {};
         const rawTokens = backendStats.original_tokens || Math.round(conversationText.length / 3.5);
-        const enrichedTokens = backendStats.compressed_tokens || Math.round(JSON.stringify(aiToken).length / 3.5);
+        // Show markdown token estimate — what actually gets injected
+        const compressed = this.compressedData;
+        const rawMsgs = this.currentConversation?.messages || [];
+        const mdText = buildMarkdownExport(compressed, rawMsgs);
+        const mdTokens = Math.round(mdText.length / 3.5);
         const isExact = !!backendStats.original_tokens;
         document.getElementById('rawTokens').textContent = (isExact ? '' : '~') + rawTokens.toLocaleString();
-        document.getElementById('enrichedTokens').textContent = (isExact ? '' : '~') + enrichedTokens.toLocaleString();
-        const saved = Math.max(0, rawTokens - enrichedTokens);
+        document.getElementById('enrichedTokens').textContent = '~' + mdTokens.toLocaleString();
+        const saved = Math.max(0, rawTokens - mdTokens);
         const savePct = rawTokens > 0 ? Math.round(saved / rawTokens * 100) : 0;
-        document.getElementById('tokensSaved').textContent = (isExact ? '' : '~') + saved.toLocaleString() + ' tokens (' + savePct + '%)';
+        document.getElementById('tokensSaved').textContent = '~' + saved.toLocaleString() + ' tokens (' + savePct + '%)';
         document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
         document.getElementById('hashingSection').style.display = 'block';

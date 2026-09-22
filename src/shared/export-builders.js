@@ -91,7 +91,15 @@ function buildMarkdownExport(compressed, rawMessages) {
   if (anchor.core_topic) lines.push('- Topic: ' + anchor.core_topic);
   if (anchor.session_register) lines.push('- Register: ' + anchor.session_register);
   if (anchor.dominant_concepts) lines.push('- Key concepts: ' + anchor.dominant_concepts.join(', '));
-  if (anchor.key_entities) lines.push('- Entities: ' + anchor.key_entities.join(', '));
+  if (anchor.key_entities) {
+    const entityNoise = new Set(['WARNING','ERROR','SYNTAX','WINDOW','DAMPING','ITERATIONS',
+      'NULL','TRUE','FALSE','TODO','FIXME','HACK','NOTE','DEBUG','INFO','WARN','LOG',
+      'GET','POST','PUT','DELETE','PATCH','HEAD','OPTIONS',
+      'SELECT','INSERT','UPDATE','DROP','CREATE','ALTER','WHERE','FROM',
+      'AssertionError','AssertionError','TypeError','ReferenceError','SyntaxError']);
+    const clean = anchor.key_entities.filter(e => !entityNoise.has(e) && !e.startsWith('@'));
+    if (clean.length > 0) lines.push('- Entities: ' + clean.join(', '));
+  }
 
   // Register-shaped events
   const eventKeys = ['files_changed','decisions','open_tasks','constraints','conclusions','open_questions','resolutions','follow_ups'];
@@ -129,8 +137,8 @@ function buildMarkdownExport(compressed, rawMessages) {
   lines.push('## Conversation');
   lines.push('');
   tokens.forEach(t => {
-    const role = (t.role || 'user').charAt(0).toUpperCase() + (t.role || 'user').slice(1);
-    lines.push('### ' + role);
+    const tag = (t.role || 'user') === 'user' ? 'U' : 'A';
+    lines.push(tag + ':');
     lines.push(t.summary || '');
     lines.push('');
   });
@@ -141,8 +149,8 @@ function buildMarkdownExport(compressed, rawMessages) {
   if (rawMessages && rawMessages.length > 0) {
     const verbatimLines = ['# LISA Handoff (verbatim)', ''];
     rawMessages.forEach(m => {
-      const role = (m.role || 'user').charAt(0).toUpperCase() + (m.role || 'user').slice(1);
-      verbatimLines.push('### ' + role);
+      const tag = (m.role || 'user') === 'user' ? 'U' : 'A';
+      verbatimLines.push(tag + ':');
       verbatimLines.push(m.content || '');
       verbatimLines.push('');
     });

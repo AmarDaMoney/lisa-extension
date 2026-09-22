@@ -34,6 +34,7 @@ async function ask(payload, question) {
       ]
     }]
   });
+  if (r.stop_reason !== 'end_turn') console.warn('[judge] ask truncated:', r.stop_reason);
   return r.content.map(b => b.text || '').join('').trim();
 }
 
@@ -50,6 +51,7 @@ async function grade(question, expected, got) {
         content: `Question: ${question}\nExpected: ${expected}\nAnswer: ${got}\nReply with one word: CORRECT, WRONG, or MISSING (if answer was NOT IN FILE).`
       }]
     });
+    if (r.stop_reason !== 'end_turn') console.warn('[judge] grade truncated:', r.stop_reason);
     const v = r.content.map(b => b.text || '').join('').trim().toUpperCase();
     if (v.includes('CORRECT')) votes.push('CORRECT');
     else if (v.includes('WRONG')) votes.push('WRONG');

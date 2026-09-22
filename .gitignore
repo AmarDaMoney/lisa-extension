@@ -1,12 +1,12 @@
-public/misc/
-node_modules/
-server/node_modules/
-*.log
-*.bak
-.env
-.env.*
-*.zip
 
 # Eval harness — local data
+*.bak
+*.log
+*.zip
+.env
+.env.*
 eval/counts.json
 eval/out/
+node_modules/
+public/misc/
+server/node_modules/

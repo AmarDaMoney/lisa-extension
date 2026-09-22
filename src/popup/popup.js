@@ -2299,6 +2299,10 @@ class LISAPopup {
       console.log('[LISA inject-debug] has derived.markdown:', !!snapshot.derived?.markdown);
       console.log('[LISA inject-debug] has semanticTokens at any path:', !!(snapshot.raw?.content?.semanticTokens || snapshot.raw?.semanticTokens || snapshot.content?.semanticTokens || snapshot.semanticTokens));
       console.log('[LISA inject-debug] format:', snapshot.format);
+      console.log('[LISA inject-debug] capture keys:', snapshot.capture ? JSON.stringify(Object.keys(snapshot.capture)) : 'no capture');
+      console.log('[LISA inject-debug] capture.messages?', !!(snapshot.capture?.messages), snapshot.capture?.messages?.length);
+      console.log('[LISA inject-debug] capture.semanticTokens?', !!(snapshot.capture?.semanticTokens), snapshot.capture?.semanticTokens?.length);
+      console.log('[LISA inject-debug] capture.metadata?', !!(snapshot.capture?.metadata), snapshot.capture?.metadata ? JSON.stringify(Object.keys(snapshot.capture.metadata)) : '-');
       console.log('[LISA inject-debug] has .messages?', !!(snapshot.messages), snapshot.messages?.length);
       console.log('[LISA inject-debug] has .metadata?', !!(snapshot.metadata), snapshot.metadata ? Object.keys(snapshot.metadata) : '-');
       let markdown;

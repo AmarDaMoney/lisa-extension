@@ -2009,7 +2009,7 @@ class LISAPopup {
         } else if (snap.format === 'compressed' || snap.format === 'ai-compressed' || snap.raw?.content?.semanticTokens || snap.raw?.semanticTokens || snap.content?.semanticTokens || snap.semanticTokens) {
           // format-gated: snapshot itself has messages+anchor at top level
           // semanticTokens-gated: compressed data may be nested in raw.content
-          const compressed = (snap.format === 'compressed' || snap.format === 'ai-compressed') ? snap : (snap.raw?.content || snap.raw || snap.content || snap);
+          const compressed = (snap.format === 'compressed' || snap.format === 'ai-compressed') ? (snap.capture || snap) : (snap.raw?.content || snap.raw || snap.content || snap);
           const rawMsgs = snap.capture?.messages || [];
           md = buildMarkdownExport(compressed, rawMsgs);
         } else if (snap.derived?.markdown) {
@@ -2309,7 +2309,7 @@ class LISAPopup {
         // Compressed snapshot: use optimized markdown builder.
         // 30-67% fewer tokens than JSON, same recall from receiving AI.
         // format-gated: snapshot itself has messages+anchor at top level
-        const compressed = (snapshot.format === 'compressed' || snapshot.format === 'ai-compressed') ? snapshot : (snapshot.raw?.content || snapshot.raw || snapshot.content || snapshot);
+        const compressed = (snapshot.format === 'compressed' || snapshot.format === 'ai-compressed') ? (snapshot.capture || snapshot) : (snapshot.raw?.content || snapshot.raw || snapshot.content || snapshot);
         const rawMsgs = snapshot.capture?.messages || [];
         markdown = buildMarkdownExport(compressed, rawMsgs);
       } else if (snapshot.derived?.markdown) {

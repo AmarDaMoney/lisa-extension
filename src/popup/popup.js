@@ -2293,7 +2293,7 @@ class LISAPopup {
 
       // DEBUG: remove after investigating inject path
       // Use format-appropriate markdown for injection
-      console.log('[LISA inject-debug] keys:', Object.keys(snapshot));
+      console.log('[LISA inject-debug] keys:', JSON.stringify(Object.keys(snapshot)));
       console.log('[LISA inject-debug] raw keys:', snapshot.raw ? Object.keys(snapshot.raw) : 'no raw');
       console.log('[LISA inject-debug] raw.content keys:', snapshot.raw?.content ? Object.keys(snapshot.raw.content) : 'no raw.content');
       console.log('[LISA inject-debug] has derived.markdown:', !!snapshot.derived?.markdown);

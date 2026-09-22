@@ -13,7 +13,7 @@
  * Returns the full download-ready object including compression gate.
  */
 function buildLeanExport(compressed, rawMessages) {
-  const tokens = compressed.semanticTokens || compressed.compressed || [];
+  const tokens = compressed.semanticTokens || compressed.messages || compressed.compressed || [];
   const messages = tokens.map(t => ({
     role: t.role,
     index: t.index,
@@ -71,7 +71,7 @@ function buildLeanExport(compressed, rawMessages) {
  * far more efficiently than nested JSON keys/brackets.
  */
 function buildMarkdownExport(compressed, rawMessages) {
-  const tokens = compressed.semanticTokens || compressed.compressed || [];
+  const tokens = compressed.semanticTokens || compressed.messages || compressed.compressed || [];
   const anchor = compressed.anchor || {};
   const glossary = compressed.glossary || {};
 

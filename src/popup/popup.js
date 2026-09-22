@@ -2293,18 +2293,6 @@ class LISAPopup {
 
       // DEBUG: remove after investigating inject path
       // Use format-appropriate markdown for injection
-      console.log('[LISA inject-debug] keys:', JSON.stringify(Object.keys(snapshot)));
-      console.log('[LISA inject-debug] raw keys:', snapshot.raw ? Object.keys(snapshot.raw) : 'no raw');
-      console.log('[LISA inject-debug] raw.content keys:', snapshot.raw?.content ? Object.keys(snapshot.raw.content) : 'no raw.content');
-      console.log('[LISA inject-debug] has derived.markdown:', !!snapshot.derived?.markdown);
-      console.log('[LISA inject-debug] has semanticTokens at any path:', !!(snapshot.raw?.content?.semanticTokens || snapshot.raw?.semanticTokens || snapshot.content?.semanticTokens || snapshot.semanticTokens));
-      console.log('[LISA inject-debug] format:', snapshot.format);
-      console.log('[LISA inject-debug] capture keys:', snapshot.capture ? JSON.stringify(Object.keys(snapshot.capture)) : 'no capture');
-      console.log('[LISA inject-debug] capture.messages?', !!(snapshot.capture?.messages), snapshot.capture?.messages?.length);
-      console.log('[LISA inject-debug] capture.semanticTokens?', !!(snapshot.capture?.semanticTokens), snapshot.capture?.semanticTokens?.length);
-      console.log('[LISA inject-debug] capture.metadata?', !!(snapshot.capture?.metadata), snapshot.capture?.metadata ? JSON.stringify(Object.keys(snapshot.capture.metadata)) : '-');
-      console.log('[LISA inject-debug] has .messages?', !!(snapshot.messages), snapshot.messages?.length);
-      console.log('[LISA inject-debug] has .metadata?', !!(snapshot.metadata), snapshot.metadata ? Object.keys(snapshot.metadata) : '-');
       let markdown;
       if (snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff) {
         // Rebirth: use the handoff markdown directly

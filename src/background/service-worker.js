@@ -589,6 +589,22 @@ class LISACompressor {
         });
     });
 
+    // ── Step 6: Global trim pass ──
+    // Short noise turns (confirmations, 'ok', syntax checks) retain 74% of
+    // their chars in per-turn summarize but carry near-zero recall signal.
+    // Trim them post-hoc to reclaim ~25% of summary output.
+    const shortConfirm = /^(?:ok|okay|got it|thanks|yes|no|sure|right|correct|alright|perfect|great|good|noted|ack|mt|lgtm|ty|thx|yep|yup|nope|k)[.!,]?$/i;
+    compressed.semanticTokens.forEach((token, idx) => {
+      const raw = conversation.messages[idx];
+      const content = raw?.content || raw?.v || '';
+      const trimmed = content.trim();
+      // Short confirmations → empty
+      if (shortConfirm.test(trimmed)) {
+        token.summary = '';
+        return;
+      }
+    });
+
     // ── Entity aliasing: PARKED (Sep 16 2026) ──
     // Claude Code audit found aliasing actively harmful:
     // - request.json() matched as filename → glossary entry r.json = request.json

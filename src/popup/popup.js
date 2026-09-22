@@ -2007,8 +2007,10 @@ class LISAPopup {
         if (snap.rebirthHandoff || snap.raw?.rebirthHandoff) {
           md = snap.rebirthHandoff || snap.raw.rebirthHandoff;
         } else if (snap.format === 'compressed' || snap.format === 'ai-compressed' || snap.raw?.content?.semanticTokens || snap.raw?.semanticTokens || snap.content?.semanticTokens || snap.semanticTokens) {
-          const compressed = snap.raw?.content || snap.raw || snap.content || snap;
-          const rawMsgs = snap.capture?.messages || snap.messages || [];
+          // format-gated: snapshot itself has messages+anchor at top level
+          // semanticTokens-gated: compressed data may be nested in raw.content
+          const compressed = (snap.format === 'compressed' || snap.format === 'ai-compressed') ? snap : (snap.raw?.content || snap.raw || snap.content || snap);
+          const rawMsgs = snap.capture?.messages || [];
           md = buildMarkdownExport(compressed, rawMsgs);
         } else if (snap.derived?.markdown) {
           md = snap.derived.markdown;
@@ -2303,8 +2305,9 @@ class LISAPopup {
       } else if (snapshot.format === 'compressed' || snapshot.format === 'ai-compressed' || snapshot.raw?.content?.semanticTokens || snapshot.raw?.semanticTokens || snapshot.content?.semanticTokens || snapshot.semanticTokens) {
         // Compressed snapshot: use optimized markdown builder.
         // 30-67% fewer tokens than JSON, same recall from receiving AI.
-        const compressed = snapshot.raw?.content || snapshot.raw || snapshot.content || snapshot;
-        const rawMsgs = snapshot.capture?.messages || snapshot.messages || [];
+        // format-gated: snapshot itself has messages+anchor at top level
+        const compressed = (snapshot.format === 'compressed' || snapshot.format === 'ai-compressed') ? snapshot : (snapshot.raw?.content || snapshot.raw || snapshot.content || snapshot);
+        const rawMsgs = snapshot.capture?.messages || [];
         markdown = buildMarkdownExport(compressed, rawMsgs);
       } else if (snapshot.derived?.markdown) {
         // Schema v2: use derived markdown directly (legacy non-compressed)

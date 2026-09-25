@@ -474,6 +474,86 @@ class LisaProgressiveCapture {
       return { success: true, method: 'fileInput', count: fileObjects.length };
     }
 
+    // Strategy 1.5: Gemini file-input materialization
+    // Gemini hides input[type=file] until the upload button is clicked,
+    // possibly inside shadow DOM. We (a) deep-search shadow roots,
+    // (b) click the upload button while intercepting the native dialog,
+    // then use the standard DataTransfer injection from Strategy 1.
+    const isGemini = /gemini\.google/.test(window.location.hostname);
+    let interceptedInput = null;
+    if (isGemini && !fileInput) {
+      // (a) Deep search including shadow DOM
+      const deepFind = (root) => {
+        const inp = root.querySelector('input[type="file"]');
+        if (inp) return inp;
+        for (const el of root.querySelectorAll('*')) {
+          if (el.shadowRoot) {
+            const found = deepFind(el.shadowRoot);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      fileInput = deepFind(document);
+
+      // (b) Two-step menu: click "+" button → click attach_file in menu
+      // Selectors are icon-based (language-independent) since Gemini
+      // localizes aria-labels (e.g. "Importation et outils" in French).
+      if (!fileInput) {
+        // Step 1: Click the "+" tools button (mat-icon "plus")
+        const plusIcon = document.querySelector('mat-icon[data-mat-icon-name="plus"]');
+        const plusBtn = plusIcon && plusIcon.closest('button');
+        if (plusBtn) {
+          plusBtn.click();
+          await new Promise(r => setTimeout(r, 400));
+
+          // Step 2: Click the attach/file option in the opened menu
+          // Look for mat-icon "attach_file" or "upload_file" in the menu
+          const attachIcon = document.querySelector(
+            'mat-icon[data-mat-icon-name="attach_file"], ' +
+            'mat-icon[data-mat-icon-name="upload_file"], ' +
+            'mat-icon[data-mat-icon-name="upload"]'
+          );
+          const attachBtn = attachIcon && (attachIcon.closest('button') || attachIcon.closest('[role="menuitem"]') || attachIcon.parentElement);
+          if (attachBtn) {
+            // Intercept HTMLInputElement.click to suppress native file dialog
+            const origClick = HTMLInputElement.prototype.click;
+            interceptedInput = null;
+            HTMLInputElement.prototype.click = function () {
+              if (this.type === 'file') { interceptedInput = this; return; }
+              return origClick.call(this);
+            };
+
+            attachBtn.click();
+            await new Promise(r => setTimeout(r, 400));
+
+            HTMLInputElement.prototype.click = origClick;
+
+            fileInput = interceptedInput
+              || document.querySelector('input[type="file"]')
+              || deepFind(document);
+          }
+
+          // Close the menu if we didn't find a file input
+          if (!fileInput) {
+            document.body.click();
+            await new Promise(r => setTimeout(r, 100));
+          }
+        }
+      }
+
+      if (fileInput) {
+        const dt = new DataTransfer();
+        fileObjects.forEach(f => dt.items.add(f));
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+        console.log('[LISA] Gemini file injection succeeded via', interceptedInput ? 'intercepted-click' : 'deep-search');
+        return { success: true, method: 'gemini-fileInput', count: fileObjects.length };
+      }
+      console.log('[LISA] Gemini: no file input found, falling through to clipboard');
+    }
+
     // Strategy 2: Simulate drag-and-drop on the chat input area
     // Skip on platforms that drop synthetic events (isTrusted guard)
     const noSyntheticDrop = /gemini\.google|chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);

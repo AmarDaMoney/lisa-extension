@@ -20,11 +20,12 @@ class LisaProgressiveCapture {
 
   async init() {
     const { progressiveCaptureMode } = await chrome.storage.sync.get('progressiveCaptureMode');
-    this.mode = progressiveCaptureMode || 'on';
+    this.mode = progressiveCaptureMode || 'auto';
     this.conversationId = this.getConversationId();
 
     if (this.mode !== 'off') {
       await this.loadBuffer();
+      this.pruneStaleBuffers();
       this.startObserver();
       if (this.mode === 'on') {
         this.active = true;
@@ -214,6 +215,19 @@ class LisaProgressiveCapture {
     if (this.conversationId) {
       await chrome.storage.local.remove(`lisa-progressive-${this.conversationId}`);
     }
+  }
+
+  // Buffers for past conversations are otherwise never revisited — sweep
+  // expired ones (same 7-day TTL as loadBuffer) so storage doesn't grow forever.
+  async pruneStaleBuffers() {
+    try {
+      const all = await chrome.storage.local.get(null);
+      const staleKeys = Object.keys(all).filter(key =>
+        key.startsWith('lisa-progressive-') &&
+        Date.now() - (all[key]?.ts || 0) > 7 * 24 * 60 * 60 * 1000
+      );
+      if (staleKeys.length > 0) await chrome.storage.local.remove(staleKeys);
+    } catch (_) {}
   }
 
   async setMode(mode) {

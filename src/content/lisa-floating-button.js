@@ -363,6 +363,7 @@ class LISAFloatingButton {
 
     // Build ACM status line
     let acmStatusHtml = '';
+    let acmMarkRefreshedHtml = '';
     const acm = window.__lisaACM;
     if (acm) {
       const status = acm.getStatus();
@@ -370,19 +371,23 @@ class LISAFloatingButton {
       const levelLabels = { green: 'Healthy', yellow: 'Building pressure', red: 'Refresh recommended', critical: 'Context degrading' };
       const dotColor = levelColors[status.healthLevel] || '#4ade80';
       const label = levelLabels[status.healthLevel] || 'Healthy';
+      const countLabel = status.baselineCount > 0
+        ? `${status.totalMessageCount} msgs total · ${status.messageCount} since refresh`
+        : `${status.totalMessageCount} msgs`;
       acmStatusHtml = `
         <div class="lisa-menu-acm-status" title="ACM Context Health">
           <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:6px;vertical-align:middle;"></span>
-          <span style="color:#9ca3af;font-size:12px;">${status.messageCount} msgs · ~${status.tokenEstimate.toLocaleString()} tokens · ${label}</span>
+          <span style="color:#9ca3af;font-size:12px;">${countLabel} · ~${status.tokenEstimate.toLocaleString()} tokens · ${label}</span>
         </div>
       `;
+      acmMarkRefreshedHtml = `<div class="lisa-menu-item" data-action="acm-mark-refreshed" title="Reset the context health clock after you've refreshed/compressed this conversation — the total message count is kept">🔄 Mark context refreshed</div>`;
     }
 
     menu.innerHTML = `
       ${acmStatusHtml}
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
-
+      ${acmMarkRefreshedHtml}
     `;
     
     // Position near the button
@@ -408,6 +413,7 @@ class LISAFloatingButton {
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
+      else if (action === "acm-mark-refreshed") window.__lisaACM?.markRefreshed();
     });
     
     // Close on outside click

@@ -180,6 +180,10 @@ class LisaProgressiveCapture {
           }
         }
       }
+      // Let other content scripts (e.g. acm-monitor.js) react to DOM
+      // activity without each running their own MutationObserver on the
+      // same subtree.
+      document.dispatchEvent(new CustomEvent('lisa-dom-activity'));
     });
 
     this.observer.observe(root, { childList: true, subtree: true });

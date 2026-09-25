@@ -5,18 +5,31 @@
 // rendering) replace already-counted nodes while streaming, which made a
 // per-node-identity/incremental design overcount. A rescan-and-diff design
 // is self-healing: it can never drift, and it needs no second
-// MutationObserver running alongside lisa-progressive.js's.
+// MutationObserver running alongside lisa-progressive.js's — it instead
+// listens for the 'lisa-dom-activity' event that observer already fires.
+//
+// Tracks two numbers, on purpose:
+//   totalMessageCount — the whole conversation, including messages from
+//     before ACM was watching (merged with lisa-progressive's buffer,
+//     which is the only thing that survives virtualised platforms
+//     unmounting old messages).
+//   effective count (total - baselineCount) — what actually drives the
+//     health dot. baselineCount is a marker set by markRefreshed(), so a
+//     context refresh/compression resets the health clock without losing
+//     the "how long has this conversation really been" number.
 // Zero new dependencies.
 
 const ACMMonitor = {
   // State
-  messageCount: 0,
+  totalMessageCount: 0,
   tokenEstimate: 0,
+  baselineCount: 0,
   conversationId: null,
   seenHashes: null, // Map<hash, charLength> for the current conversation
   _lastUrl: null,
   _rescanTimer: null,
   _pollTimer: null,
+  _domActivityTimer: null,
   _lastCheckpointAt: 0,
 
   // Thresholds (configurable via chrome.storage.sync)
@@ -51,9 +64,17 @@ const ACMMonitor = {
     this._rescan();
     this._pruneStaleState();
 
-    // Periodic rescan instead of a second MutationObserver — the health
-    // indicator doesn't need sub-second precision, so polling every few
-    // seconds is both cheaper and immune to the node-replacement bug above.
+    // Primary trigger: lisa-progressive.js's existing MutationObserver
+    // dispatches this on every batch of DOM activity, so we react within a
+    // few hundred ms of a new message instead of waiting for the poll.
+    // Debounced because a streaming reply fires many mutations in a row.
+    document.addEventListener('lisa-dom-activity', () => {
+      clearTimeout(this._domActivityTimer);
+      this._domActivityTimer = setTimeout(() => this._rescan(), 500);
+    });
+
+    // Fallback poll for platforms/moments the event doesn't cover (e.g.
+    // progressive capture is off, or a mutation landed outside `main`).
     this._pollTimer = setInterval(() => this._rescan(), 4000);
 
     this._watchNavigation();
@@ -68,12 +89,18 @@ const ACMMonitor = {
       }
       if (msg.action === 'acm_resetMonitor') {
         this.seenHashes = new Map();
-        this.messageCount = 0;
+        this.totalMessageCount = 0;
         this.tokenEstimate = 0;
+        this.baselineCount = 0;
         this._lastCheckpointAt = 0;
         this._saveState();
         this._updateDot();
         sendResponse({ success: true });
+        return false;
+      }
+      if (msg.action === 'acm_markRefreshed') {
+        this.markRefreshed();
+        sendResponse({ success: true, status: this.getStatus() });
         return false;
       }
     });
@@ -151,6 +178,9 @@ const ACMMonitor = {
 
   // Rescans the DOM from scratch and rebuilds seenHashes. Authoritative —
   // never drifts, since it doesn't depend on which mutation events fired.
+  // Merges in lisa-progressive.js's buffer (same content-hash scheme) so
+  // that on virtualised platforms, messages the DOM has already unmounted
+  // still count toward the conversation's true total.
   _rescan() {
     const selector = this._getMessageSelector();
     const elements = document.querySelectorAll(selector);
@@ -165,13 +195,20 @@ const ACMMonitor = {
       freshHashes.set(hash, text.length);
     }
 
+    const buffer = window.lisaProgressive?.buffer;
+    if (buffer) {
+      for (const [hash, block] of buffer) {
+        if (!freshHashes.has(hash)) freshHashes.set(hash, (block.v || '').length);
+      }
+    }
+
     const changed = freshHashes.size !== this.seenHashes.size;
     this.seenHashes = freshHashes;
 
     let charTotal = 0;
     for (const len of freshHashes.values()) charTotal += len;
 
-    this.messageCount = freshHashes.size;
+    this.totalMessageCount = freshHashes.size;
     this.tokenEstimate = Math.round(charTotal / 3.5);
 
     if (changed) {
@@ -181,16 +218,35 @@ const ACMMonitor = {
     }
   },
 
+  // messages since the last context refresh — this is what health is based on
+  getEffectiveCount() {
+    return Math.max(0, this.totalMessageCount - this.baselineCount);
+  },
+
+  // Called when a context refresh/compression happens for this
+  // conversation (manually today via the floating-button menu; Phase 3's
+  // automatic inject flow will call this too). Resets the health clock
+  // without losing the running total.
+  markRefreshed() {
+    this.baselineCount = this.totalMessageCount;
+    this._lastCheckpointAt = 0;
+    this._saveState();
+    this._updateDot();
+    console.debug('[LISA ACM] Context marked refreshed at', this.baselineCount, 'total messages');
+  },
+
   _maybeCheckpoint() {
     // Threshold-crossing check, not a modulo — rescans arrive in batches
     // (e.g. 8 -> 13 messages in one tick), so "count % 10 === 0" can skip
     // right over a checkpoint boundary.
-    if (this.messageCount >= 20 && this.messageCount - this._lastCheckpointAt >= 10) {
-      this._lastCheckpointAt = this.messageCount;
+    const ec = this.getEffectiveCount();
+    if (ec >= 20 && ec - this._lastCheckpointAt >= 10) {
+      this._lastCheckpointAt = ec;
       chrome.runtime.sendMessage({
         action: 'acm_checkpoint',
         conversationId: this.conversationId,
-        messageCount: this.messageCount,
+        messageCount: ec,
+        totalMessageCount: this.totalMessageCount,
         tokenEstimate: this.tokenEstimate,
         healthLevel: this.getHealthLevel()
       }).catch(() => {}); // service worker may not handle this yet in Phase 1
@@ -222,8 +278,9 @@ const ACMMonitor = {
     // Reset for new conversation
     this.conversationId = newId || this._getConversationId();
     this.seenHashes = new Map();
-    this.messageCount = 0;
+    this.totalMessageCount = 0;
     this.tokenEstimate = 0;
+    this.baselineCount = 0;
     this._lastCheckpointAt = 0;
 
     // Load any existing persisted state for this conversation, then
@@ -244,8 +301,9 @@ const ACMMonitor = {
       const key = `lisa-acm-${this.conversationId}`;
       await chrome.storage.local.set({
         [key]: {
-          messageCount: this.messageCount,
+          totalMessageCount: this.totalMessageCount,
           tokenEstimate: this.tokenEstimate,
+          baselineCount: this.baselineCount,
           conversationId: this.conversationId,
           updatedAt: Date.now()
         }
@@ -262,8 +320,9 @@ const ACMMonitor = {
       if (!stored) return;
       // Only restore if data is less than 24 hours old
       if (Date.now() - stored.updatedAt > 24 * 60 * 60 * 1000) return;
-      this.messageCount = stored.messageCount || 0;
+      this.totalMessageCount = stored.totalMessageCount || 0;
       this.tokenEstimate = stored.tokenEstimate || 0;
+      this.baselineCount = stored.baselineCount || 0;
     } catch (_) {}
   },
 
@@ -280,29 +339,32 @@ const ACMMonitor = {
     } catch (_) {}
   },
 
-  // Health computation
+  // Health computation — based on the effective count (since last
+  // refresh), not the raw conversation total.
   getHealthLevel() {
-    const mc = this.messageCount;
-    if (mc < this.thresholds.green) return 'green';
-    if (mc < this.thresholds.yellow) return 'yellow';
-    if (mc < this.thresholds.red) return 'red';
+    const ec = this.getEffectiveCount();
+    if (ec < this.thresholds.green) return 'green';
+    if (ec < this.thresholds.yellow) return 'yellow';
+    if (ec < this.thresholds.red) return 'red';
     return 'critical';
   },
 
   getHealthScore() {
     // 0-100 score: 100 = fresh, 0 = severely degraded.
     // Decays to ~10 by the red threshold, then keeps falling slowly.
-    const mc = this.messageCount;
+    const ec = this.getEffectiveCount();
     const { red } = this.thresholds;
-    if (mc <= 0) return 100;
-    if (mc >= red) return Math.max(0, 10 - (mc - red) / 20);
-    const ratio = mc / red;
+    if (ec <= 0) return 100;
+    if (ec >= red) return Math.max(0, 10 - (ec - red) / 20);
+    const ratio = ec / red;
     return Math.round(100 - (ratio * 90));
   },
 
   getStatus() {
     return {
-      messageCount: this.messageCount,
+      totalMessageCount: this.totalMessageCount,
+      messageCount: this.getEffectiveCount(), // since last refresh — kept as `messageCount` for callers that predate the total/baseline split
+      baselineCount: this.baselineCount,
       tokenEstimate: this.tokenEstimate,
       healthLevel: this.getHealthLevel(),
       healthScore: this.getHealthScore(),
@@ -333,7 +395,9 @@ const ACMMonitor = {
     }
 
     // Update tooltip
-    dot.title = `Context: ${this.messageCount} msgs (~${this.tokenEstimate.toLocaleString()} tokens)`;
+    const ec = this.getEffectiveCount();
+    const sinceRefresh = this.baselineCount > 0 ? ` (${ec} since last refresh)` : '';
+    dot.title = `Context: ${this.totalMessageCount} msgs total${sinceRefresh} · ~${this.tokenEstimate.toLocaleString()} tokens`;
   }
 };
 

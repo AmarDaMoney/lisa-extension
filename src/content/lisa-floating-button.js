@@ -166,6 +166,7 @@ class LISAFloatingButton {
     button.id = 'lisa-floating-btn';
     button.innerHTML = `
       <button class="lisa-fab" title="Export to LISA">
+        <span class="lisa-acm-dot" title="Context health"></span>
         <span class="lisa-fab-icon">💾</span>
         <span class="lisa-fab-text">Export to LISA</span>
       </button>
@@ -204,6 +205,18 @@ class LISAFloatingButton {
       }
       .lisa-fab-icon { font-size: 16px; }
       .lisa-fab-text { font-size: 13px; }
+      .lisa-acm-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4ade80;
+        flex-shrink: 0;
+        transition: background 0.3s ease;
+      }
+      @keyframes lisa-acm-pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(1.3); }
+      }
       .lisa-toast {
         position: fixed;
         bottom: 80px;
@@ -222,6 +235,12 @@ class LISAFloatingButton {
       @keyframes lisa-slide-up {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
+      }
+      .lisa-menu-acm-status {
+        padding: 8px 16px;
+        border-bottom: 1px solid #333;
+        display: flex;
+        align-items: center;
       }
       .lisa-menu-item {
         padding: 10px 16px;
@@ -341,10 +360,29 @@ class LISAFloatingButton {
     
     const menu = document.createElement("div");
     menu.className = "lisa-action-menu";
+
+    // Build ACM status line
+    let acmStatusHtml = '';
+    const acm = window.__lisaACM;
+    if (acm) {
+      const status = acm.getStatus();
+      const levelColors = { green: '#4ade80', yellow: '#facc15', red: '#f87171', critical: '#ef4444' };
+      const levelLabels = { green: 'Healthy', yellow: 'Building pressure', red: 'Refresh recommended', critical: 'Context degrading' };
+      const dotColor = levelColors[status.healthLevel] || '#4ade80';
+      const label = levelLabels[status.healthLevel] || 'Healthy';
+      acmStatusHtml = `
+        <div class="lisa-menu-acm-status" title="ACM Context Health">
+          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:6px;vertical-align:middle;"></span>
+          <span style="color:#9ca3af;font-size:12px;">${status.messageCount} msgs · ~${status.tokenEstimate.toLocaleString()} tokens · ${label}</span>
+        </div>
+      `;
+    }
+
     menu.innerHTML = `
+      ${acmStatusHtml}
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
-      
+
     `;
     
     // Position near the button

@@ -46,6 +46,7 @@
         "src/content/claude-code-parser.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -60,6 +61,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -74,6 +76,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -87,6 +90,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -100,6 +104,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -113,6 +118,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -126,6 +132,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -139,6 +146,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -163,6 +171,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -176,6 +185,7 @@
         "src/content/huggingchat-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -189,6 +199,7 @@
         "src/content/metaai-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -202,6 +213,7 @@
         "src/content/poe-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-v-parser.js",
+        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"

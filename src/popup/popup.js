@@ -2020,8 +2020,10 @@ class LISAPopup {
         } else {
           content = this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
         }
+        const isJson = typeof content === 'string' && content.trimStart().startsWith('{');
+        const ext = isJson ? '.json' : '.md';
         const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
-        return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.json', content };
+        return { filename: title + '-lisa-' + (snap.platform || 'unknown') + ext, content, mimeType: isJson ? 'application/json' : 'text/markdown' };
       });
 
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -2032,8 +2034,7 @@ class LISAPopup {
 
       const result = await chrome.tabs.sendMessage(tab.id, {
         action: 'injectFileAttachment',
-        files: markdownFiles,
-        mimeType: 'application/json'
+        files: markdownFiles
       });
 
       if (result && result.success) {
@@ -2322,7 +2323,7 @@ class LISAPopup {
       const kind = snapshot.format
         || 'snapshot';
       const stamp = String(snapshot.savedAt || Date.now()).replace(/\D/g, '').slice(-6);
-      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + kind + '-' + stamp + '.json';
+      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + kind + '-' + stamp + (injectContent.trimStart().startsWith('{') ? '.json' : '.md');
 
       // Send to content script on active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -2335,7 +2336,7 @@ class LISAPopup {
         action: 'injectFileAttachment',
         filename: filename,
         content: injectContent,
-        mimeType: 'application/json'
+        mimeType: injectContent.trimStart().startsWith('{') ? 'application/json' : 'text/markdown'
       });
 
       if (result && result.success) {

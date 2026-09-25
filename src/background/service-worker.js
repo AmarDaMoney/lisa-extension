@@ -624,145 +624,6 @@ class LISACompressor {
     return compressed;
   }
 
-
-  // Score sentences for global budget allocation.
-  // Returns {scored, cleanedText} for compress() to use in Step 6b.
-  // summarize() is unchanged — this is an independent copy of its
-  // cleanup+scoring pipeline with pinned flags added.
-  scoreSentences(text) {
-    if (!text) return { scored: [], cleanedText: '' };
-    if (typeof text !== 'string') {
-      try { text = JSON.stringify(text); } catch(e) { return { scored: [], cleanedText: '' }; }
-    }
-    // Strip ChatGPT citation syntax
-    text = text.replace(/filecite\w+/g, '');
-    // Extract commit messages from code blocks before stripping.
-    // "git commit -m 'fix: webhook verification'" carries resolution
-    // signal that the fence-strip regex below would destroy.
-    const commitPattern = /git\s+(?:-c\s+\S+\s+)?commit\s+(?:-[a-z]\s+)*-m\s+["']([^"']{10,}?)["']/gi;
-    let cmMatch;
-    const extractedCommits = [];
-    while ((cmMatch = commitPattern.exec(text)) !== null) {
-      extractedCommits.push(cmMatch[1].trim());
-    }
-    // Extract code deltas from patch-shaped blocks before fence strip.
-    // Heredoc edits, content.replace, sed, unified-diff + lines, str_replace.
-    // Preserves the NEW side capped at ~6 lines / 300 chars.
-    const extractedDeltas = [];
-    // Python heredoc: new = """...""" or new_content = """..."""
-    const heredocNew = /(?:new(?:_\w+)?\s*=\s*(?:"""|'''))([\s\S]*?)(?:"""|''')/gi;
-    let hdMatch;
-    while ((hdMatch = heredocNew.exec(text)) !== null) {
-      const delta = hdMatch[1].trim().split('\n').slice(0, 6).join('\n').substring(0, 300);
-      if (delta.length > 20) extractedDeltas.push('Change applied: ' + delta);
-    }
-    // Unified diff + lines (consecutive lines starting with +)
-    const diffPattern = /(?:^\+(?!\+\+).*(?:\n|$)){2,}/gm;
-    let diffMatch;
-    while ((diffMatch = diffPattern.exec(text)) !== null) {
-      const lines = diffMatch[0].split('\n').filter(l => l.startsWith('+')).map(l => l.substring(1));
-      const delta = lines.slice(0, 6).join('\n').substring(0, 300);
-      if (delta.length > 20) extractedDeltas.push('Diff applied: ' + delta);
-    }
-    // Fences must open and close a line of their own. Matching them
-    // inline let a sentence that merely mentions two fence sequences
-    // delete itself and everything between - which corrupted the
-    // State Snapshot whenever this code was discussed with an AI.
-    text = text.replace(/^[ \t]*```[a-z0-9]*[ \t]*\r?$[\s\S]*?^[ \t]*```[ \t]*\r?$/gmi, ' ');
-    // Clean fence residue — orphan opening fences that had no closing pair,
-    // and blank-line runs left behind by stripped blocks.
-    text = text.replace(/^[ \t]*```[a-z0-9]*[ \t]*$/gm, '');
-    text = text.replace(/\n{3,}/g, '\n\n');
-    // Re-inject extracted commit messages as scorable sentences
-    if (extractedCommits.length > 0) {
-      text = text + ' ' + extractedCommits.join('. ') + '.';
-    }
-    // Re-inject extracted code deltas as scorable sentences
-    if (extractedDeltas.length > 0) {
-      text = text + ' ' + extractedDeltas.join('. ') + '.';
-    }
-    // Unwrap inline spans - keep the text, drop the delimiters.
-    // These carry the technical nouns of the sentence (identifiers,
-    // filenames, field names); deleting them left fluent summaries
-    // about nothing.
-    text = text.replace(/`([^`]+)`/g, '$1');
-    // Strip console/log output noise. Two patterns were dropped: '>' is a
-    // markdown blockquote far more often than a shell prompt, and \d+[:|]
-    // matched numbered points and clock times as readily as grep -n output.
-    // Together they removed 938 chars from one 2,649-char turn - quoted
-    // material and enumerated arguments, not noise. '$' now requires the
-    // trailing space of a shell prompt.
-    text = text.replace(/^\s*(?:matches:|replaced|aborted|syntax|\$\s|\[LISA).*/gm, '');
-    // Strip bash/command lines. The command word alone is not enough -
-    // "git handles this differently" is a sentence, not a command. Require
-    // something command-shaped after it: a flag, a path, or a quoted arg.
-    text = text.replace(/^\s*(?:sed|grep|python3?|node|git|cat|head|tail|wc|cd|bash)\s+(?:-{1,2}[a-z]|[.~/]|["'][^"']*["']|[a-z0-9_.-]+\.[a-z0-9]{1,4}\b).*/gmi, '');
-    // Collapse unfenced code/log dumps that bypass fence stripping.
-    // Grep output (Line NNN: / NNN:), tracebacks, raw code lines.
-    // Replace consecutive dump lines with a one-line description.
-    text = text.replace(/(?:^\s*(?:Line \d+:|\d+[:|]\s|\s{4,}\S|Traceback|File "|>>>).*(?:\n|$)){2,}/gm, (match) => {
-      const lines = match.trim().split('\n').filter(l => l.trim());
-      const first = lines[0].trim().substring(0, 60);
-      return '(showed ' + lines.length + ' lines: ' + first + '...). ';
-    });
-    text = text.trim();
-    // Deduplicate before scoring. A sentence repeated in the source -
-    // a draft and its revision, a quoted reply - scores identically
-    // twice and lands in the output twice, side by side.
-    const seenSentence = new Set();
-    // Normalize list items and headings into sentence boundaries
-    // so the splitter treats each item as a separate sentence.
-    // Strip item markers (1. / - / * / ##) — they glue to the previous sentence otherwise.
-    text = text.replace(/\n\s*\d+[.)]+\s+/g, '. ');
-    text = text.replace(/\n\s*[-*•]\s+/g, '. ');
-    text = text.replace(/\n\s*#{1,4}\s+/g, '. ');
-    // Split on sentence boundaries — not inside numbers (v0.51), abbreviations, or markdown
-    const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z"*\[(`])/).filter(s => {
-      const t = s.trim();
-      if (t.length <= 10) return false;
-      const k = t.toLowerCase().replace(/\s+/g, ' ');
-      if (seenSentence.has(k)) return false;
-      seenSentence.add(k);
-      return true;
-    });
-    
-    if (sentences.length <= 2) {
-      // End at sentence boundary, not mid-word
-      const cut = text.substring(0, 500);
-      const lastPeriod = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '), cut.lastIndexOf('! '));
-      return lastPeriod > 50 ? cut.substring(0, lastPeriod + 1) : cut;
-    }
-    
-    // Score sentences using TextRank word scores — sentences with central concepts rank highest
-    const conceptScores = this.extractConcepts(text);
-    const scoreMap = {};
-    conceptScores.forEach(c => scoreMap[c.term] = c.weight);
-    // Also score multi-word matches
-    const phraseTerms = conceptScores.filter(c => c.term.includes(' ')).map(c => c.term);
-
-    const scored = sentences.map((s, i) => {
-      const words = s.toLowerCase().split(/\s+/).map(w => w.replace(/[^\w]/g, ''));
-      // Sum TextRank scores for words in this sentence
-      let score = words.reduce((sum, w) => sum + (scoreMap[w] || 0), 0);
-      // Bonus for multi-word phrases found in this sentence
-      const sLower = s.toLowerCase();
-      phraseTerms.forEach(p => { if (sLower.includes(p)) score += (scoreMap[p] || 0); });
-      // Normalize by sentence length to avoid bias toward long sentences
-      score = score / Math.max(words.length, 1);
-      // Position bonus: first and last sentences carry framing context
-      if (i === 0) score += 0.5;
-      if (i === sentences.length - 1) score += 0.3;
-      // Technical signal bonus (acronyms, camelCase)
-      if (/\b[A-Z]{2,}\b/.test(s)) score += 0.2;
-      if (/[A-Z][a-z]+[A-Z]/.test(s)) score += 0.2;
-      // Penalize short filler
-      if (s.trim().length < 20) score -= 1;
-      const pinned = extractedCommits.some(c => s.includes(c)) ||
-                     /^(?:Change applied|Diff applied):/.test(s.trim());
-      return { text: s.trim(), score, index: i, pinned };
-    });
-    return { scored, cleanedText: text };
-  }
   summarize(text) {
     if (!text) return '';
     if (typeof text !== 'string') {
@@ -883,9 +744,9 @@ class LISACompressor {
       phraseTerms.forEach(p => { if (sLower.includes(p)) score += (scoreMap[p] || 0); });
       // Normalize by sentence length to avoid bias toward long sentences
       score = score / Math.max(words.length, 1);
-      // Position bonus: first and last sentences carry framing context
-      if (i === 0) score += 0.5;
-      if (i === sentences.length - 1) score += 0.3;
+      // Position bonus: last sentence carries resolution, first is often throat-clearing
+      if (i === 0) score += 0.2;
+      if (i === sentences.length - 1) score += 0.5;
       // Technical signal bonus (acronyms, camelCase)
       if (/\b[A-Z]{2,}\b/.test(s)) score += 0.2;
       if (/[A-Z][a-z]+[A-Z]/.test(s)) score += 0.2;

@@ -1230,11 +1230,12 @@ class LISAPopup {
         // Use real tiktoken counts from backend when available, fallback to estimate
         const backendStats = data.stats || {};
         const rawTokens = backendStats.original_tokens || Math.round(conversationText.length / 3.5);
-        // Show markdown token estimate — what actually gets injected
+        // Show JSON token estimate — what actually gets injected
         const compressed = this.compressedData;
         const rawMsgs = this.currentConversation?.messages || [];
-        const mdText = buildMarkdownExport(compressed, rawMsgs);
-        const mdTokens = Math.round(mdText.length / 3.5);
+        const lean = buildLeanExport(compressed, rawMsgs);
+        const jsonText = JSON.stringify(lean, null, 2);
+        const mdTokens = Math.round(jsonText.length / 3.5);
         const isExact = !!backendStats.original_tokens;
         document.getElementById('rawTokens').textContent = (isExact ? '' : '~') + rawTokens.toLocaleString();
         document.getElementById('enrichedTokens').textContent = '~' + mdTokens.toLocaleString();
@@ -2001,24 +2002,26 @@ class LISAPopup {
         return;
       }
 
-      // Convert all selected to markdown and combine
+      // Convert all selected to inject-ready JSON and combine
+      // AI receivers prefer structured JSON over prose markdown (validated Sep 22 2026).
+      // buildMarkdownExport kept for human-readable downloads; inject uses JSON.
       const markdownFiles = snapshots.map(snap => {
-        let md;
+        let content;
         if (snap.rebirthHandoff || snap.raw?.rebirthHandoff) {
-          md = snap.rebirthHandoff || snap.raw.rebirthHandoff;
+          content = snap.rebirthHandoff || snap.raw.rebirthHandoff;
         } else if (snap.format === 'compressed' || snap.format === 'ai-compressed' || snap.raw?.content?.semanticTokens || snap.raw?.semanticTokens || snap.content?.semanticTokens || snap.semanticTokens) {
-          // format-gated: snapshot itself has messages+anchor at top level
-          // semanticTokens-gated: compressed data may be nested in raw.content
+          // Compressed snapshot: inject as structured JSON (AI-preferred format)
           const compressed = (snap.format === 'compressed' || snap.format === 'ai-compressed') ? (snap.capture?.content || snap.capture || snap) : (snap.raw?.content || snap.raw || snap.content || snap);
           const rawMsgs = snap.capture?.messages || [];
-          md = buildMarkdownExport(compressed, rawMsgs);
+          const lean = buildLeanExport(compressed, rawMsgs);
+          content = JSON.stringify(lean, null, 2);
         } else if (snap.derived?.markdown) {
-          md = snap.derived.markdown;
+          content = snap.derived.markdown;
         } else {
-          md = this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
+          content = this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
         }
         const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
-        return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.md', content: md };
+        return { filename: title + '-lisa-' + (snap.platform || 'unknown') + '.json', content };
       });
 
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -2030,12 +2033,12 @@ class LISAPopup {
       const result = await chrome.tabs.sendMessage(tab.id, {
         action: 'injectFileAttachment',
         files: markdownFiles,
-        mimeType: 'text/markdown'
+        mimeType: 'application/json'
       });
 
       if (result && result.success) {
         this.updatePlatformStatus('📎 Context transferred — ' + markdownFiles.length + ' handoff(s) carried forward', true);
-        this.trackEvent('snapshot_multi_injected_md', { count: markdownFiles.length });
+        this.trackEvent('snapshot_multi_injected_json', { count: markdownFiles.length });
         // Uncheck all
         checked.forEach(cb => { cb.checked = false; });
         document.getElementById('injectSelectedBar').classList.remove('visible');
@@ -2291,25 +2294,24 @@ class LISAPopup {
         return;
       }
 
-      // DEBUG: remove after investigating inject path
-      // Use format-appropriate markdown for injection
-      let markdown;
+      // Inject as structured JSON — AI receivers prefer it over prose markdown
+      // (validated Sep 22 2026). buildMarkdownExport kept for human-readable downloads.
+      let injectContent;
       if (snapshot.rebirthHandoff || snapshot.raw?.rebirthHandoff) {
         // Rebirth: use the handoff markdown directly
-        markdown = snapshot.rebirthHandoff || snapshot.raw.rebirthHandoff;
+        injectContent = snapshot.rebirthHandoff || snapshot.raw.rebirthHandoff;
       } else if (snapshot.format === 'compressed' || snapshot.format === 'ai-compressed' || snapshot.raw?.content?.semanticTokens || snapshot.raw?.semanticTokens || snapshot.content?.semanticTokens || snapshot.semanticTokens) {
-        // Compressed snapshot: use optimized markdown builder.
-        // 30-67% fewer tokens than JSON, same recall from receiving AI.
-        // format-gated: snapshot itself has messages+anchor at top level
+        // Compressed snapshot: inject as structured JSON (AI-preferred format)
         const compressed = (snapshot.format === 'compressed' || snapshot.format === 'ai-compressed') ? (snapshot.capture?.content || snapshot.capture || snapshot) : (snapshot.raw?.content || snapshot.raw || snapshot.content || snapshot);
         const rawMsgs = snapshot.capture?.messages || [];
-        markdown = buildMarkdownExport(compressed, rawMsgs);
+        const lean = buildLeanExport(compressed, rawMsgs);
+        injectContent = JSON.stringify(lean, null, 2);
       } else if (snapshot.derived?.markdown) {
         // Schema v2: use derived markdown directly (legacy non-compressed)
-        markdown = snapshot.derived.markdown;
+        injectContent = snapshot.derived.markdown;
       } else {
         // All other formats: wrap with structured header for AI consumption
-        markdown = this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
+        injectContent = this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
       }
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
       // Platforms dedupe attachments by filename within a conversation: a
@@ -2320,7 +2322,7 @@ class LISAPopup {
       const kind = snapshot.format
         || 'snapshot';
       const stamp = String(snapshot.savedAt || Date.now()).replace(/\D/g, '').slice(-6);
-      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + kind + '-' + stamp + '.md';
+      const filename = snapshotTitle + '-lisa-' + (snapshot.platform || 'unknown') + '-' + kind + '-' + stamp + '.json';
 
       // Send to content script on active tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -2332,8 +2334,8 @@ class LISAPopup {
       const result = await chrome.tabs.sendMessage(tab.id, {
         action: 'injectFileAttachment',
         filename: filename,
-        content: markdown,
-        mimeType: 'text/markdown'
+        content: injectContent,
+        mimeType: 'application/json'
       });
 
       if (result && result.success) {
@@ -2350,7 +2352,7 @@ class LISAPopup {
           ? '📎 Context transferred — ' + msgCount + ' messages, ' + entities + ' entities resolved, ' + concepts + ' concepts preserved'
           : '📎 Context transferred — ' + msgCount + ' messages carried forward';
         this.updatePlatformStatus(badge, true);
-        this.trackEvent('snapshot_injected_md', { platform: snapshot.platform });
+        this.trackEvent('snapshot_injected_json', { platform: snapshot.platform });
       } else {
         alert(result?.error || 'Injection failed — platform may not support file attachments');
       }

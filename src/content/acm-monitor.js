@@ -1,25 +1,35 @@
 // LISA ACM — Active Context Management: Monitor Layer
 // Phase 1: Message counting, token estimation, context health indicator
-// Hooks into the same MutationObserver infrastructure as lisa-progressive.js
-// ~80 lines. Zero new dependencies.
+// Counts by content hash (via periodic rescan), not DOM node identity or
+// incremental mutation deltas — several platforms (e.g. Gemini's Angular
+// rendering) replace already-counted nodes while streaming, which made a
+// per-node-identity/incremental design overcount. A rescan-and-diff design
+// is self-healing: it can never drift, and it needs no second
+// MutationObserver running alongside lisa-progressive.js's.
+// Zero new dependencies.
 
 const ACMMonitor = {
   // State
   messageCount: 0,
   tokenEstimate: 0,
   conversationId: null,
+  seenHashes: null, // Map<hash, charLength> for the current conversation
   _lastUrl: null,
+  _rescanTimer: null,
+  _pollTimer: null,
+  _lastCheckpointAt: 0,
 
   // Thresholds (configurable via chrome.storage.sync)
+  // 'critical' is the label for messageCount >= red — there is no 4th
+  // numeric boundary; a conversation is either healthy, building pressure,
+  // due for a refresh, or past due.
   thresholds: {
-    green: 40,    // 0 to green: healthy
-    yellow: 80,   // green to yellow: building context pressure
-    red: 120,     // yellow to red: recommend refresh
-    critical: 160 // red+: context degrading
+    green: 40,   // 0 to green: healthy
+    yellow: 80,  // green to yellow: building context pressure
+    red: 120,    // yellow to red: recommend refresh; red+: critical
   },
 
   async init() {
-    // Load any saved thresholds
     try {
       const stored = await chrome.storage.sync.get(['acmThresholds', 'acmEnabled']);
       if (stored.acmThresholds) {
@@ -31,26 +41,36 @@ const ACMMonitor = {
 
     this.conversationId = this._getConversationId();
     this._lastUrl = window.location.href;
+    this.seenHashes = new Map();
 
-    // Load persisted state for this conversation
+    // Load persisted display state so the dot isn't blank on first paint —
+    // the rescan below is the authoritative source and will correct it.
     await this._loadState();
+    this._updateDot();
 
-    // Hook into existing MutationObserver via lisa-progressive's events
-    // OR set up our own lightweight observer if progressive isn't active
-    this._startObserving();
+    this._rescan();
+    this._pruneStaleState();
 
-    // Watch for conversation switches (SPA navigation)
+    // Periodic rescan instead of a second MutationObserver — the health
+    // indicator doesn't need sub-second precision, so polling every few
+    // seconds is both cheaper and immune to the node-replacement bug above.
+    this._pollTimer = setInterval(() => this._rescan(), 4000);
+
     this._watchNavigation();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this._rescan();
+    });
 
-    // Listen for status queries from floating button
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (msg.action === 'acm_getMonitorStatus') {
         sendResponse(this.getStatus());
         return false;
       }
       if (msg.action === 'acm_resetMonitor') {
+        this.seenHashes = new Map();
         this.messageCount = 0;
         this.tokenEstimate = 0;
+        this._lastCheckpointAt = 0;
         this._saveState();
         this._updateDot();
         sendResponse({ success: true });
@@ -117,65 +137,64 @@ const ACMMonitor = {
     return '[data-message-author-role]';
   },
 
-  _startObserving() {
-    // Count existing visible messages on page load
+  // Same hashing approach as lisa-progressive.js's simpleHash — hashing by
+  // content (not DOM node identity) means a node a platform re-renders
+  // with identical text is recognized as the same message, not a new one.
+  _hashText(text) {
+    const s = text.substring(0, 100);
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+    }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  },
+
+  // Rescans the DOM from scratch and rebuilds seenHashes. Authoritative —
+  // never drifts, since it doesn't depend on which mutation events fired.
+  _rescan() {
     const selector = this._getMessageSelector();
-    const existing = document.querySelectorAll(selector);
-    if (existing.length > 0 && this.messageCount === 0) {
-      // Page loaded with existing messages — count them
-      this.messageCount = existing.length;
-      let charTotal = 0;
-      existing.forEach(el => { charTotal += (el.textContent || '').length; });
-      this.tokenEstimate = Math.round(charTotal / 3.5);
-      this._saveState();
+    const elements = document.querySelectorAll(selector);
+    const freshHashes = new Map();
+
+    for (const el of elements) {
+      const text = (el.textContent || '').trim();
+      if (text.length < 5) continue; // skip loading skeletons / empty containers
+      if (text.includes('[object Object]')) continue;
+      const hash = this._hashText(text);
+      if (freshHashes.has(hash)) continue; // same message rendered twice in DOM
+      freshHashes.set(hash, text.length);
     }
 
-    // Set up our own lightweight observer — we only count, no heavy capture
-    const root = document.querySelector('main') || document.body;
-    const seenNodes = new WeakSet();
+    const changed = freshHashes.size !== this.seenHashes.size;
+    this.seenHashes = freshHashes;
 
-    this._observer = new MutationObserver(mutations => {
-      let newMessages = 0;
-      let newChars = 0;
+    let charTotal = 0;
+    for (const len of freshHashes.values()) charTotal += len;
 
-      for (const mut of mutations) {
-        for (const node of mut.addedNodes) {
-          if (node.nodeType !== Node.ELEMENT_NODE) continue;
-          if (seenNodes.has(node)) continue;
+    this.messageCount = freshHashes.size;
+    this.tokenEstimate = Math.round(charTotal / 3.5);
 
-          const matches = [];
-          if (node.matches?.(selector)) matches.push(node);
-          else node.querySelectorAll?.(selector).forEach(el => matches.push(el));
+    if (changed) {
+      this._updateDot();
+      this._saveState();
+      this._maybeCheckpoint();
+    }
+  },
 
-          for (const el of matches) {
-            if (seenNodes.has(el)) continue;
-            seenNodes.add(el);
-            newMessages++;
-            newChars += (el.textContent || '').length;
-          }
-        }
-      }
-
-      if (newMessages > 0) {
-        this.messageCount += newMessages;
-        this.tokenEstimate += Math.round(newChars / 3.5);
-        this._updateDot();
-        this._saveState();
-
-        // Notify service worker at checkpoint intervals (every 10 messages)
-        if (this.messageCount % 10 === 0 && this.messageCount >= 20) {
-          chrome.runtime.sendMessage({
-            action: 'acm_checkpoint',
-            conversationId: this.conversationId,
-            messageCount: this.messageCount,
-            tokenEstimate: this.tokenEstimate,
-            healthLevel: this.getHealthLevel()
-          }).catch(() => {}); // service worker may not handle this yet in Phase 1
-        }
-      }
-    });
-
-    this._observer.observe(root, { childList: true, subtree: true });
+  _maybeCheckpoint() {
+    // Threshold-crossing check, not a modulo — rescans arrive in batches
+    // (e.g. 8 -> 13 messages in one tick), so "count % 10 === 0" can skip
+    // right over a checkpoint boundary.
+    if (this.messageCount >= 20 && this.messageCount - this._lastCheckpointAt >= 10) {
+      this._lastCheckpointAt = this.messageCount;
+      chrome.runtime.sendMessage({
+        action: 'acm_checkpoint',
+        conversationId: this.conversationId,
+        messageCount: this.messageCount,
+        tokenEstimate: this.tokenEstimate,
+        healthLevel: this.getHealthLevel()
+      }).catch(() => {}); // service worker may not handle this yet in Phase 1
+    }
   },
 
   _watchNavigation() {
@@ -202,11 +221,17 @@ const ACMMonitor = {
 
     // Reset for new conversation
     this.conversationId = newId || this._getConversationId();
+    this.seenHashes = new Map();
     this.messageCount = 0;
     this.tokenEstimate = 0;
+    this._lastCheckpointAt = 0;
 
-    // Load any existing state for this conversation
+    // Load any existing persisted state for this conversation, then
+    // rescan the now-current DOM immediately — a switch is usually an SPA
+    // nav, not a reload, so the new conversation's messages are already
+    // in the DOM and won't fire fresh mutation/rescan events on their own.
     await this._loadState();
+    this._rescan();
     this._updateDot();
 
     console.debug('[LISA ACM] Switched to conversation:', this.conversationId);
@@ -242,6 +267,19 @@ const ACMMonitor = {
     } catch (_) {}
   },
 
+  // Sweep ACM state for conversations that haven't been touched in 30 days,
+  // mirroring lisa-progressive.js's pruneStaleBuffers pattern.
+  async _pruneStaleState() {
+    try {
+      const all = await chrome.storage.local.get(null);
+      const staleKeys = Object.keys(all).filter(key =>
+        (key.startsWith('lisa-acm-') || key.startsWith('lisa-acm-checkpoint-')) &&
+        Date.now() - (all[key]?.updatedAt || 0) > 30 * 24 * 60 * 60 * 1000
+      );
+      if (staleKeys.length > 0) await chrome.storage.local.remove(staleKeys);
+    } catch (_) {}
+  },
+
   // Health computation
   getHealthLevel() {
     const mc = this.messageCount;
@@ -252,12 +290,13 @@ const ACMMonitor = {
   },
 
   getHealthScore() {
-    // 0-100 score: 100 = fresh, 0 = severely degraded
+    // 0-100 score: 100 = fresh, 0 = severely degraded.
+    // Decays to ~10 by the red threshold, then keeps falling slowly.
     const mc = this.messageCount;
+    const { red } = this.thresholds;
     if (mc <= 0) return 100;
-    if (mc >= this.thresholds.critical) return Math.max(0, 100 - mc);
-    // Linear decay from 100 to 10 across the threshold range
-    const ratio = mc / this.thresholds.critical;
+    if (mc >= red) return Math.max(0, 10 - (mc - red) / 20);
+    const ratio = mc / red;
     return Math.round(100 - (ratio * 90));
   },
 

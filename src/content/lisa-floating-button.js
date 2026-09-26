@@ -397,17 +397,18 @@ class LISAFloatingButton {
     }
 
     let acmItems = '';
-    if (acm && acm.messageCount > 0) {
-      const cpLabel = acm.hasCheckpoint ? '🧠 Update Checkpoint' : '🧠 Context Checkpoint';
-      const cpTitle = acm.hasCheckpoint
+    const acmStatus = acm ? acm.getStatus() : null;
+    if (acmStatus && acmStatus.conversationId) {
+      const cpLabel = acmStatus.hasCheckpoint ? '🧠 Update Checkpoint' : '🧠 Context Checkpoint';
+      const cpTitle = acmStatus.hasCheckpoint
         ? 'Refresh the context checkpoint — ask the AI for an updated summary'
         : 'Ask the AI to summarize key decisions, open items and constraints — zero extra cost';
       acmItems = `
         <div class="lisa-menu-item" data-action="checkpoint" title="${cpTitle}">${cpLabel}</div>
-        <div class="lisa-menu-item" data-action="compress-context" title="Compress conversation via LISA pipeline — copies to clipboard for handoff">🗜️ Compress & Copy</div>
       `;
-      if (acm.hasCheckpoint) {
-        acmItems += `<div class="lisa-menu-item" data-action="handoff" title="Copy your context checkpoint as a continuation brief — paste into a fresh chat to carry the relationship forward">🔄 Handoff</div>`;
+      if (acmStatus.messageCount > 0) {
+        acmItems += `<div class="lisa-menu-item" data-action="compress-context" title="Compress conversation via LISA pipeline — copies to clipboard for handoff">🗜️ Compress & Copy</div>`;
+        acmItems += `<div class="lisa-menu-item" data-action="handoff" title="Guided handoff — checkpoint your context and transfer to a fresh session">🔄 Handoff</div>`;
       }
     }
 

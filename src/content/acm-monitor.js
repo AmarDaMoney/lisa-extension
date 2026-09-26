@@ -28,6 +28,7 @@ const ACMMonitor = {
   _domActivityTimer: null,
   _lastCheckpointAt: 0,
   _apiRescanInFlight: false,
+  _lastDetectedCheckpointHash: null,
 
   // Thresholds (configurable via chrome.storage.sync)
   thresholds: {
@@ -104,11 +105,16 @@ const ACMMonitor = {
         sendResponse(this.getStatus());
         return false;
       }
+      if (msg.action === 'acm_getCheckpoint') {
+        this.getCheckpoint().then(cp => sendResponse({ checkpoint: cp }));
+        return true; // async sendResponse
+      }
       if (msg.action === 'acm_resetMonitor') {
         this.seenHashes = new Map();
         this.messageCount = 0;
         this.tokenEstimate = 0;
         this._lastCheckpointAt = 0;
+        this._lastDetectedCheckpointHash = null;
         this._saveState();
         this._updateDot();
         sendResponse({ success: true });
@@ -205,6 +211,7 @@ const ACMMonitor = {
         this._updateDot();
         this._saveState();
         this._maybeCheckpoint();
+        this._detectCheckpointResponse(result.messages);
       }
     } catch (err) {
       console.debug('[LISA ACM] API rescan failed, keeping last known count:', err);
@@ -286,6 +293,11 @@ const ACMMonitor = {
       this._updateDot();
       this._saveState();
       this._maybeCheckpoint();
+      // On DOM platforms, check the last element for checkpoint format
+      if (elements.length > 0) {
+        const lastText = (elements[elements.length - 1].textContent || '').trim();
+        this._detectCheckpointResponse([{ role: 'assistant', content: lastText }]);
+      }
     }
   },
 
@@ -302,6 +314,131 @@ const ACMMonitor = {
         tokenEstimate: this.tokenEstimate,
         healthLevel: this.getHealthLevel()
       }).catch(() => {}); // service worker may not handle this yet in Phase 1
+    }
+  },
+
+  // Checkpoint response detection — looks for the structured format LISA's
+  // checkpoint prompt asks for (DECISIONS, OPEN, RESOLVED, CONSTRAINTS, KEY CONTEXT).
+  // Runs on every API rescan; only fires once per unique response.
+  _CHECKPOINT_SECTIONS: ['DECISIONS', 'OPEN', 'RESOLVED', 'CONSTRAINTS', 'KEY CONTEXT'],
+
+  _detectCheckpointResponse(messages) {
+    if (!messages || messages.length === 0) return;
+
+    // Walk backwards to find the most recent assistant message
+    let assistantMsg = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        assistantMsg = messages[i];
+        break;
+      }
+    }
+    if (!assistantMsg || !assistantMsg.content) return;
+
+    const text = assistantMsg.content;
+    // Quick check: must contain at least 4 of the 5 section headers
+    let matchCount = 0;
+    for (const section of this._CHECKPOINT_SECTIONS) {
+      if (text.includes(section + ':')) matchCount++;
+    }
+    if (matchCount < 4) return;
+
+    // Deduplicate — don't re-store the same checkpoint
+    const hash = this._hashText(text);
+    if (hash === this._lastDetectedCheckpointHash) return;
+    this._lastDetectedCheckpointHash = hash;
+
+    // Parse sections
+    const checkpoint = this._parseCheckpointResponse(text);
+    if (!checkpoint) return;
+
+    this._storeCheckpoint(checkpoint);
+    console.debug('[LISA ACM] Checkpoint response detected and stored');
+  },
+
+  _parseCheckpointResponse(text) {
+    const sections = {};
+
+    // Split text into sections by header
+    const lines = text.split('\n');
+    let currentSection = null;
+    let currentLines = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Check if this line starts a new section
+      let foundSection = null;
+      for (const name of this._CHECKPOINT_SECTIONS) {
+        if (trimmed.startsWith(name + ':') || trimmed.startsWith(name + ' :')) {
+          foundSection = name;
+          break;
+        }
+      }
+
+      if (foundSection) {
+        // Save previous section
+        if (currentSection) {
+          sections[currentSection] = this._cleanSectionLines(currentLines);
+        }
+        currentSection = foundSection;
+        // Capture any inline content after the header
+        const afterHeader = trimmed.substring(trimmed.indexOf(':') + 1).trim();
+        currentLines = afterHeader ? [afterHeader] : [];
+      } else if (currentSection) {
+        currentLines.push(trimmed);
+      }
+    }
+    // Save last section
+    if (currentSection) {
+      sections[currentSection] = this._cleanSectionLines(currentLines);
+    }
+
+    if (Object.keys(sections).length < 3) return null;
+
+    return {
+      decisions: sections['DECISIONS'] || [],
+      open: sections['OPEN'] || [],
+      resolved: sections['RESOLVED'] || [],
+      constraints: sections['CONSTRAINTS'] || [],
+      keyContext: sections['KEY CONTEXT'] || [],
+      raw: text,
+      capturedAt: Date.now(),
+      messageCount: this.messageCount,
+      conversationId: this.conversationId
+    };
+  },
+
+  _cleanSectionLines(lines) {
+    return lines
+      .map(l => l.replace(/^[-•*]\s*/, '').trim())
+      .filter(l => l.length > 0 && l !== '[' && l !== ']');
+  },
+
+  async _storeCheckpoint(checkpoint) {
+    if (!this.conversationId) return;
+    try {
+      const key = `lisa-acm-checkpoint-${this.conversationId}`;
+      // Keep last 3 checkpoints as history
+      const result = await chrome.storage.local.get(key);
+      const existing = result[key] || { history: [] };
+      existing.history.push(checkpoint);
+      if (existing.history.length > 3) {
+        existing.history = existing.history.slice(-3);
+      }
+      existing.latest = checkpoint;
+      existing.updatedAt = Date.now();
+      await chrome.storage.local.set({ [key]: existing });
+    } catch (_) {}
+  },
+
+  async getCheckpoint() {
+    if (!this.conversationId) return null;
+    try {
+      const key = `lisa-acm-checkpoint-${this.conversationId}`;
+      const result = await chrome.storage.local.get(key);
+      return result[key]?.latest || null;
+    } catch (_) {
+      return null;
     }
   },
 
@@ -333,6 +470,7 @@ const ACMMonitor = {
     this.messageCount = 0;
     this.tokenEstimate = 0;
     this._lastCheckpointAt = 0;
+    this._lastDetectedCheckpointHash = null;
 
     // Load any existing persisted state for this conversation, then
     // rescan the now-current conversation immediately — a switch is
@@ -417,7 +555,8 @@ const ACMMonitor = {
       healthLevel: this.getHealthLevel(),
       healthScore: this.getHealthScore(),
       conversationId: this.conversationId,
-      thresholds: this.thresholds
+      thresholds: this.thresholds,
+      hasCheckpoint: this._lastDetectedCheckpointHash !== null
     };
   },
 

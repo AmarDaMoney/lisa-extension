@@ -381,8 +381,12 @@ class LISAFloatingButton {
 
     let acmItems = '';
     if (acm && acm.messageCount > 0) {
+      const cpLabel = acm.hasCheckpoint ? '🧠 Update Checkpoint' : '🧠 Context Checkpoint';
+      const cpTitle = acm.hasCheckpoint
+        ? 'Refresh the context checkpoint — ask the AI for an updated summary'
+        : 'Ask the AI to summarize key decisions, open items and constraints — zero extra cost';
       acmItems = `
-        <div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize key decisions, open items and constraints — zero extra cost">🧠 Context Checkpoint</div>
+        <div class="lisa-menu-item" data-action="checkpoint" title="${cpTitle}">${cpLabel}</div>
         <div class="lisa-menu-item" data-action="compress-context" title="Compress conversation via LISA pipeline — copies to clipboard for handoff">🗜️ Compress & Copy</div>
       `;
     }

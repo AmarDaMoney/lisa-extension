@@ -423,6 +423,22 @@ class LISAFloatingButton {
   }
 
 
+  // One retry before giving up on the API — see the matching helper in
+  // lisa-v-parser.js for why (a transient failure shouldn't silently
+  // downgrade to an undercounted DOM capture).
+  async _captureViaApiWithRetry(captureModule, isShared) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = isShared
+          ? await captureModule.extractSharedViaAPI()
+          : await captureModule.extractViaAPI();
+        if (result && result.messages && result.messages.length > 0) return result;
+      } catch (_) { /* retry below, or fall through after the last attempt */ }
+      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    return null;
+  }
+
   async saveAsMarkdown() {
     try {
       const limitCheck = await this.checkFloatingLimit('md');
@@ -435,29 +451,16 @@ class LISAFloatingButton {
 
       // Use API capture if available, else fall back to LisaVParser
       let messages = null;
+      let usedFallbackCapture = false;
 
       if (window.__LISA_CLAUDE_API_CAPTURE) {
-        try {
-          const isShared = window.location.pathname.startsWith('/share/');
-          const apiResult = isShared
-            ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
-            : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
-          if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-            messages = apiResult;
-          }
-        } catch (e) { /* fall through */ }
+        const isShared = window.location.pathname.startsWith('/share/');
+        messages = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
       }
 
       if (!messages && window.__LISA_CHATGPT_API_CAPTURE) {
-        try {
-          const isShared = window.location.pathname.startsWith('/share/');
-          const apiResult = isShared
-            ? await window.__LISA_CHATGPT_API_CAPTURE.extractSharedViaAPI()
-            : await window.__LISA_CHATGPT_API_CAPTURE.extractViaAPI();
-          if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-            messages = apiResult;
-          }
-        } catch (e) { /* fall through */ }
+        const isShared = window.location.pathname.startsWith('/share/');
+        messages = await this._captureViaApiWithRetry(window.__LISA_CHATGPT_API_CAPTURE, isShared);
       }
 
       if (!messages) {
@@ -465,6 +468,7 @@ class LISAFloatingButton {
         await parser.extractConversation();
         await parser.finalize();
         messages = parser.toMessages();
+        usedFallbackCapture = parser.usedFallbackCapture;
       }
 
       if (!messages || !messages.messages || messages.messages.length === 0) {
@@ -504,6 +508,9 @@ class LISAFloatingButton {
 
       if (response && response.success) {
         this.showToast("✅ Markdown saved to library!");
+        if (usedFallbackCapture) {
+          setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
+        }
       } else {
         this.showToast('❌ ' + (response?.error || 'Save failed'), true);
         return;
@@ -550,6 +557,9 @@ class LISAFloatingButton {
       
       if (response?.success) {
         this.showToast("✅ LISA-V saved! " + stats.totalBlocks + " blocks");
+        if (parser.usedFallbackCapture) {
+          setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
+        }
         const remaining = await this.incrementFloatingLimit('lisav');
           if (remaining !== undefined && remaining <= 5) {
             const label = remaining > 2 ? `${remaining} welcome credits remaining` : `${remaining} saves remaining today`;

@@ -6,6 +6,31 @@ class LisaVParser {
     this.blocks = [];
     const match = window.location.pathname.match(/\/(?:chat|code)\/([a-f0-9-]+)/);
     this.conversationId = match ? match[1] : null;
+    // Set to true if an API-first capture failed even after retrying and
+    // this parser fell back to the DOM — the caller can warn the user that
+    // the message count/content may be incomplete (DOM parsing can miss
+    // messages a virtualized long conversation has unmounted).
+    this.usedFallbackCapture = false;
+  }
+
+  // One retry before giving up on the API — a lot of API-capture failures
+  // are a transient network/cookie-timing blip, not a real block, and
+  // silently falling back to DOM parsing on the first failure is what
+  // produced an undercounted export previously (218 vs the API's real 292
+  // on the same conversation).
+  async _captureViaApiWithRetry(captureModule, isShared) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = isShared
+          ? await captureModule.extractSharedViaAPI()
+          : await captureModule.extractViaAPI();
+        if (result && result.messages && result.messages.length > 0) return result;
+      } catch (err) {
+        if (attempt === 1) console.warn('[LISA] API capture failed after retry:', err?.message || err);
+      }
+      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    return null;
   }
 
   // SHA-256 hash for code provenance
@@ -293,53 +318,42 @@ class LisaVParser {
       messages = await this.extractClaudeCodeMessages();
     } else if (platform === 'Claude' && window.__LISA_CLAUDE_API_CAPTURE) {
       // ---- API-FIRST CAPTURE (instant, complete, no scroll sweep) ----
-      try {
-        const isShared = window.location.pathname.startsWith('/share/');
-        const apiResult = isShared
-          ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
-          : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
-        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-          console.log('[LISA] LISA-V using API capture:', apiResult.messageCount, 'messages');
-          for (const msg of apiResult.messages) {
-            const msgBlocks = await this._apiMessageToBlocks(msg);
-            messages.push(msgBlocks);
-          }
-          // Add all message blocks and return early — skip DOM path
-          for (const msg of messages) {
-            this.blocks.push(...msg);
-          }
-          return this.blocks;
+      const isShared = window.location.pathname.startsWith('/share/');
+      const apiResult = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
+      if (apiResult) {
+        console.log('[LISA] LISA-V using API capture:', apiResult.messageCount, 'messages');
+        for (const msg of apiResult.messages) {
+          const msgBlocks = await this._apiMessageToBlocks(msg);
+          messages.push(msgBlocks);
         }
-      } catch (apiErr) {
-        console.warn('[LISA] API capture failed for LISA-V, falling back to DOM:', apiErr.message);
-        messages = [];
+        // Add all message blocks and return early — skip DOM path
+        for (const msg of messages) {
+          this.blocks.push(...msg);
+        }
+        return this.blocks;
       }
-      // DOM fallback
+      console.warn('[LISA] API capture failed for LISA-V after retry, falling back to DOM (message count may be incomplete)');
+      this.usedFallbackCapture = true;
       messages = await this.extractClaudeMessages();
     } else if (platform === 'Claude') {
       messages = await this.extractClaudeMessages();
     } else if (platform === 'ChatGPT' && window.__LISA_CHATGPT_API_CAPTURE) {
       // ---- API-FIRST CAPTURE for ChatGPT ----
-      try {
-        const isShared = window.location.pathname.startsWith('/share/');
-        const apiResult = isShared
-          ? await window.__LISA_CHATGPT_API_CAPTURE.extractSharedViaAPI()
-          : await window.__LISA_CHATGPT_API_CAPTURE.extractViaAPI();
-        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-          console.log('[LISA] LISA-V using ChatGPT API capture:', apiResult.messageCount, 'messages');
-          for (const msg of apiResult.messages) {
-            const msgBlocks = await this._apiMessageToBlocks(msg);
-            messages.push(msgBlocks);
-          }
-          for (const msg of messages) {
-            this.blocks.push(...msg);
-          }
-          return this.blocks;
+      const isShared = window.location.pathname.startsWith('/share/');
+      const apiResult = await this._captureViaApiWithRetry(window.__LISA_CHATGPT_API_CAPTURE, isShared);
+      if (apiResult) {
+        console.log('[LISA] LISA-V using ChatGPT API capture:', apiResult.messageCount, 'messages');
+        for (const msg of apiResult.messages) {
+          const msgBlocks = await this._apiMessageToBlocks(msg);
+          messages.push(msgBlocks);
         }
-      } catch (apiErr) {
-        console.warn('[LISA] ChatGPT API capture failed, falling back to DOM:', apiErr.message);
-        messages = [];
+        for (const msg of messages) {
+          this.blocks.push(...msg);
+        }
+        return this.blocks;
       }
+      console.warn('[LISA] ChatGPT API capture failed after retry, falling back to DOM (message count may be incomplete)');
+      this.usedFallbackCapture = true;
       messages = await this.extractChatGPTMessages();
     } else if (platform === 'Mistral AI') {
       messages = await this.extractMistralMessages();

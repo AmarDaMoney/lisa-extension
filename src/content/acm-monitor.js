@@ -38,6 +38,62 @@ const ACMMonitor = {
     red: 120,    // yellow to red: recommend refresh; red+: critical
   },
 
+  // Platform compatibility matrix for handoff — which targets receive well
+  // from which source. Built from testing; will grow as we verify more pairs.
+  // true = tested and works, false = tested and problematic, absent = untested
+  HANDOFF_COMPAT: {
+    claude:    { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true },
+    chatgpt:   { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true },
+    gemini:    { claude: true, chatgpt: true, gemini: true },
+    grok:      { claude: true, chatgpt: true, grok: true },
+    deepseek:  { claude: true, chatgpt: true, deepseek: true },
+    mistral:   { claude: true, chatgpt: true, mistral: true },
+    copilot:   { claude: true, chatgpt: true },
+    perplexity:{ claude: true, chatgpt: true },
+  },
+
+  // New chat URLs per platform
+  NEW_CHAT_URLS: {
+    claude:     'https://claude.ai/new',
+    chatgpt:    'https://chatgpt.com/',
+    gemini:     'https://gemini.google.com/app',
+    grok:       'https://grok.com/',
+    deepseek:   'https://chat.deepseek.com/',
+    mistral:    'https://chat.mistral.ai/chat',
+    copilot:    'https://copilot.microsoft.com/',
+    perplexity: 'https://www.perplexity.ai/',
+  },
+
+  async getHandoffTargets() {
+    const currentPlatform = this._detectPlatform();
+    const compat = this.HANDOFF_COMPAT[currentPlatform] || {};
+
+    try {
+      const result = await chrome.storage.sync.get(['acmPlatforms']);
+      const userPrefs = result.acmPlatforms || [];
+      if (userPrefs.length === 0) return [];
+
+      return userPrefs
+        .filter(p => p !== currentPlatform && compat[p] === true)
+        .map(p => ({ platform: p, url: this.NEW_CHAT_URLS[p] }));
+    } catch (_) {
+      return [];
+    }
+  },
+
+  _detectPlatform() {
+    const host = window.location.hostname;
+    if (host.includes('claude.ai')) return 'claude';
+    if (host.includes('chatgpt.com')) return 'chatgpt';
+    if (host.includes('gemini.google')) return 'gemini';
+    if (host.includes('grok.com')) return 'grok';
+    if (host.includes('deepseek.com')) return 'deepseek';
+    if (host.includes('mistral.ai')) return 'mistral';
+    if (host.includes('copilot.microsoft')) return 'copilot';
+    if (host.includes('perplexity.ai')) return 'perplexity';
+    return 'unknown';
+  },
+
   async init() {
     // https://claude.ai/code/* also matches the broader https://claude.ai/*
     // manifest pattern, so this script gets injected there too via that

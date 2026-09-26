@@ -693,6 +693,30 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     }
   }
 
+  _buildHandoffBrief(checkpoint) {
+    const platform = window.__lisaACM?._detectPlatform() || 'unknown';
+    const ts = new Date(checkpoint.capturedAt).toLocaleString();
+
+    let brief = `[LISA Context Transfer — continuing from ${platform} conversation]\n`;
+    brief += `[Captured at message ${checkpoint.messageCount}, ${ts}]\n\n`;
+
+    const sections = [
+      ['DECISIONS', checkpoint.decisions],
+      ['OPEN', checkpoint.open],
+      ['RESOLVED', checkpoint.resolved],
+      ['CONSTRAINTS', checkpoint.constraints],
+      ['KEY CONTEXT', checkpoint.keyContext],
+    ];
+    for (const [name, items] of sections) {
+      if (items && items.length > 0) {
+        brief += `${name}:\n${items.map(d => `- ${d}`).join('\n')}\n\n`;
+      }
+    }
+
+    brief += `Continue from where we left off. The above is a checkpoint from our previous session — use it to maintain full continuity. Ask if anything needs clarification before proceeding.`;
+    return brief;
+  }
+
   async contextHandoff() {
     try {
       const acm = window.__lisaACM;
@@ -707,47 +731,98 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         return;
       }
 
-      // Build continuation brief
-      const platform = window.location.hostname.replace('www.', '').split('.')[0];
-      const title = document.title || 'Untitled conversation';
-      const ts = new Date(checkpoint.capturedAt).toLocaleString();
+      const targets = await acm.getHandoffTargets();
+      const brief = this._buildHandoffBrief(checkpoint);
 
-      let brief = `[LISA Context Transfer — continuing from ${platform} conversation]\n`;
-      brief += `[Captured at message ${checkpoint.messageCount}, ${ts}]\n\n`;
-
-      if (checkpoint.decisions.length > 0) {
-        brief += `DECISIONS:\n${checkpoint.decisions.map(d => `- ${d}`).join('\n')}\n\n`;
-      }
-      if (checkpoint.open.length > 0) {
-        brief += `OPEN:\n${checkpoint.open.map(d => `- ${d}`).join('\n')}\n\n`;
-      }
-      if (checkpoint.resolved.length > 0) {
-        brief += `RESOLVED:\n${checkpoint.resolved.map(d => `- ${d}`).join('\n')}\n\n`;
-      }
-      if (checkpoint.constraints.length > 0) {
-        brief += `CONSTRAINTS:\n${checkpoint.constraints.map(d => `- ${d}`).join('\n')}\n\n`;
-      }
-      if (checkpoint.keyContext.length > 0) {
-        brief += `KEY CONTEXT:\n${checkpoint.keyContext.map(d => `- ${d}`).join('\n')}\n\n`;
+      if (targets.length === 0) {
+        // No platform preferences set — just copy to clipboard
+        await navigator.clipboard.writeText(brief);
+        this.showToast("Handoff brief copied — open a fresh chat and paste it. Set preferred platforms in LISA Settings for one-click handoff.");
+        return;
       }
 
-      brief += `Continue from where we left off. The above is a checkpoint from our previous session — use it to maintain full continuity. Ask if anything needs clarification before proceeding.`;
-
-      await navigator.clipboard.writeText(brief);
-
-      const editor = document.querySelector(
-        'div[contenteditable="true"].ProseMirror, ' +
-        '#prompt-textarea, ' +
-        'div[contenteditable="true"], ' +
-        'textarea'
-      );
-      if (editor) editor.focus();
-
-      this.showToast("Handoff brief copied — open a fresh chat and paste it to continue with full context.");
+      // Show platform picker
+      this._showHandoffPicker(targets, brief);
     } catch (error) {
       console.error("[LISA] Handoff error:", error);
       this.showToast("Could not prepare handoff", true);
     }
+  }
+
+  _showHandoffPicker(targets, brief) {
+    const existing = document.querySelector('.lisa-handoff-picker');
+    if (existing) existing.remove();
+
+    const currentPlatform = window.__lisaACM?._detectPlatform() || 'unknown';
+    const platformNames = {
+      claude: 'Claude', chatgpt: 'ChatGPT', gemini: 'Gemini', grok: 'Grok',
+      deepseek: 'DeepSeek', mistral: 'Mistral', copilot: 'Copilot', perplexity: 'Perplexity'
+    };
+
+    // Include same-platform rebirth option
+    const allTargets = [
+      { platform: currentPlatform, url: window.__lisaACM?.NEW_CHAT_URLS[currentPlatform], label: `${platformNames[currentPlatform] || currentPlatform} (fresh session)` },
+      ...targets.map(t => ({ ...t, label: platformNames[t.platform] || t.platform }))
+    ];
+
+    const picker = document.createElement('div');
+    picker.className = 'lisa-handoff-picker';
+    picker.innerHTML = `
+      <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Handoff to:</div>
+      ${allTargets.map(t => `
+        <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}" style="padding:10px 16px;color:#fafafa;font-size:14px;cursor:pointer;">
+          ${t.label}
+        </div>
+      `).join('')}
+      <div class="lisa-menu-item" data-action="copy-only" style="padding:10px 16px;color:#9ca3af;font-size:13px;cursor:pointer;border-top:1px solid #333;">
+        📋 Just copy to clipboard
+      </div>
+    `;
+
+    const btn = this.button.getBoundingClientRect();
+    picker.style.cssText = `
+      position:fixed;
+      bottom:${window.innerHeight - btn.top + 10}px;
+      right:${window.innerWidth - btn.right}px;
+      background:#1f1f23;
+      border:1px solid #3b82f6;
+      border-radius:8px;
+      padding:0;
+      z-index:2147483647;
+      box-shadow:0 4px 20px rgba(0,0,0,0.4);
+      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+      min-width:200px;
+    `;
+
+    document.body.appendChild(picker);
+
+    picker.addEventListener('click', async (e) => {
+      const item = e.target.closest('.lisa-menu-item');
+      if (!item) return;
+      picker.remove();
+
+      if (item.dataset.action === 'copy-only') {
+        await navigator.clipboard.writeText(brief);
+        this.showToast("Handoff brief copied to clipboard.");
+        return;
+      }
+
+      const url = item.dataset.url;
+      if (url) {
+        await navigator.clipboard.writeText(brief);
+        window.open(url, '_blank');
+        this.showToast(`Handoff copied & new ${platformNames[item.dataset.platform] || ''} tab opened — paste to continue.`);
+      }
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', function closePicker(e) {
+        if (!picker.contains(e.target)) {
+          picker.remove();
+          document.removeEventListener('click', closePicker);
+        }
+      });
+    }, 100);
   }
 
 

@@ -1639,12 +1639,43 @@ class LISAPopup {
       }
     }
     
+    this.loadAcmPreferences();
+
     document.getElementById('settingsModal').style.display = 'flex';
     this.trackEvent('settings_modal_opened');
   }
 
   closeSettingsModal() {
     document.getElementById('settingsModal').style.display = 'none';
+  }
+
+  async loadAcmPreferences() {
+    try {
+      const result = await chrome.storage.sync.get(['acmPlatforms', 'acmEnabled']);
+      const platforms = result.acmPlatforms || [];
+      const enabled = result.acmEnabled !== false;
+
+      const checkboxes = document.querySelectorAll('#acmPlatformPrefs input[type="checkbox"]');
+      checkboxes.forEach(cb => {
+        cb.checked = platforms.includes(cb.value);
+        cb.addEventListener('change', () => this.saveAcmPlatforms());
+      });
+
+      const toggle = document.getElementById('acmEnabledToggle');
+      if (toggle) {
+        toggle.checked = enabled;
+        toggle.addEventListener('change', () => {
+          chrome.storage.sync.set({ acmEnabled: toggle.checked });
+        });
+      }
+    } catch (_) {}
+  }
+
+  async saveAcmPlatforms() {
+    const checkboxes = document.querySelectorAll('#acmPlatformPrefs input[type="checkbox"]');
+    const selected = [];
+    checkboxes.forEach(cb => { if (cb.checked) selected.push(cb.value); });
+    await chrome.storage.sync.set({ acmPlatforms: selected });
   }
 
   async loadLicenseKey() {

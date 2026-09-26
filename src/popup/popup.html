@@ -483,6 +483,33 @@
           <!-- Content will be injected by JavaScript -->
         </div>
         
+        <div class="settings-divider"></div>
+
+        <section class="settings-section">
+          <h3>🧠 ACM — Context Management</h3>
+          <p class="settings-desc">Select your preferred AI platforms for context handoff. Only compatible targets will be offered.</p>
+
+          <div id="acmPlatformPrefs" class="acm-platform-grid">
+            <label class="acm-platform-option"><input type="checkbox" value="claude" /> Claude</label>
+            <label class="acm-platform-option"><input type="checkbox" value="chatgpt" /> ChatGPT</label>
+            <label class="acm-platform-option"><input type="checkbox" value="gemini" /> Gemini</label>
+            <label class="acm-platform-option"><input type="checkbox" value="grok" /> Grok</label>
+            <label class="acm-platform-option"><input type="checkbox" value="deepseek" /> DeepSeek</label>
+            <label class="acm-platform-option"><input type="checkbox" value="mistral" /> Mistral</label>
+            <label class="acm-platform-option"><input type="checkbox" value="copilot" /> Copilot</label>
+            <label class="acm-platform-option"><input type="checkbox" value="perplexity" /> Perplexity</label>
+          </div>
+
+          <div class="acm-toggle-row" style="margin-top: 10px;">
+            <label class="acm-platform-option">
+              <input type="checkbox" id="acmEnabledToggle" checked />
+              Enable ACM health monitoring
+            </label>
+          </div>
+        </section>
+
+        <div class="settings-divider"></div>
+
         <section class="settings-section" >
           <h3>🗑️ Reset</h3>
           <p class="settings-desc">Clear all local data and start fresh.</p>

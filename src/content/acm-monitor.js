@@ -27,6 +27,7 @@ const ACMMonitor = {
   _pollTimer: null,
   _domActivityTimer: null,
   _lastCheckpointAt: 0,
+  _apiRescanInFlight: false,
 
   // Thresholds (configurable via chrome.storage.sync)
   thresholds: {
@@ -57,11 +58,16 @@ const ACMMonitor = {
     this._pruneStaleState();
 
     if (this._isApiCapturePlatform()) {
-      // API path: an exact source of truth, but a real network call (two
-      // requests on Claude) — poll infrequently rather than on every DOM
-      // event/keystroke-driven mutation.
+      // API path: event-triggered, not timed — a real network call (two
+      // requests on Claude), so it only fires once DOM activity settles
+      // (a longer debounce than the DOM path's, since a streaming reply
+      // fires many events in a row and we only need the final state, not
+      // every intermediate one) rather than on a fixed interval.
       this._rescanViaApi();
-      this._pollTimer = setInterval(() => this._rescanViaApi(), 20000);
+      document.addEventListener('lisa-dom-activity', () => {
+        clearTimeout(this._domActivityTimer);
+        this._domActivityTimer = setTimeout(() => this._rescanViaApi(), 3000);
+      });
     } else {
       this._rescan();
       // Primary trigger: lisa-progressive.js's existing MutationObserver
@@ -157,12 +163,17 @@ const ACMMonitor = {
   // any failure (module not loaded yet, transient API error, shared/
   // read-only view the API doesn't cover) so the dot never goes stale.
   async _rescanViaApi() {
-    const api = this._getApiCapture();
-    if (!api || typeof api.extractViaAPI !== 'function') {
-      this._rescan();
-      return;
-    }
+    // Guard against overlapping calls — a conversation switch, a
+    // visibility change, and a settled debounce can all fire close
+    // together, and each one is a real network request.
+    if (this._apiRescanInFlight) return;
+    this._apiRescanInFlight = true;
     try {
+      const api = this._getApiCapture();
+      if (!api || typeof api.extractViaAPI !== 'function') {
+        this._rescan();
+        return;
+      }
       const result = await api.extractViaAPI();
       if (!result || !Array.isArray(result.messages)) {
         this._rescan();
@@ -183,6 +194,8 @@ const ACMMonitor = {
       }
     } catch (_) {
       this._rescan();
+    } finally {
+      this._apiRescanInFlight = false;
     }
   },
 

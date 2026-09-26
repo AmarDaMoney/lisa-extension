@@ -196,6 +196,18 @@ const ACMMonitor = {
       let charTotal = 0;
       for (const m of result.messages) charTotal += (m.content || '').length;
       const newCount = result.messageCount != null ? result.messageCount : result.messages.length;
+
+      // Temporary diagnostic — helps tell apart "branch resolution is
+      // wrong" (activeBranch << totalTreeMessages, leafSource: 'guessed')
+      // from "the API count is actually right and something else is off".
+      if (result._totalTreeMessages != null) {
+        console.debug(
+          '[LISA ACM] active branch:', newCount,
+          '/ total across all branches:', result._totalTreeMessages,
+          '/ leaf source:', result._leafSource
+        );
+      }
+
       const changed = newCount !== this.messageCount;
 
       this.messageCount = newCount;

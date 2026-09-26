@@ -201,7 +201,10 @@ const ACMMonitor = {
       // wrong" (activeBranch << totalTreeMessages, leafSource: 'guessed')
       // from "the API count is actually right and something else is off".
       if (result._totalTreeMessages != null) {
-        console.debug(
+        // console.log, not .debug — Chrome's console hides "Verbose"
+        // level (which .debug maps to) by default, and this needs to be
+        // visible without the tester having to change devtools filters.
+        console.log(
           '[LISA ACM] active branch:', newCount,
           '/ total across all branches:', result._totalTreeMessages,
           '/ leaf source:', result._leafSource

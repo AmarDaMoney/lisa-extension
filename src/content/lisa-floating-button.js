@@ -206,6 +206,7 @@ class LISAFloatingButton {
       .lisa-fab-icon { font-size: 16px; }
       .lisa-fab-text { font-size: 13px; }
       .lisa-acm-dot {
+        display: none;
         width: 8px;
         height: 8px;
         border-radius: 50%;
@@ -363,7 +364,6 @@ class LISAFloatingButton {
 
     // Build ACM status line
     let acmStatusHtml = '';
-    let acmMarkRefreshedHtml = '';
     const acm = window.__lisaACM;
     if (acm) {
       const status = acm.getStatus();
@@ -371,23 +371,19 @@ class LISAFloatingButton {
       const levelLabels = { green: 'Healthy', yellow: 'Building pressure', red: 'Refresh recommended', critical: 'Context degrading' };
       const dotColor = levelColors[status.healthLevel] || '#4ade80';
       const label = levelLabels[status.healthLevel] || 'Healthy';
-      const countLabel = status.baselineCount > 0
-        ? `${status.totalMessageCount} msgs total · ${status.messageCount} since refresh`
-        : `${status.totalMessageCount} msgs`;
       acmStatusHtml = `
         <div class="lisa-menu-acm-status" title="ACM Context Health">
           <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:6px;vertical-align:middle;"></span>
-          <span style="color:#9ca3af;font-size:12px;">${countLabel} · ~${status.tokenEstimate.toLocaleString()} tokens · ${label}</span>
+          <span style="color:#9ca3af;font-size:12px;">${status.messageCount} msgs · ~${status.tokenEstimate.toLocaleString()} tokens · ${label}</span>
         </div>
       `;
-      acmMarkRefreshedHtml = `<div class="lisa-menu-item" data-action="acm-mark-refreshed" title="Reset the context health clock after you've refreshed/compressed this conversation — the total message count is kept">🔄 Mark context refreshed</div>`;
     }
 
     menu.innerHTML = `
       ${acmStatusHtml}
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
-      ${acmMarkRefreshedHtml}
+
     `;
     
     // Position near the button
@@ -413,7 +409,6 @@ class LISAFloatingButton {
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
-      else if (action === "acm-mark-refreshed") window.__lisaACM?.markRefreshed();
     });
     
     // Close on outside click
@@ -428,6 +423,22 @@ class LISAFloatingButton {
   }
 
 
+  // One retry before giving up on the API — see the matching helper in
+  // lisa-v-parser.js for why (a transient failure shouldn't silently
+  // downgrade to an undercounted DOM capture).
+  async _captureViaApiWithRetry(captureModule, isShared) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = isShared
+          ? await captureModule.extractSharedViaAPI()
+          : await captureModule.extractViaAPI();
+        if (result && result.messages && result.messages.length > 0) return result;
+      } catch (_) { /* retry below, or fall through after the last attempt */ }
+      if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    return null;
+  }
+
   async saveAsMarkdown() {
     try {
       const limitCheck = await this.checkFloatingLimit('md');
@@ -440,29 +451,16 @@ class LISAFloatingButton {
 
       // Use API capture if available, else fall back to LisaVParser
       let messages = null;
+      let usedFallbackCapture = false;
 
       if (window.__LISA_CLAUDE_API_CAPTURE) {
-        try {
-          const isShared = window.location.pathname.startsWith('/share/');
-          const apiResult = isShared
-            ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
-            : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
-          if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-            messages = apiResult;
-          }
-        } catch (e) { /* fall through */ }
+        const isShared = window.location.pathname.startsWith('/share/');
+        messages = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
       }
 
       if (!messages && window.__LISA_CHATGPT_API_CAPTURE) {
-        try {
-          const isShared = window.location.pathname.startsWith('/share/');
-          const apiResult = isShared
-            ? await window.__LISA_CHATGPT_API_CAPTURE.extractSharedViaAPI()
-            : await window.__LISA_CHATGPT_API_CAPTURE.extractViaAPI();
-          if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-            messages = apiResult;
-          }
-        } catch (e) { /* fall through */ }
+        const isShared = window.location.pathname.startsWith('/share/');
+        messages = await this._captureViaApiWithRetry(window.__LISA_CHATGPT_API_CAPTURE, isShared);
       }
 
       if (!messages) {
@@ -470,6 +468,7 @@ class LISAFloatingButton {
         await parser.extractConversation();
         await parser.finalize();
         messages = parser.toMessages();
+        usedFallbackCapture = parser.usedFallbackCapture;
       }
 
       if (!messages || !messages.messages || messages.messages.length === 0) {
@@ -486,7 +485,22 @@ class LISAFloatingButton {
 
       for (const msg of messages.messages) {
         const role = msg.role === 'user' ? 'User' : 'Assistant';
-        const text = typeof msg.content === 'string' ? msg.content : (msg.content ? JSON.stringify(msg.content) : '');
+        let text = typeof msg.content === 'string' ? msg.content : (msg.content ? JSON.stringify(msg.content) : '');
+        // Tool calls/results live in msg.artifacts, not msg.content (see
+        // claude-api-capture.js's processContentBlocks) — without this, a
+        // message that's purely a tool call renders as an empty section
+        // with its actual content silently lost.
+        if (Array.isArray(msg.artifacts) && msg.artifacts.length > 0) {
+          const artifactText = msg.artifacts.map(a => {
+            if (a.type === 'tool_use') return `Tool call: ${a.name}\nInput: ${JSON.stringify(a.input)}`;
+            if (a.type === 'tool_result') {
+              const resultText = typeof a.content === 'string' ? a.content : JSON.stringify(a.content);
+              return `Tool result:\n${resultText}`;
+            }
+            return null;
+          }).filter(Boolean).join('\n\n');
+          text = text ? `${text}\n\n${artifactText}` : artifactText;
+        }
         md += `### ${role}\n\n${text}\n\n`;
       }
 
@@ -509,6 +523,9 @@ class LISAFloatingButton {
 
       if (response && response.success) {
         this.showToast("✅ Markdown saved to library!");
+        if (usedFallbackCapture) {
+          setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
+        }
       } else {
         this.showToast('❌ ' + (response?.error || 'Save failed'), true);
         return;
@@ -555,6 +572,9 @@ class LISAFloatingButton {
       
       if (response?.success) {
         this.showToast("✅ LISA-V saved! " + stats.totalBlocks + " blocks");
+        if (parser.usedFallbackCapture) {
+          setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
+        }
         const remaining = await this.incrementFloatingLimit('lisav');
           if (remaining !== undefined && remaining <= 5) {
             const label = remaining > 2 ? `${remaining} welcome credits remaining` : `${remaining} saves remaining today`;

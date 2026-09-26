@@ -1,41 +1,35 @@
 // LISA ACM — Active Context Management: Monitor Layer
 // Phase 1: Message counting, token estimation, context health indicator
-// Counts by content hash (via periodic rescan), not DOM node identity or
-// incremental mutation deltas — several platforms (e.g. Gemini's Angular
-// rendering) replace already-counted nodes while streaming, which made a
-// per-node-identity/incremental design overcount. A rescan-and-diff design
-// is self-healing: it can never drift, and it needs no second
-// MutationObserver running alongside lisa-progressive.js's — it instead
-// listens for the 'lisa-dom-activity' event that observer already fires.
 //
-// Tracks two numbers, on purpose:
-//   totalMessageCount — the whole conversation, including messages from
-//     before ACM was watching (merged with lisa-progressive's buffer,
-//     which is the only thing that survives virtualised platforms
-//     unmounting old messages).
-//   effective count (total - baselineCount) — what actually drives the
-//     health dot. baselineCount is a marker set by markRefreshed(), so a
-//     context refresh/compression resets the health clock without losing
-//     the "how long has this conversation really been" number.
+// On claude.ai and chatgpt.com, message count/tokens come from the
+// platform's own REST API (via claude-api-capture.js / chatgpt-api-capture.js,
+// which already exist for export) instead of DOM scraping — exact message
+// boundaries, no selector guessing, immune to streaming re-renders.
+// Falls back to the DOM rescan below if the API call fails.
+//
+// Everywhere else, counts by content hash (via periodic rescan), not DOM
+// node identity or incremental mutation deltas — several platforms (e.g.
+// Gemini's Angular rendering) replace already-counted nodes while
+// streaming, which made a per-node-identity/incremental design overcount.
+// A rescan-and-diff design is self-healing: it can never drift, and it
+// needs no second MutationObserver running alongside lisa-progressive.js's
+// — it instead listens for the 'lisa-dom-activity' event that observer
+// already fires.
 // Zero new dependencies.
 
 const ACMMonitor = {
   // State
-  totalMessageCount: 0,
+  messageCount: 0,
   tokenEstimate: 0,
-  baselineCount: 0,
   conversationId: null,
   seenHashes: null, // Map<hash, charLength> for the current conversation
   _lastUrl: null,
-  _rescanTimer: null,
   _pollTimer: null,
   _domActivityTimer: null,
   _lastCheckpointAt: 0,
+  _apiRescanInFlight: false,
 
   // Thresholds (configurable via chrome.storage.sync)
-  // 'critical' is the label for messageCount >= red — there is no 4th
-  // numeric boundary; a conversation is either healthy, building pressure,
-  // due for a refresh, or past due.
   thresholds: {
     green: 40,   // 0 to green: healthy
     yellow: 80,  // green to yellow: building context pressure
@@ -43,6 +37,15 @@ const ACMMonitor = {
   },
 
   async init() {
+    // https://claude.ai/code/* also matches the broader https://claude.ai/*
+    // manifest pattern, so this script gets injected there too via that
+    // second block even though it's deliberately left out of the
+    // claude.ai/code/* one (no API capture exists for Claude Code, and its
+    // DOM is virtualized in a way generic selector-counting can't handle).
+    if (window.location.hostname.includes('claude.ai') && window.location.pathname.startsWith('/code/')) {
+      return;
+    }
+
     try {
       const stored = await chrome.storage.sync.get(['acmThresholds', 'acmEnabled']);
       if (stored.acmThresholds) {
@@ -61,25 +64,39 @@ const ACMMonitor = {
     await this._loadState();
     this._updateDot();
 
-    this._rescan();
     this._pruneStaleState();
 
-    // Primary trigger: lisa-progressive.js's existing MutationObserver
-    // dispatches this on every batch of DOM activity, so we react within a
-    // few hundred ms of a new message instead of waiting for the poll.
-    // Debounced because a streaming reply fires many mutations in a row.
-    document.addEventListener('lisa-dom-activity', () => {
-      clearTimeout(this._domActivityTimer);
-      this._domActivityTimer = setTimeout(() => this._rescan(), 500);
-    });
-
-    // Fallback poll for platforms/moments the event doesn't cover (e.g.
-    // progressive capture is off, or a mutation landed outside `main`).
-    this._pollTimer = setInterval(() => this._rescan(), 4000);
+    if (this._isApiCapturePlatform()) {
+      // API path: event-triggered, not timed — a real network call (two
+      // requests on Claude), so it only fires once DOM activity settles
+      // (a longer debounce than the DOM path's, since a streaming reply
+      // fires many events in a row and we only need the final state, not
+      // every intermediate one) rather than on a fixed interval.
+      this._rescanViaApi();
+      document.addEventListener('lisa-dom-activity', () => {
+        clearTimeout(this._domActivityTimer);
+        this._domActivityTimer = setTimeout(() => this._rescanViaApi(), 3000);
+      });
+    } else {
+      this._rescan();
+      // Primary trigger: lisa-progressive.js's existing MutationObserver
+      // dispatches this on every batch of DOM activity, so we react within
+      // a few hundred ms of a new message instead of waiting for the poll.
+      // Debounced because a streaming reply fires many mutations in a row.
+      document.addEventListener('lisa-dom-activity', () => {
+        clearTimeout(this._domActivityTimer);
+        this._domActivityTimer = setTimeout(() => this._rescan(), 500);
+      });
+      // Fallback poll for platforms/moments the event doesn't cover (e.g.
+      // progressive capture is off, or a mutation landed outside `main`).
+      this._pollTimer = setInterval(() => this._rescan(), 4000);
+    }
 
     this._watchNavigation();
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') this._rescan();
+      if (document.visibilityState !== 'visible') return;
+      if (this._isApiCapturePlatform()) this._rescanViaApi();
+      else this._rescan();
     });
 
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -89,18 +106,12 @@ const ACMMonitor = {
       }
       if (msg.action === 'acm_resetMonitor') {
         this.seenHashes = new Map();
-        this.totalMessageCount = 0;
+        this.messageCount = 0;
         this.tokenEstimate = 0;
-        this.baselineCount = 0;
         this._lastCheckpointAt = 0;
         this._saveState();
         this._updateDot();
         sendResponse({ success: true });
-        return false;
-      }
-      if (msg.action === 'acm_markRefreshed') {
-        this.markRefreshed();
-        sendResponse({ success: true, status: this.getStatus() });
         return false;
       }
     });
@@ -140,6 +151,66 @@ const ACMMonitor = {
       }
     }
     return `unknown-${Date.now()}`;
+  },
+
+  _isApiCapturePlatform() {
+    const host = window.location.hostname;
+    if (host.includes('claude.ai') && !window.location.pathname.startsWith('/code/')) return true;
+    if (host.includes('chatgpt.com')) return true;
+    return false;
+  },
+
+  _getApiCapture() {
+    const host = window.location.hostname;
+    if (host.includes('claude.ai')) return window.__LISA_CLAUDE_API_CAPTURE || null;
+    if (host.includes('chatgpt.com')) return window.__LISA_CHATGPT_API_CAPTURE || null;
+    return null;
+  },
+
+  // Exact count/token source for claude.ai and chatgpt.com — the platform's
+  // own REST API instead of DOM guessing. Falls back to the DOM rescan on
+  // any failure (module not loaded yet, transient API error, shared/
+  // read-only view the API doesn't cover) so the dot never goes stale.
+  async _rescanViaApi() {
+    // Guard against overlapping calls — a conversation switch, a
+    // visibility change, and a settled debounce can all fire close
+    // together, and each one is a real network request.
+    if (this._apiRescanInFlight) return;
+    this._apiRescanInFlight = true;
+    try {
+      const api = this._getApiCapture();
+      if (!api || typeof api.extractViaAPI !== 'function') {
+        console.debug('[LISA ACM] API capture module not available, skipping this rescan');
+        return;
+      }
+      const result = await api.extractViaAPI();
+      if (!result || !Array.isArray(result.messages)) {
+        // Don't fall back to the DOM/buffer heuristic here — it disagrees
+        // with the API by a lot on Claude (stale progressive-buffer hashes
+        // from before edits/regenerations get unioned in), which defeats
+        // the point of using the API as the source of truth. Keep the last
+        // known-good count and let the next trigger retry instead.
+        console.debug('[LISA ACM] API rescan returned no result, keeping last known count');
+        return;
+      }
+      let charTotal = 0;
+      for (const m of result.messages) charTotal += (m.content || '').length;
+      const newCount = result.messageCount != null ? result.messageCount : result.messages.length;
+      const changed = newCount !== this.messageCount;
+
+      this.messageCount = newCount;
+      this.tokenEstimate = Math.round(charTotal / 3.5);
+
+      if (changed) {
+        this._updateDot();
+        this._saveState();
+        this._maybeCheckpoint();
+      }
+    } catch (err) {
+      console.debug('[LISA ACM] API rescan failed, keeping last known count:', err);
+    } finally {
+      this._apiRescanInFlight = false;
+    }
   },
 
   _getMessageSelector() {
@@ -208,7 +279,7 @@ const ACMMonitor = {
     let charTotal = 0;
     for (const len of freshHashes.values()) charTotal += len;
 
-    this.totalMessageCount = freshHashes.size;
+    this.messageCount = freshHashes.size;
     this.tokenEstimate = Math.round(charTotal / 3.5);
 
     if (changed) {
@@ -218,35 +289,16 @@ const ACMMonitor = {
     }
   },
 
-  // messages since the last context refresh — this is what health is based on
-  getEffectiveCount() {
-    return Math.max(0, this.totalMessageCount - this.baselineCount);
-  },
-
-  // Called when a context refresh/compression happens for this
-  // conversation (manually today via the floating-button menu; Phase 3's
-  // automatic inject flow will call this too). Resets the health clock
-  // without losing the running total.
-  markRefreshed() {
-    this.baselineCount = this.totalMessageCount;
-    this._lastCheckpointAt = 0;
-    this._saveState();
-    this._updateDot();
-    console.debug('[LISA ACM] Context marked refreshed at', this.baselineCount, 'total messages');
-  },
-
   _maybeCheckpoint() {
     // Threshold-crossing check, not a modulo — rescans arrive in batches
     // (e.g. 8 -> 13 messages in one tick), so "count % 10 === 0" can skip
     // right over a checkpoint boundary.
-    const ec = this.getEffectiveCount();
-    if (ec >= 20 && ec - this._lastCheckpointAt >= 10) {
-      this._lastCheckpointAt = ec;
+    if (this.messageCount >= 20 && this.messageCount - this._lastCheckpointAt >= 10) {
+      this._lastCheckpointAt = this.messageCount;
       chrome.runtime.sendMessage({
         action: 'acm_checkpoint',
         conversationId: this.conversationId,
-        messageCount: ec,
-        totalMessageCount: this.totalMessageCount,
+        messageCount: this.messageCount,
         tokenEstimate: this.tokenEstimate,
         healthLevel: this.getHealthLevel()
       }).catch(() => {}); // service worker may not handle this yet in Phase 1
@@ -278,17 +330,18 @@ const ACMMonitor = {
     // Reset for new conversation
     this.conversationId = newId || this._getConversationId();
     this.seenHashes = new Map();
-    this.totalMessageCount = 0;
+    this.messageCount = 0;
     this.tokenEstimate = 0;
-    this.baselineCount = 0;
     this._lastCheckpointAt = 0;
 
     // Load any existing persisted state for this conversation, then
-    // rescan the now-current DOM immediately — a switch is usually an SPA
-    // nav, not a reload, so the new conversation's messages are already
-    // in the DOM and won't fire fresh mutation/rescan events on their own.
+    // rescan the now-current conversation immediately — a switch is
+    // usually an SPA nav, not a reload, so the new conversation's messages
+    // are already available and won't fire fresh mutation/rescan events
+    // on their own.
     await this._loadState();
-    this._rescan();
+    if (this._isApiCapturePlatform()) await this._rescanViaApi();
+    else this._rescan();
     this._updateDot();
 
     console.debug('[LISA ACM] Switched to conversation:', this.conversationId);
@@ -301,9 +354,8 @@ const ACMMonitor = {
       const key = `lisa-acm-${this.conversationId}`;
       await chrome.storage.local.set({
         [key]: {
-          totalMessageCount: this.totalMessageCount,
+          messageCount: this.messageCount,
           tokenEstimate: this.tokenEstimate,
-          baselineCount: this.baselineCount,
           conversationId: this.conversationId,
           updatedAt: Date.now()
         }
@@ -320,9 +372,8 @@ const ACMMonitor = {
       if (!stored) return;
       // Only restore if data is less than 24 hours old
       if (Date.now() - stored.updatedAt > 24 * 60 * 60 * 1000) return;
-      this.totalMessageCount = stored.totalMessageCount || 0;
+      this.messageCount = stored.messageCount || 0;
       this.tokenEstimate = stored.tokenEstimate || 0;
-      this.baselineCount = stored.baselineCount || 0;
     } catch (_) {}
   },
 
@@ -339,32 +390,29 @@ const ACMMonitor = {
     } catch (_) {}
   },
 
-  // Health computation — based on the effective count (since last
-  // refresh), not the raw conversation total.
+  // Health computation
   getHealthLevel() {
-    const ec = this.getEffectiveCount();
-    if (ec < this.thresholds.green) return 'green';
-    if (ec < this.thresholds.yellow) return 'yellow';
-    if (ec < this.thresholds.red) return 'red';
+    const mc = this.messageCount;
+    if (mc < this.thresholds.green) return 'green';
+    if (mc < this.thresholds.yellow) return 'yellow';
+    if (mc < this.thresholds.red) return 'red';
     return 'critical';
   },
 
   getHealthScore() {
     // 0-100 score: 100 = fresh, 0 = severely degraded.
     // Decays to ~10 by the red threshold, then keeps falling slowly.
-    const ec = this.getEffectiveCount();
+    const mc = this.messageCount;
     const { red } = this.thresholds;
-    if (ec <= 0) return 100;
-    if (ec >= red) return Math.max(0, 10 - (ec - red) / 20);
-    const ratio = ec / red;
+    if (mc <= 0) return 100;
+    if (mc >= red) return Math.max(0, 10 - (mc - red) / 20);
+    const ratio = mc / red;
     return Math.round(100 - (ratio * 90));
   },
 
   getStatus() {
     return {
-      totalMessageCount: this.totalMessageCount,
-      messageCount: this.getEffectiveCount(), // since last refresh — kept as `messageCount` for callers that predate the total/baseline split
-      baselineCount: this.baselineCount,
+      messageCount: this.messageCount,
       tokenEstimate: this.tokenEstimate,
       healthLevel: this.getHealthLevel(),
       healthScore: this.getHealthScore(),
@@ -377,6 +425,7 @@ const ACMMonitor = {
   _updateDot() {
     const dot = document.querySelector('.lisa-acm-dot');
     if (!dot) return;
+    dot.style.display = 'inline-block'; // hidden by default; only ACM-active platforms reveal it
 
     const level = this.getHealthLevel();
     const colors = {
@@ -395,9 +444,7 @@ const ACMMonitor = {
     }
 
     // Update tooltip
-    const ec = this.getEffectiveCount();
-    const sinceRefresh = this.baselineCount > 0 ? ` (${ec} since last refresh)` : '';
-    dot.title = `Context: ${this.totalMessageCount} msgs total${sinceRefresh} · ~${this.tokenEstimate.toLocaleString()} tokens`;
+    dot.title = `Context: ${this.messageCount} msgs (~${this.tokenEstimate.toLocaleString()} tokens)`;
   }
 };
 

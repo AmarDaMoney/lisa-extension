@@ -216,6 +216,9 @@
     }
 
     // Resolve the active branch
+    var leafSource = treeData.current_leaf_message_uuid ? 'tree'
+      : (latestData && latestData.snapshot && latestData.snapshot.current_leaf_message_uuid) ? 'latest'
+      : 'guessed';
     var leafUuid = treeData.current_leaf_message_uuid
       || (latestData && latestData.snapshot && latestData.snapshot.current_leaf_message_uuid)
       || null;
@@ -278,6 +281,9 @@
       _captureMethod: 'api',
       _orgId: orgId,
       _branchPath: branchMessages.map(function(m) { return m.uuid; }).filter(Boolean),
+      // Diagnostics only — doesn't change messages/messageCount for existing callers.
+      _totalTreeMessages: chatMessages.length,
+      _leafSource: leafSource,
       _conversationMeta: {
         created_at: treeData.created_at || null,
         updated_at: treeData.updated_at || null,

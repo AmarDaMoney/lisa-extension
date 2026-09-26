@@ -379,15 +379,23 @@ class LISAFloatingButton {
       `;
     }
 
-    const compressItem = acm && acm.messageCount > 0
-      ? `<div class="lisa-menu-item" data-action="compress-context" title="Compress conversation to semantic snapshot — copies to clipboard for handoff">🗜️ Compress Context</div>`
-      : '';
+    let acmItems = '';
+    if (acm && acm.messageCount > 0) {
+      const cpLabel = acm.hasCheckpoint ? '🧠 Update Checkpoint' : '🧠 Context Checkpoint';
+      const cpTitle = acm.hasCheckpoint
+        ? 'Refresh the context checkpoint — ask the AI for an updated summary'
+        : 'Ask the AI to summarize key decisions, open items and constraints — zero extra cost';
+      acmItems = `
+        <div class="lisa-menu-item" data-action="checkpoint" title="${cpTitle}">${cpLabel}</div>
+        <div class="lisa-menu-item" data-action="compress-context" title="Compress conversation via LISA pipeline — copies to clipboard for handoff">🗜️ Compress & Copy</div>
+      `;
+    }
 
     menu.innerHTML = `
       ${acmStatusHtml}
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
-      ${compressItem}
+      ${acmItems}
     `;
     
     // Position near the button
@@ -414,6 +422,7 @@ class LISAFloatingButton {
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
       else if (action === "compress-context") this.compressContext();
+      else if (action === "checkpoint") this.contextCheckpoint();
     });
     
     // Close on outside click
@@ -618,26 +627,55 @@ class LISAFloatingButton {
       }
 
       const response = await chrome.runtime.sendMessage({
-        action: 'compress',
+        action: 'extractAndSave',
+        source: 'acm-compress',
         data: conversation
       });
 
-      if (!response || !response.success || !response.compressed) {
+      if (!response || !response.success) {
         this.showToast("Compression failed: " + (response?.error || "unknown error"), true);
         return;
       }
 
-      const compressed = response.compressed;
-      const json = JSON.stringify(compressed, null, 2);
-
+      const snapshot = response.snapshot;
+      const json = JSON.stringify(snapshot, null, 2);
       await navigator.clipboard.writeText(json);
 
-      const ratio = compressed.metadata?.compressionRatio || '?';
-      const tokenCount = compressed.semanticTokens?.length || 0;
-      this.showToast(`Context compressed — copied to clipboard (${conversation.messages.length} msgs → ${tokenCount} tokens, ${ratio}x ratio)`);
+      const msgCount = conversation.messages.length;
+      const ratio = snapshot.anchor ? 'with anchor' : 'raw';
+      this.showToast(`Compressed & copied (${msgCount} msgs, ${ratio}). Paste into any AI to continue.`);
     } catch (error) {
       console.error("[LISA] Compress context error:", error);
       this.showToast("Could not compress context", true);
+    }
+  }
+
+  async contextCheckpoint() {
+    const checkpointPrompt = `Quick context checkpoint — I need you to summarize where we are right now. Use this exact format:
+
+DECISIONS: [list each active decision we've made, one per line]
+OPEN: [list unresolved topics or questions, one per line]
+RESOLVED: [list completed/closed items, one line each]
+CONSTRAINTS: [list rules, requirements, or things to remember]
+KEY CONTEXT: [the 3-5 most important points from our conversation]
+
+Keep it tight — this is for continuity, not a report. Only include what matters for picking up where we left off.`;
+
+    try {
+      await navigator.clipboard.writeText(checkpointPrompt);
+
+      const editor = document.querySelector(
+        'div[contenteditable="true"].ProseMirror, ' +
+        '#prompt-textarea, ' +
+        'div[contenteditable="true"], ' +
+        'textarea'
+      );
+      if (editor) editor.focus();
+
+      this.showToast("Checkpoint prompt copied — paste it (Ctrl+V) and send. LISA will capture the AI's response automatically.");
+    } catch (error) {
+      console.error("[LISA] Checkpoint error:", error);
+      this.showToast("Could not copy checkpoint prompt", true);
     }
   }
 

@@ -571,7 +571,10 @@ class LISAFloatingButton {
       });
       
       if (response?.success) {
-        this.showToast("✅ LISA-V saved! " + stats.totalBlocks + " blocks");
+        const countLabel = stats.apiMessageCount != null
+          ? stats.apiMessageCount + " messages, " + stats.totalBlocks + " blocks"
+          : stats.totalBlocks + " blocks";
+        this.showToast("✅ LISA-V saved! " + countLabel);
         if (parser.usedFallbackCapture) {
           setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
         }

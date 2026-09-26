@@ -1312,41 +1312,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
-  // ACM Phase 1 — checkpoint signal from content script monitor
-  if (request.action === 'acm_checkpoint') {
-    const key = `lisa-acm-checkpoint-${request.conversationId}`;
-    chrome.storage.local.set({
-      [key]: {
-        conversationId: request.conversationId,
-        messageCount: request.messageCount,
-        tokenEstimate: request.tokenEstimate,
-        healthLevel: request.healthLevel,
-        updatedAt: Date.now()
-      }
-    }).then(() => {
-      console.debug(`[LISA ACM] Checkpoint: ${request.messageCount} msgs, health=${request.healthLevel}`);
-      sendResponse({ success: true });
-    }).catch(err => {
-      sendResponse({ success: false, error: err.message });
-    });
-    return true;
-  }
-
-  // ACM — get status for a conversation (used by popup)
-  if (request.action === 'acm_getStatus') {
-    const convId = request.conversationId;
-    if (!convId) {
-      sendResponse({ success: false, error: 'No conversationId' });
-      return false;
-    }
-    chrome.storage.local.get(`lisa-acm-${convId}`).then(result => {
-      sendResponse({ success: true, status: result[`lisa-acm-${convId}`] || null });
-    }).catch(err => {
-      sendResponse({ success: false, error: err.message });
-    });
-    return true;
-  }
-
   // Handle compression
   if (request.action === 'compress') {
     (async () => {

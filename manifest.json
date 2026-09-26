@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LISA - AI Chat Exporter for Claude, ChatGPT & More",
   "version": "0.52.7",
-  "description": "Semantic compression for AI conversations. Export from 12 AI platforms. Premium features include cloud sync and integrity verification.",
+  "description": "Semantic compression for AI conversations. Export from 12 AI platforms. Premium features : Cloud sync and integrity verification.",
   "permissions": [
     "storage",
     "unlimitedStorage",
@@ -46,7 +46,6 @@
         "src/content/claude-code-parser.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -61,7 +60,6 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -76,7 +74,6 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -90,7 +87,6 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -104,7 +100,6 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -118,7 +113,6 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -132,7 +126,6 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -146,7 +139,6 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -171,7 +163,6 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -185,7 +176,6 @@
         "src/content/huggingchat-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -199,7 +189,6 @@
         "src/content/metaai-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -213,7 +202,6 @@
         "src/content/poe-parser.js",
         "src/content/lisa-progressive.js",
         "src/content/lisa-v-parser.js",
-        "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"

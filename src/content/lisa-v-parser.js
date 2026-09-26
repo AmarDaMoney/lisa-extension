@@ -11,6 +11,7 @@ class LisaVParser {
     // the message count/content may be incomplete (DOM parsing can miss
     // messages a virtualized long conversation has unmounted).
     this.usedFallbackCapture = false;
+    this.apiMessageCount = null;
   }
 
   // One retry before giving up on the API — a lot of API-capture failures
@@ -347,6 +348,7 @@ class LisaVParser {
       const isShared = window.location.pathname.startsWith('/share/');
       const apiResult = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
       if (apiResult) {
+        this.apiMessageCount = apiResult.messageCount;
         console.log('[LISA] LISA-V using API capture:', apiResult.messageCount, 'messages');
         for (const msg of apiResult.messages) {
           const msgBlocks = await this._apiMessageToBlocks(msg);
@@ -368,6 +370,7 @@ class LisaVParser {
       const isShared = window.location.pathname.startsWith('/share/');
       const apiResult = await this._captureViaApiWithRetry(window.__LISA_CHATGPT_API_CAPTURE, isShared);
       if (apiResult) {
+        this.apiMessageCount = apiResult.messageCount;
         console.log('[LISA] LISA-V using ChatGPT API capture:', apiResult.messageCount, 'messages');
         for (const msg of apiResult.messages) {
           const msgBlocks = await this._apiMessageToBlocks(msg);
@@ -1586,6 +1589,7 @@ class LisaVParser {
     const metaBlock = metaIndex >= 0
       ? conversationBlocks.splice(metaIndex, 1)[0]
       : { t: "meta", id: "unknown", platform: "unknown", ver: "1.0", timestamp: new Date().toISOString() };
+    if (this.apiMessageCount != null) metaBlock.apiMessageCount = this.apiMessageCount;
     this.blocks.push(metaBlock);
 
     // Line 2: lite manifest — receiving AI knows file scope immediately
@@ -1739,13 +1743,15 @@ class LisaVParser {
     const userMessages = this.blocks.filter(b => b.t === 'u');
     const assistantMessages = this.blocks.filter(b => b.t === 'a_text');
     
-    return {
+    const stats = {
       totalBlocks: this.blocks.length,
       codeBlocks: codeBlocks.length,
       userMessages: userMessages.length,
       assistantMessages: assistantMessages.length,
       languages: [...new Set(codeBlocks.map(b => b.lang))]
     };
+    if (this.apiMessageCount != null) stats.apiMessageCount = this.apiMessageCount;
+    return stats;
   }
 
 

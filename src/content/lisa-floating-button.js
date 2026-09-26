@@ -485,7 +485,22 @@ class LISAFloatingButton {
 
       for (const msg of messages.messages) {
         const role = msg.role === 'user' ? 'User' : 'Assistant';
-        const text = typeof msg.content === 'string' ? msg.content : (msg.content ? JSON.stringify(msg.content) : '');
+        let text = typeof msg.content === 'string' ? msg.content : (msg.content ? JSON.stringify(msg.content) : '');
+        // Tool calls/results live in msg.artifacts, not msg.content (see
+        // claude-api-capture.js's processContentBlocks) — without this, a
+        // message that's purely a tool call renders as an empty section
+        // with its actual content silently lost.
+        if (Array.isArray(msg.artifacts) && msg.artifacts.length > 0) {
+          const artifactText = msg.artifacts.map(a => {
+            if (a.type === 'tool_use') return `Tool call: ${a.name}\nInput: ${JSON.stringify(a.input)}`;
+            if (a.type === 'tool_result') {
+              const resultText = typeof a.content === 'string' ? a.content : JSON.stringify(a.content);
+              return `Tool result:\n${resultText}`;
+            }
+            return null;
+          }).filter(Boolean).join('\n\n');
+          text = text ? `${text}\n\n${artifactText}` : artifactText;
+        }
         md += `### ${role}\n\n${text}\n\n`;
       }
 

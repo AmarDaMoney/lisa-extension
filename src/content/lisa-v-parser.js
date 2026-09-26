@@ -292,6 +292,32 @@ class LisaVParser {
       }
     }
 
+    // Tool calls/results never appear in msg.content — claude-api-capture.js
+    // extracts them into msg.artifacts separately. Without this, a message
+    // that's purely a tool call (no accompanying prose) produced zero blocks
+    // above and silently vanished from the export entirely, even though it
+    // still counted as 1 message in the API's messageCount.
+    if (Array.isArray(msg.artifacts)) {
+      for (const artifact of msg.artifacts) {
+        if (artifact.type === 'tool_use') {
+          consolidated.push({
+            t: 'tool_use',
+            role: role,
+            v: `Tool call: ${artifact.name}\nInput: ${JSON.stringify(artifact.input)}`
+          });
+        } else if (artifact.type === 'tool_result') {
+          const resultText = typeof artifact.content === 'string'
+            ? artifact.content
+            : JSON.stringify(artifact.content);
+          consolidated.push({
+            t: 'tool_result',
+            role: role,
+            v: `Tool result:\n${resultText}`
+          });
+        }
+      }
+    }
+
     return consolidated;
   }
   // Main extraction method - platform agnostic

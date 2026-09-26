@@ -1821,3 +1821,21 @@ input:checked + .toggle-slider:before {
   display: block;
   color: var(--success-color);
 }
+
+/* ACM Platform Preferences */
+.acm-platform-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.acm-platform-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.acm-platform-option input[type="checkbox"] {
+  accent-color: #6366f1;
+}

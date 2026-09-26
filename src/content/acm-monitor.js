@@ -29,12 +29,69 @@ const ACMMonitor = {
   _lastCheckpointAt: 0,
   _apiRescanInFlight: false,
   _lastDetectedCheckpointHash: null,
+  _lastSuggestedLevel: null, // track which threshold we last suggested at
 
   // Thresholds (configurable via chrome.storage.sync)
   thresholds: {
     green: 40,   // 0 to green: healthy
     yellow: 80,  // green to yellow: building context pressure
     red: 120,    // yellow to red: recommend refresh; red+: critical
+  },
+
+  // Platform compatibility matrix for handoff — which targets receive well
+  // from which source. Built from testing; will grow as we verify more pairs.
+  // true = tested and works, false = tested and problematic, absent = untested
+  HANDOFF_COMPAT: {
+    claude:    { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true },
+    chatgpt:   { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true },
+    gemini:    { claude: true, chatgpt: true, gemini: true },
+    grok:      { claude: true, chatgpt: true, grok: true },
+    deepseek:  { claude: true, chatgpt: true, deepseek: true },
+    mistral:   { claude: true, chatgpt: true, mistral: true },
+    copilot:   { claude: true, chatgpt: true },
+    perplexity:{ claude: true, chatgpt: true },
+  },
+
+  // New chat URLs per platform
+  NEW_CHAT_URLS: {
+    claude:     'https://claude.ai/new',
+    chatgpt:    'https://chatgpt.com/',
+    gemini:     'https://gemini.google.com/app',
+    grok:       'https://grok.com/',
+    deepseek:   'https://chat.deepseek.com/',
+    mistral:    'https://chat.mistral.ai/chat',
+    copilot:    'https://copilot.microsoft.com/',
+    perplexity: 'https://www.perplexity.ai/',
+  },
+
+  async getHandoffTargets() {
+    const currentPlatform = this._detectPlatform();
+    const compat = this.HANDOFF_COMPAT[currentPlatform] || {};
+
+    try {
+      const result = await chrome.storage.sync.get(['acmPlatforms']);
+      const userPrefs = result.acmPlatforms || [];
+      if (userPrefs.length === 0) return [];
+
+      return userPrefs
+        .filter(p => p !== currentPlatform && compat[p] === true)
+        .map(p => ({ platform: p, url: this.NEW_CHAT_URLS[p] }));
+    } catch (_) {
+      return [];
+    }
+  },
+
+  _detectPlatform() {
+    const host = window.location.hostname;
+    if (host.includes('claude.ai')) return 'claude';
+    if (host.includes('chatgpt.com')) return 'chatgpt';
+    if (host.includes('gemini.google')) return 'gemini';
+    if (host.includes('grok.com')) return 'grok';
+    if (host.includes('deepseek.com')) return 'deepseek';
+    if (host.includes('mistral.ai')) return 'mistral';
+    if (host.includes('copilot.microsoft')) return 'copilot';
+    if (host.includes('perplexity.ai')) return 'perplexity';
+    return 'unknown';
   },
 
   async init() {
@@ -115,6 +172,7 @@ const ACMMonitor = {
         this.tokenEstimate = 0;
         this._lastCheckpointAt = 0;
         this._lastDetectedCheckpointHash = null;
+        this._lastSuggestedLevel = null;
         this._saveState();
         this._updateDot();
         sendResponse({ success: true });
@@ -302,9 +360,30 @@ const ACMMonitor = {
   },
 
   _maybeCheckpoint() {
-    // Threshold-crossing check, not a modulo — rescans arrive in batches
-    // (e.g. 8 -> 13 messages in one tick), so "count % 10 === 0" can skip
-    // right over a checkpoint boundary.
+    const level = this.getHealthLevel();
+
+    // Suggest checkpoint at each health transition (yellow, red, critical)
+    // but only once per level per conversation — not every rescan
+    if (level !== 'green' && level !== this._lastSuggestedLevel) {
+      this._lastSuggestedLevel = level;
+
+      const suggestions = {
+        yellow: 'Context building up — good time for a checkpoint to keep things sharp.',
+        red: 'Context pressure is high — a checkpoint now will help maintain quality.',
+        critical: 'Context is strained — checkpoint strongly recommended, or consider a handoff.'
+      };
+
+      document.dispatchEvent(new CustomEvent('lisa-acm-suggest', {
+        detail: {
+          level,
+          message: suggestions[level],
+          hasCheckpoint: this._lastDetectedCheckpointHash !== null,
+          messageCount: this.messageCount
+        }
+      }));
+    }
+
+    // Also notify service worker at regular intervals for internal tracking
     if (this.messageCount >= 20 && this.messageCount - this._lastCheckpointAt >= 10) {
       this._lastCheckpointAt = this.messageCount;
       chrome.runtime.sendMessage({
@@ -312,8 +391,8 @@ const ACMMonitor = {
         conversationId: this.conversationId,
         messageCount: this.messageCount,
         tokenEstimate: this.tokenEstimate,
-        healthLevel: this.getHealthLevel()
-      }).catch(() => {}); // service worker may not handle this yet in Phase 1
+        healthLevel: level
+      }).catch(() => {});
     }
   },
 
@@ -471,6 +550,7 @@ const ACMMonitor = {
     this.tokenEstimate = 0;
     this._lastCheckpointAt = 0;
     this._lastDetectedCheckpointHash = null;
+    this._lastSuggestedLevel = null;
 
     // Load any existing persisted state for this conversation, then
     // rescan the now-current conversation immediately — a switch is

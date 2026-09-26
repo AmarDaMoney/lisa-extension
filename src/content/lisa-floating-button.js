@@ -343,6 +343,16 @@ class LISAFloatingButton {
 
     button.querySelector(".lisa-fab").addEventListener("click", () => this.showActionMenu());
     this.button = button;
+
+    // Listen for ACM checkpoint suggestions
+    document.addEventListener('lisa-acm-suggest', (e) => {
+      const { level, message, hasCheckpoint } = e.detail;
+      const action = hasCheckpoint && level === 'critical'
+        ? 'Consider a handoff — click LISA → Handoff to carry your context to a fresh session.'
+        : 'Click LISA → Context Checkpoint to keep things sharp.';
+      this.showToast(`${message} ${action}`);
+    });
+
     console.debug('[LISA] Floating button ready');
   }
   removeButton() {
@@ -389,6 +399,9 @@ class LISAFloatingButton {
         <div class="lisa-menu-item" data-action="checkpoint" title="${cpTitle}">${cpLabel}</div>
         <div class="lisa-menu-item" data-action="compress-context" title="Compress conversation via LISA pipeline — copies to clipboard for handoff">🗜️ Compress & Copy</div>
       `;
+      if (acm.hasCheckpoint) {
+        acmItems += `<div class="lisa-menu-item" data-action="handoff" title="Copy your context checkpoint as a continuation brief — paste into a fresh chat to carry the relationship forward">🔄 Handoff</div>`;
+      }
     }
 
     menu.innerHTML = `
@@ -423,6 +436,7 @@ class LISAFloatingButton {
       else if (action === "save-lisav") this.saveLisaV();
       else if (action === "compress-context") this.compressContext();
       else if (action === "checkpoint") this.contextCheckpoint();
+      else if (action === "handoff") this.contextHandoff();
     });
     
     // Close on outside click
@@ -679,6 +693,62 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     }
   }
 
+  async contextHandoff() {
+    try {
+      const acm = window.__lisaACM;
+      if (!acm) {
+        this.showToast("ACM not available", true);
+        return;
+      }
+
+      const checkpoint = await acm.getCheckpoint();
+      if (!checkpoint) {
+        this.showToast("No checkpoint captured yet — run a Context Checkpoint first", true);
+        return;
+      }
+
+      // Build continuation brief
+      const platform = window.location.hostname.replace('www.', '').split('.')[0];
+      const title = document.title || 'Untitled conversation';
+      const ts = new Date(checkpoint.capturedAt).toLocaleString();
+
+      let brief = `[LISA Context Transfer — continuing from ${platform} conversation]\n`;
+      brief += `[Captured at message ${checkpoint.messageCount}, ${ts}]\n\n`;
+
+      if (checkpoint.decisions.length > 0) {
+        brief += `DECISIONS:\n${checkpoint.decisions.map(d => `- ${d}`).join('\n')}\n\n`;
+      }
+      if (checkpoint.open.length > 0) {
+        brief += `OPEN:\n${checkpoint.open.map(d => `- ${d}`).join('\n')}\n\n`;
+      }
+      if (checkpoint.resolved.length > 0) {
+        brief += `RESOLVED:\n${checkpoint.resolved.map(d => `- ${d}`).join('\n')}\n\n`;
+      }
+      if (checkpoint.constraints.length > 0) {
+        brief += `CONSTRAINTS:\n${checkpoint.constraints.map(d => `- ${d}`).join('\n')}\n\n`;
+      }
+      if (checkpoint.keyContext.length > 0) {
+        brief += `KEY CONTEXT:\n${checkpoint.keyContext.map(d => `- ${d}`).join('\n')}\n\n`;
+      }
+
+      brief += `Continue from where we left off. The above is a checkpoint from our previous session — use it to maintain full continuity. Ask if anything needs clarification before proceeding.`;
+
+      await navigator.clipboard.writeText(brief);
+
+      const editor = document.querySelector(
+        'div[contenteditable="true"].ProseMirror, ' +
+        '#prompt-textarea, ' +
+        'div[contenteditable="true"], ' +
+        'textarea'
+      );
+      if (editor) editor.focus();
+
+      this.showToast("Handoff brief copied — open a fresh chat and paste it to continue with full context.");
+    } catch (error) {
+      console.error("[LISA] Handoff error:", error);
+      this.showToast("Could not prepare handoff", true);
+    }
+  }
 
 
 
@@ -709,8 +779,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
 
 
-
-  showToast(message, isError = false) {
+  showToast(message, isError = false, duration = 0) {
     const existing = document.querySelector('.lisa-toast');
     if (existing) existing.remove();
 
@@ -720,7 +789,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     document.body.appendChild(toast);
 
     if (!message.includes('Saving')) {
-      setTimeout(() => toast.remove(), 3000);
+      const ms = duration || (message.length > 80 ? 5000 : 3000);
+      setTimeout(() => toast.remove(), ms);
     }
   }
   showUpgradePrompt(reason = 'limit') {

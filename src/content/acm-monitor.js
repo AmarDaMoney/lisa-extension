@@ -29,6 +29,7 @@ const ACMMonitor = {
   _lastCheckpointAt: 0,
   _apiRescanInFlight: false,
   _lastDetectedCheckpointHash: null,
+  _lastSuggestedLevel: null, // track which threshold we last suggested at
 
   // Thresholds (configurable via chrome.storage.sync)
   thresholds: {
@@ -115,6 +116,7 @@ const ACMMonitor = {
         this.tokenEstimate = 0;
         this._lastCheckpointAt = 0;
         this._lastDetectedCheckpointHash = null;
+        this._lastSuggestedLevel = null;
         this._saveState();
         this._updateDot();
         sendResponse({ success: true });
@@ -302,9 +304,30 @@ const ACMMonitor = {
   },
 
   _maybeCheckpoint() {
-    // Threshold-crossing check, not a modulo — rescans arrive in batches
-    // (e.g. 8 -> 13 messages in one tick), so "count % 10 === 0" can skip
-    // right over a checkpoint boundary.
+    const level = this.getHealthLevel();
+
+    // Suggest checkpoint at each health transition (yellow, red, critical)
+    // but only once per level per conversation — not every rescan
+    if (level !== 'green' && level !== this._lastSuggestedLevel) {
+      this._lastSuggestedLevel = level;
+
+      const suggestions = {
+        yellow: 'Context building up — good time for a checkpoint to keep things sharp.',
+        red: 'Context pressure is high — a checkpoint now will help maintain quality.',
+        critical: 'Context is strained — checkpoint strongly recommended, or consider a handoff.'
+      };
+
+      document.dispatchEvent(new CustomEvent('lisa-acm-suggest', {
+        detail: {
+          level,
+          message: suggestions[level],
+          hasCheckpoint: this._lastDetectedCheckpointHash !== null,
+          messageCount: this.messageCount
+        }
+      }));
+    }
+
+    // Also notify service worker at regular intervals for internal tracking
     if (this.messageCount >= 20 && this.messageCount - this._lastCheckpointAt >= 10) {
       this._lastCheckpointAt = this.messageCount;
       chrome.runtime.sendMessage({
@@ -312,8 +335,8 @@ const ACMMonitor = {
         conversationId: this.conversationId,
         messageCount: this.messageCount,
         tokenEstimate: this.tokenEstimate,
-        healthLevel: this.getHealthLevel()
-      }).catch(() => {}); // service worker may not handle this yet in Phase 1
+        healthLevel: level
+      }).catch(() => {});
     }
   },
 
@@ -471,6 +494,7 @@ const ACMMonitor = {
     this.tokenEstimate = 0;
     this._lastCheckpointAt = 0;
     this._lastDetectedCheckpointHash = null;
+    this._lastSuggestedLevel = null;
 
     // Load any existing persisted state for this conversation, then
     // rescan the now-current conversation immediately — a switch is

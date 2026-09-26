@@ -37,6 +37,15 @@ const ACMMonitor = {
   },
 
   async init() {
+    // https://claude.ai/code/* also matches the broader https://claude.ai/*
+    // manifest pattern, so this script gets injected there too via that
+    // second block even though it's deliberately left out of the
+    // claude.ai/code/* one (no API capture exists for Claude Code, and its
+    // DOM is virtualized in a way generic selector-counting can't handle).
+    if (window.location.hostname.includes('claude.ai') && window.location.pathname.startsWith('/code/')) {
+      return;
+    }
+
     try {
       const stored = await chrome.storage.sync.get(['acmThresholds', 'acmEnabled']);
       if (stored.acmThresholds) {
@@ -171,12 +180,17 @@ const ACMMonitor = {
     try {
       const api = this._getApiCapture();
       if (!api || typeof api.extractViaAPI !== 'function') {
-        this._rescan();
+        console.debug('[LISA ACM] API capture module not available, skipping this rescan');
         return;
       }
       const result = await api.extractViaAPI();
       if (!result || !Array.isArray(result.messages)) {
-        this._rescan();
+        // Don't fall back to the DOM/buffer heuristic here — it disagrees
+        // with the API by a lot on Claude (stale progressive-buffer hashes
+        // from before edits/regenerations get unioned in), which defeats
+        // the point of using the API as the source of truth. Keep the last
+        // known-good count and let the next trigger retry instead.
+        console.debug('[LISA ACM] API rescan returned no result, keeping last known count');
         return;
       }
       let charTotal = 0;
@@ -192,8 +206,8 @@ const ACMMonitor = {
         this._saveState();
         this._maybeCheckpoint();
       }
-    } catch (_) {
-      this._rescan();
+    } catch (err) {
+      console.debug('[LISA ACM] API rescan failed, keeping last known count:', err);
     } finally {
       this._apiRescanInFlight = false;
     }

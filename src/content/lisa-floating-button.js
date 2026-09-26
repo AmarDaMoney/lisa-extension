@@ -206,6 +206,7 @@ class LISAFloatingButton {
       .lisa-fab-icon { font-size: 16px; }
       .lisa-fab-text { font-size: 13px; }
       .lisa-acm-dot {
+        display: none;
         width: 8px;
         height: 8px;
         border-radius: 50%;

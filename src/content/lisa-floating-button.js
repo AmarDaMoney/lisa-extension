@@ -379,11 +379,15 @@ class LISAFloatingButton {
       `;
     }
 
+    const compressItem = acm && acm.messageCount > 0
+      ? `<div class="lisa-menu-item" data-action="compress-context" title="Compress conversation to semantic snapshot — copies to clipboard for handoff">🗜️ Compress Context</div>`
+      : '';
+
     menu.innerHTML = `
       ${acmStatusHtml}
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
-
+      ${compressItem}
     `;
     
     // Position near the button
@@ -409,6 +413,7 @@ class LISAFloatingButton {
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
+      else if (action === "compress-context") this.compressContext();
     });
     
     // Close on outside click
@@ -571,7 +576,10 @@ class LISAFloatingButton {
       });
       
       if (response?.success) {
-        this.showToast("✅ LISA-V saved! " + stats.totalBlocks + " blocks");
+        const countLabel = stats.apiMessageCount != null
+          ? stats.apiMessageCount + " messages, " + stats.totalBlocks + " blocks"
+          : stats.totalBlocks + " blocks";
+        this.showToast("✅ LISA-V saved! " + countLabel);
         if (parser.usedFallbackCapture) {
           setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
         }
@@ -589,7 +597,49 @@ class LISAFloatingButton {
     }
   }
 
+  async compressContext() {
+    try {
+      this.showToast("Compressing context...");
 
+      let conversation = null;
+
+      if (window.__LISA_CLAUDE_API_CAPTURE) {
+        const isShared = window.location.pathname.startsWith('/share/');
+        conversation = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
+      }
+      if (!conversation && window.__LISA_CHATGPT_API_CAPTURE) {
+        const isShared = window.location.pathname.startsWith('/share/');
+        conversation = await this._captureViaApiWithRetry(window.__LISA_CHATGPT_API_CAPTURE, isShared);
+      }
+
+      if (!conversation || !conversation.messages || conversation.messages.length === 0) {
+        this.showToast("No messages to compress", true);
+        return;
+      }
+
+      const response = await chrome.runtime.sendMessage({
+        action: 'compress',
+        data: conversation
+      });
+
+      if (!response || !response.success || !response.compressed) {
+        this.showToast("Compression failed: " + (response?.error || "unknown error"), true);
+        return;
+      }
+
+      const compressed = response.compressed;
+      const json = JSON.stringify(compressed, null, 2);
+
+      await navigator.clipboard.writeText(json);
+
+      const ratio = compressed.metadata?.compressionRatio || '?';
+      const tokenCount = compressed.semanticTokens?.length || 0;
+      this.showToast(`Context compressed — copied to clipboard (${conversation.messages.length} msgs → ${tokenCount} tokens, ${ratio}x ratio)`);
+    } catch (error) {
+      console.error("[LISA] Compress context error:", error);
+      this.showToast("Could not compress context", true);
+    }
+  }
 
 
 

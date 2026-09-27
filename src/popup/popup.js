@@ -1025,14 +1025,40 @@ class LISAPopup {
           document.getElementById('conceptCount').textContent = conceptCount;
           document.getElementById('relationshipCount').textContent = relationshipCount;
 
-          // Estimate token savings
-          // Raw: sum original message lengths, estimate ~4 chars per token (industry standard)
-          let totalOriginalChars = 0;
+          // Estimate token savings.
+          // "Raw" must mean the conversation as the user experienced it —
+          // not whatever LISA-V's own processing pipeline happens to carry
+          // (e.g. tool_use/tool_result artifacts get folded into message
+          // content there, which can inflate this well past what a human
+          // would call "the conversation", even with zero code/DOM
+          // involved). ACM's monitor already computes a clean estimate
+          // straight from the platform's own API response with no such
+          // transformation — defer to that when it's available and its
+          // message count agrees with what we're about to compress, so
+          // the comparison is honest. Falls back to the old chars-based
+          // estimate (now matching ACM's own 3.5 chars/token constant,
+          // instead of a different divisor that made the two numbers
+          // disagree even before the deeper cause above) when ACM isn't
+          // running for this platform/page.
           const rawMsgs = (this.currentConversation && this.currentConversation.messages) || [];
-          for (const m of rawMsgs) {
-            totalOriginalChars += (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content || '').length);
+          let rawTokenEstimate = null;
+          try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tab && tab.id) {
+              const acmStatus = await this.sendMessageToTab(tab.id, { action: 'acm_getMonitorStatus' }, 3000, 0);
+              if (acmStatus && acmStatus.messageCount === rawMsgs.length && acmStatus.tokenEstimate > 0) {
+                rawTokenEstimate = acmStatus.tokenEstimate;
+              }
+            }
+          } catch (_) { /* ACM not available on this page — fall through */ }
+
+          if (rawTokenEstimate == null) {
+            let totalOriginalChars = 0;
+            for (const m of rawMsgs) {
+              totalOriginalChars += (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content || '').length);
+            }
+            rawTokenEstimate = Math.round(totalOriginalChars / 3.5);
           }
-          const rawTokenEstimate = Math.round(totalOriginalChars / 4);
           
           // Enriched: the semantic structure is pre-parsed, so receiving AI
           // only needs to read the structured metadata, not re-parse raw text

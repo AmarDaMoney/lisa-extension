@@ -2110,29 +2110,15 @@ class LISAPopup {
         mimeType = 'application/jsonl';
         extension = 'jsonl';
       } else if (fmt === 'ai-compressed' || fmt === 'compressed') {
-        // Lean export — same filtering as downloadJSON()
+        // Reuse the same buildLeanExport() the Compress button uses — this
+        // used to be a hand-duplicated copy of that logic that drifted out
+        // of sync (missed the edge-verbatim fix entirely, for example).
         const raw = snapshot.capture?.content || snapshot.raw || snapshot;
-        const tokens = raw.semanticTokens || raw.compressed || [];
-        const _leanMsgsLib = tokens.map(t => ({ role: t.role, index: t.index, summary: t.summary }));
-        // Compression gate: if lean >= raw, use verbatim
-        const _rawMsgsLib = snapshot.messages || raw.messages || [];
-        const _useVerbatimLib = _rawMsgsLib.length > 0 && JSON.stringify(_leanMsgsLib).length >= JSON.stringify(_rawMsgsLib.map((m, i) => ({ role: m.role, index: i, content: m.content }))).length;
-        const leanMessages = _useVerbatimLib
-          ? _rawMsgsLib.map((m, i) => ({ role: m.role, index: i, content: m.content }))
-          : _leanMsgsLib;
-        const data = {
-          _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
-          platform: raw.metadata?.platform || 'Unknown',
-          url: raw.metadata?.originalUrl || raw.metadata?.url || '',
-          title: raw.metadata?.title || '',
-          messageCount: raw.metadata?.messageCount || tokens.length,
-          messages: leanMessages,
-          format: fmt,
-          exportedAt: new Date().toISOString(),
-          anchor: raw.anchor || '',
-          semantic_anchors: Object.fromEntries(Object.entries(raw.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest])),
-          session_metadata: raw.session_metadata || {}
-        };
+        const rawMessages = snapshot.messages || raw.messages || [];
+        const data = buildLeanExport(raw, rawMessages);
+        data.format = fmt; // preserve the original label (ai-compressed vs compressed)
+        data.url = raw.metadata?.originalUrl || raw.metadata?.url || '';
+        data.exportedAt = new Date().toISOString();
         fileContent = JSON.stringify(data, null, 2);
         mimeType = 'application/json';
         extension = 'json';
@@ -2418,36 +2404,17 @@ class LISAPopup {
       } else if (typeof contentData === 'string') {
         rawContent = contentData;
       } else if (typeof contentData === 'object') {
-        // Compressed/AI-compressed: lean export
-        const _r = contentData;
-        const _msgs = (_r.semanticTokens || _r.compressed || []).map(t => ({
-          role: t.role, index: t.index, summary: t.summary
-        }));
-        const _sa = Object.fromEntries(Object.entries(_r.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest]));
-        rawContent = JSON.stringify({
-          _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.',
-          platform: _r.metadata?.platform || platform,
-          title: _r.metadata?.title || title,
-          messageCount: _r.metadata?.messageCount || _msgs.length,
-          messages: _msgs, format: format, anchor: _r.anchor || '',
-          semantic_anchors: _sa, session_metadata: _r.session_metadata || {}
-        }, null, 2);
+        // Reuse buildLeanExport() — this used to be a hand-duplicated copy
+        // that had drifted out of sync (missing both the edge-verbatim fix
+        // and the compression gate entirely).
+        const lean = buildLeanExport(contentData, snapshot.messages || contentData.messages || []);
+        lean.format = format;
+        rawContent = JSON.stringify(lean, null, 2);
       }
     } else if (snapshot.raw) {
-      // Raw or compressed — lean export
-      const _r = snapshot.raw;
-      const _msgs = (_r.semanticTokens || _r.compressed || []).map(t => ({
-        role: t.role, index: t.index, summary: t.summary
-      }));
-      const _sa = Object.fromEntries(Object.entries(_r.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest]));
-      rawContent = JSON.stringify({
-        _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.',
-        platform: _r.metadata?.platform || platform,
-        title: _r.metadata?.title || title,
-        messageCount: _r.metadata?.messageCount || _msgs.length,
-        messages: _msgs, format: format, anchor: _r.anchor || '',
-        semantic_anchors: _sa, session_metadata: _r.session_metadata || {}
-      }, null, 2);
+      const lean = buildLeanExport(snapshot.raw, snapshot.messages || snapshot.raw.messages || []);
+      lean.format = format;
+      rawContent = JSON.stringify(lean, null, 2);
     }
 
     if (!rawContent) return null;

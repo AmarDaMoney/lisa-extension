@@ -1429,7 +1429,14 @@ class LISAPopup {
         url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || window.location.href,
         title: this.compressedData.metadata?.title || 'Compressed Conversation',
         messageCount: this.compressedData.metadata?.messageCount || 0,
-        messages: [],
+        // Raw verbatim messages — without these, saveSnapshot() stores an
+        // empty capture.messages, and every downstream read (download,
+        // inject, markdown-wrap) loses the raw text needed for the
+        // edge-verbatim opening/closing and the compression gate. This was
+        // the actual reason "save to library then download" reverted to
+        // summary-only output while an immediate download (which still had
+        // this.currentConversation in scope) worked correctly.
+        messages: this.currentConversation?.messages || [],
         format: this.compressedData._aiCompressed ? 'ai-compressed' : 'compressed',
         content: this.compressedData
       };
@@ -2114,7 +2121,7 @@ class LISAPopup {
         // used to be a hand-duplicated copy of that logic that drifted out
         // of sync (missed the edge-verbatim fix entirely, for example).
         const raw = snapshot.capture?.content || snapshot.raw || snapshot;
-        const rawMessages = snapshot.messages || raw.messages || [];
+        const rawMessages = snapshot.capture?.messages || raw.messages || [];
         const data = buildLeanExport(raw, rawMessages);
         data.format = fmt; // preserve the original label (ai-compressed vs compressed)
         data.url = raw.metadata?.originalUrl || raw.metadata?.url || '';
@@ -2407,12 +2414,12 @@ class LISAPopup {
         // Reuse buildLeanExport() — this used to be a hand-duplicated copy
         // that had drifted out of sync (missing both the edge-verbatim fix
         // and the compression gate entirely).
-        const lean = buildLeanExport(contentData, snapshot.messages || contentData.messages || []);
+        const lean = buildLeanExport(contentData, snapshot.capture?.messages || contentData.messages || []);
         lean.format = format;
         rawContent = JSON.stringify(lean, null, 2);
       }
     } else if (snapshot.raw) {
-      const lean = buildLeanExport(snapshot.raw, snapshot.messages || snapshot.raw.messages || []);
+      const lean = buildLeanExport(snapshot.raw, snapshot.capture?.messages || snapshot.raw.messages || []);
       lean.format = format;
       rawContent = JSON.stringify(lean, null, 2);
     }

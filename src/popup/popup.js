@@ -1075,8 +1075,12 @@ class LISAPopup {
             ? Math.min(95, Math.max(5, Math.round(preComputedWork * 3 / rawTokenEstimate * 100)))
             : 0;
           
+          const rawTokensSaved = Math.max(0, rawTokenEstimate - enrichedTokenEstimate);
+          const rawTokensSavedPct = rawTokenEstimate > 0 ? Math.round(rawTokensSaved / rawTokenEstimate * 100) : 0;
+
           document.getElementById('rawTokens').textContent = rawTokenEstimate.toLocaleString();
           document.getElementById('enrichedTokens').textContent = enrichedTokenEstimate.toLocaleString();
+          document.getElementById('rawTokensSaved').textContent = rawTokensSaved.toLocaleString() + ' (' + rawTokensSavedPct + '%)';
           document.getElementById('tokensSaved').textContent = '~' + inferenceReduction + '% inference pre-resolved';
           document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
@@ -1267,7 +1271,10 @@ class LISAPopup {
         document.getElementById('enrichedTokens').textContent = '~' + mdTokens.toLocaleString();
         const saved = Math.max(0, rawTokens - mdTokens);
         const savePct = rawTokens > 0 ? Math.round(saved / rawTokens * 100) : 0;
-        document.getElementById('tokensSaved').textContent = '~' + saved.toLocaleString() + ' tokens (' + savePct + '%)';
+        // This mode has no separate inference-cost-saved computation (that
+        // metric is specific to the free-tier local semanticTokens path) —
+        // was previously mislabeled into that slot; belongs in "Tokens saved".
+        document.getElementById('rawTokensSaved').textContent = '~' + saved.toLocaleString() + ' (' + savePct + '%)';
         document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
         document.getElementById('hashingSection').style.display = 'block';

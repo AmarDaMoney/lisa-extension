@@ -437,20 +437,35 @@ class LisaProgressiveCapture {
         }
 
         if (!attachBtn) {
-          // None of our guesses matched — log what's actually near the
-          // composer so the real selector can be read out of devtools
-          // instead of guessed again blind.
-          const composer = document.querySelector('#prompt-textarea, [contenteditable="true"]');
-          const composerRoot = composer ? composer.closest('form') || composer.parentElement?.parentElement : null;
-          const nearbyButtons = composerRoot
-            ? [...composerRoot.querySelectorAll('button')].map(b => ({
-                ariaLabel: b.getAttribute('aria-label'),
-                testId: b.getAttribute('data-testid'),
-                title: b.getAttribute('title'),
-                text: b.textContent?.trim().slice(0, 30)
-              }))
-            : [];
-          console.warn('[LISA] ChatGPT: no attach button matched known selectors. Buttons found near composer:', nearbyButtons);
+          // None of our guesses matched. Widen the search instead of
+          // silently coming back empty — the prior version only looked
+          // near a composer found via #prompt-textarea/[contenteditable],
+          // which may not exist yet on a brand-new chat's landing page
+          // (a real possibility here, since this run's URL had no
+          // conversation ID — i.e. this was likely the fresh homepage,
+          // not an in-progress conversation, and its composer markup may
+          // differ). Log both what was found and how the search was
+          // scoped, so the real selector can be read straight out of
+          // devtools instead of guessed a third time.
+          const composer = document.querySelector('#prompt-textarea, [contenteditable="true"], textarea');
+          const composerRoot = composer && (composer.closest('form') || composer.closest('[class*="composer" i]'));
+          const describeBtn = b => ({
+            ariaLabel: b.getAttribute('aria-label'),
+            testId: b.getAttribute('data-testid'),
+            title: b.getAttribute('title'),
+            text: b.textContent?.trim().slice(0, 30)
+          });
+          const nearbyButtons = composerRoot ? [...composerRoot.querySelectorAll('button')].map(describeBtn) : [];
+          const allPageButtons = [...document.querySelectorAll('button')].map(describeBtn);
+          console.warn('[LISA] ChatGPT: no attach button matched known selectors.', {
+            url: window.location.href,
+            composerFound: !!composer,
+            composerTag: composer?.tagName,
+            composerRootFound: !!composerRoot,
+            nearbyButtons,
+            allPageButtonCount: allPageButtons.length,
+            allPageButtons: allPageButtons.slice(0, 40)
+          });
         } else {
           console.debug('[LISA] ChatGPT: attach button found via selector:', matchedSelector);
 

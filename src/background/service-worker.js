@@ -1325,7 +1325,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     (async () => {
       try {
         const { url, fileContent, filename, mimeType } = request;
-        const newTab = await chrome.tabs.create({ url, active: true });
+        // Open right next to the source tab instead of at the end of the
+        // tab strip — sender.tab is the conversation tab the handoff came from.
+        const createOpts = { url, active: true };
+        if (sender.tab) {
+          createOpts.index = sender.tab.index + 1;
+          createOpts.windowId = sender.tab.windowId;
+        }
+        const newTab = await chrome.tabs.create(createOpts);
         const tabId = newTab.id;
 
         await new Promise((resolve) => {

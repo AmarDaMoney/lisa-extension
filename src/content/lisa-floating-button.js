@@ -799,33 +799,56 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         return;
       }
 
-      // If a checkpoint exists, exclude that exact message from the
-      // compressed body — it's sent separately as the anchor, so leaving
-      // it in would duplicate it. No checkpoint means nothing to exclude.
+      // Keep the opening (how it started) and closing (how it ended —
+      // typically the checkpoint prompt + the AI's response) verbatim.
+      // Only the middle gets compressed, using the exact same 'compress'
+      // pipeline the popup's own Compress button uses, so the handoff's
+      // compressed section matches what "properly compressed by the
+      // extension" actually produces (not a lighter derived shortcut).
+      const allMessages = conversation.messages;
+      const n = allMessages.length;
+      const openingCount = Math.min(2, n);
+      const closingCount = Math.min(4, n - openingCount);
+      const opening = allMessages.slice(0, openingCount);
+      const closing = closingCount > 0 ? allMessages.slice(n - closingCount) : [];
+      let middle = allMessages.slice(openingCount, n - closingCount);
+
+      // Safety net: if a checkpoint exists but its message isn't in the
+      // verbatim closing window (e.g. more messages followed it before
+      // handoff), drop it from the compressed middle so it's never
+      // represented twice.
       if (checkpoint) {
-        conversation.messages = conversation.messages.filter(m => m.content !== checkpoint.raw);
+        middle = middle.filter(m => m.content !== checkpoint.raw);
       }
 
-      const response = await chrome.runtime.sendMessage({
-        action: 'extractAndSave',
-        source: 'acm-handoff',
-        data: conversation
-      });
-      if (!response || !response.success) {
-        this.showToast("Compression failed: " + (response?.error || "unknown error"), true);
-        return;
+      let middleCompressed = null;
+      if (middle.length > 0) {
+        const middleConversation = { ...conversation, messages: middle };
+        const response = await chrome.runtime.sendMessage({
+          action: 'compress',
+          data: middleConversation
+        });
+        if (!response || !response.success) {
+          this.showToast("Compression failed: " + (response?.error || "unknown error"), true);
+          return;
+        }
+        middleCompressed = {
+          semanticTokens: response.compressed.semanticTokens,
+          anchor: response.compressed.anchor
+        };
       }
 
-      const snapshot = response.snapshot;
+      const verbatim = m => ({ role: m.role, index: m.index, content: m.content });
       const payload = {
         _instructions: checkpoint
-          ? 'LISA context handoff. Read "checkpoint" first for continuity — decisions, open items, constraints from the prior session. Then use "anchor" and "messages" for full conversation detail. Continue from where the checkpoint left off.'
-          : 'LISA context handoff. Read "anchor" for session context, then "messages" for the full conversation. Continue from where it left off.',
-        platform: snapshot.platform,
-        title: snapshot.title,
-        messageCount: snapshot.messageCount,
-        anchor: snapshot.anchor || null,
-        messages: snapshot.derived?.lisaTokens || []
+          ? 'LISA context handoff. Read "checkpoint" first for continuity — decisions, open items, constraints from the prior session. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from where the checkpoint left off.'
+          : 'LISA context handoff. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from where it left off.',
+        platform: conversation.platform,
+        title: conversation.title,
+        messageCount: n,
+        opening: opening.map(verbatim),
+        middleCompressed,
+        closing: closing.map(verbatim)
       };
       if (checkpoint) {
         payload.checkpoint = {

@@ -410,9 +410,61 @@ class LisaProgressiveCapture {
     const files = msg.files || [{ filename: msg.filename, content: msg.content }];
     const mimeType = msg.mimeType || 'text/markdown';
 
-    // ChatGPT: clipboard fallback for non-user-gesture injects (rebirth auto-inject)
-    // Manual library inject has user gesture context and works via file input
+    // ChatGPT: on-demand injects (rebirth/handoff auto-inject) land in a
+    // fresh tab with no live user gesture, so the plain fileInput path
+    // below (guarded off for this case, see Strategy 1) is skipped.
+    // Try the same two-step reveal-and-intercept approach that already
+    // works for Gemini — click the attach button to materialize the real
+    // input, capture it via a click() intercept, then assign via
+    // DataTransfer. ChatGPT's markup shifts often, so this is a
+    // best-effort attempt across a few candidate selectors; any failure
+    // falls straight through to the clipboard fallback below, unchanged.
     const isChatGPTHost = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
+    if (isChatGPTHost && msg._autoInject) {
+      try {
+        const attachSelectors = [
+          'button[aria-label="Attach files"]',
+          'button[aria-label*="attach" i]',
+          'button[data-testid="composer-add-button"]',
+          'button[data-testid*="attach" i]',
+          'button[data-testid*="upload" i]',
+        ];
+        let attachBtn = null;
+        for (const sel of attachSelectors) {
+          attachBtn = document.querySelector(sel);
+          if (attachBtn) break;
+        }
+        if (attachBtn) {
+          const origClick = HTMLInputElement.prototype.click;
+          let interceptedInput = null;
+          HTMLInputElement.prototype.click = function () {
+            if (this.type === 'file') { interceptedInput = this; return; }
+            return origClick.call(this);
+          };
+          attachBtn.click();
+          await new Promise(r => setTimeout(r, 400));
+          HTMLInputElement.prototype.click = origClick;
+
+          const revealedInput = interceptedInput || document.querySelector('input[type="file"]');
+          // Menu may have opened instead of firing the input directly —
+          // close it so it doesn't linger over the composer.
+          if (!revealedInput) document.body.click();
+
+          if (revealedInput) {
+            const dt = new DataTransfer();
+            fileObjects.forEach(f => dt.items.add(f));
+            revealedInput.files = dt.files;
+            revealedInput.dispatchEvent(new Event('change', { bubbles: true }));
+            revealedInput.dispatchEvent(new Event('input', { bubbles: true }));
+            console.log('[LISA] ChatGPT file injection attempted via reveal-and-intercept');
+            return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
+          }
+        }
+      } catch (e) {
+        console.warn('[LISA] ChatGPT file-input reveal failed, falling back to clipboard:', e);
+      }
+    }
+
     if (isChatGPTHost && msg._autoInject) {
       const textContent = msg.content || (files[0] && files[0].content) || '';
       if (textContent) {

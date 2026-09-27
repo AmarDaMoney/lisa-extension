@@ -801,10 +801,11 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
       // Keep the opening (how it started) and closing (how it ended —
       // typically the checkpoint prompt + the AI's response) verbatim.
-      // Only the middle gets compressed, using the exact same 'compress'
-      // pipeline the popup's own Compress button uses, so the handoff's
-      // compressed section matches what "properly compressed by the
-      // extension" actually produces (not a lighter derived shortcut).
+      // Only the middle gets compressed, using compressForHandoff — the
+      // same SemanticAnalyzer -> compress -> buildLeanExport chain the
+      // popup's own Compress button runs, so the handoff's compressed
+      // section matches what "properly compressed by the extension"
+      // actually produces, not a lighter derived shortcut.
       const allMessages = conversation.messages;
       const n = allMessages.length;
       const openingCount = Math.min(2, n);
@@ -822,20 +823,25 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       }
 
       let middleCompressed = null;
+      let sessionMetadata = null;
       if (middle.length > 0) {
         const middleConversation = { ...conversation, messages: middle };
         const response = await chrome.runtime.sendMessage({
-          action: 'compress',
+          action: 'compressForHandoff',
           data: middleConversation
         });
         if (!response || !response.success) {
           this.showToast("Compression failed: " + (response?.error || "unknown error"), true);
           return;
         }
+        const lean = response.lean;
         middleCompressed = {
-          semanticTokens: response.compressed.semanticTokens,
-          anchor: response.compressed.anchor
+          format: lean.format,
+          messages: lean.messages,
+          anchor: lean.anchor || undefined,
+          semantic_anchors: lean.semantic_anchors || undefined
         };
+        sessionMetadata = lean.session_metadata || null;
       }
 
       const verbatim = m => ({ role: m.role, index: m.index, content: m.content });
@@ -848,7 +854,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         messageCount: n,
         opening: opening.map(verbatim),
         middleCompressed,
-        closing: closing.map(verbatim)
+        closing: closing.map(verbatim),
+        session_metadata: sessionMetadata || undefined
       };
       if (checkpoint) {
         payload.checkpoint = {

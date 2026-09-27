@@ -6,6 +6,13 @@
 // Must load before any code that reads snapshots.
 importScripts('../shared/snapshot-shim.js');
 
+// Reused by the ACM handoff pipeline so it matches the popup's own
+// Compress button exactly (SemanticAnalyzer.analyze -> compress ->
+// buildLeanExport) instead of a lighter lookalike. Neither file touches
+// document/window, so both load safely with no DOM in this context.
+importScripts('../utils/semantic-analyzer.js');
+importScripts('../shared/export-builders.js');
+
 // Safe text extraction — m.content can be a string, an array of
 // content blocks (Claude API), or an object. Only strings pass through;
 // arrays get their text parts joined; objects are skipped.
@@ -1447,7 +1454,62 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     })();
     return true;
   }
-  
+
+  // Same pipeline the popup's own Compress button uses — SemanticAnalyzer
+  // enrichment, then compress(), then the same merge popup.js does, then
+  // buildLeanExport's lean shaping (or its verbatim gate for a short
+  // conversation) — so a handoff's compressed section is the same kind
+  // of output "properly compressed by the extension" actually produces,
+  // not a lighter lookalike missing semantic_anchors/session_metadata.
+  //
+  // request.data may be a slice of a larger conversation (the "middle"
+  // between verbatim opening/closing messages for handoff). Each message
+  // already carries its own absolute .index from capture, but
+  // SemanticAnalyzer computes semantic_anchors' turnIndex from the
+  // array's local position — so when the slice starts partway through
+  // the conversation, those need remapping back to the real index.
+  if (request.action === 'compressForHandoff') {
+    (async () => {
+      try {
+        const conversation = request.data;
+        let enriched = conversation;
+        if (typeof SemanticAnalyzer !== 'undefined') {
+          const analyzed = SemanticAnalyzer.analyze(conversation);
+          if (analyzed && analyzed.session_metadata && analyzed.session_metadata.enriched) {
+            enriched = { ...conversation, ...analyzed };
+            if (enriched.semantic_anchors) {
+              for (const anchor of Object.values(enriched.semantic_anchors)) {
+                const msg = conversation.messages[anchor.turnIndex];
+                if (msg && msg.index != null) anchor.turnIndex = msg.index;
+              }
+            }
+          }
+        }
+
+        const compressed = compressor.compress(enriched);
+        if (enriched.semantic_anchors) compressed.semantic_anchors = enriched.semantic_anchors;
+        if (enriched.action_vectors) compressed.action_vectors = enriched.action_vectors;
+        if (enriched.flow_metrics) compressed.flow_metrics = enriched.flow_metrics;
+        if (enriched.reconstruction_protocol) compressed.reconstruction_protocol = enriched.reconstruction_protocol;
+        if (enriched.session_metadata && enriched.session_metadata.enriched) {
+          compressed.session_metadata = compressed.session_metadata || {};
+          Object.assign(compressed.session_metadata, enriched.session_metadata);
+        }
+
+        // This request.data is already just the handoff's "middle" slice —
+        // the outer handoff logic owns edge-verbatim semantics for the
+        // real conversation's start/end, so this inner call shouldn't
+        // also verbatim-ify the edges of the slice itself.
+        const lean = buildLeanExport(compressed, conversation.messages, { applyEdgeVerbatim: false });
+        sendResponse({ success: true, lean });
+      } catch (error) {
+        console.error('[LISA] compressForHandoff error:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+
   // Handle reconstruction
   if (request.action === 'reconstruct') {
     try {

@@ -671,9 +671,9 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         <div style="color:#fafafa;font-size:14px;">① 🧠 ${cpLabel}</div>
         <div style="color:#6b7280;font-size:11px;margin-top:2px;">${cpDesc}</div>
       </div>
-      <div class="lisa-menu-item" data-action="step2" style="padding:10px 16px;${hasCheckpoint ? 'cursor:pointer;' : 'cursor:not-allowed;opacity:0.4;'}">
+      <div class="lisa-menu-item" data-action="step2" style="padding:10px 16px;cursor:pointer;">
         <div style="color:#fafafa;font-size:14px;">② 🔄 Compress & Handoff</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:2px;">${hasCheckpoint ? 'Pick a target and transfer' : 'Run step 1 first'}</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:2px;">${hasCheckpoint ? 'Pick a target and transfer' : 'Pick a target — works without a checkpoint too, just leaner with one'}</div>
       </div>
     `;
 
@@ -702,7 +702,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         panel.remove();
         await this.contextCheckpoint();
         this.showToast("Paste and send it — LISA captures the response automatically. Come back and click Handoff → step 2 when it's ready.");
-      } else if (action === 'step2' && hasCheckpoint) {
+      } else if (action === 'step2') {
         panel.remove();
         await this._pickHandoffTarget();
       }
@@ -782,11 +782,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     try {
       this.showToast("Preparing handoff...");
       const acm = window.__lisaACM;
-      const checkpoint = await acm.getCheckpoint();
-      if (!checkpoint) {
-        this.showToast("No checkpoint found — run step 1 first", true);
-        return;
-      }
+      const checkpoint = await acm.getCheckpoint(); // optional — enriches the handoff when present
 
       // Extract the live conversation the same way Compress & Copy does
       let conversation = null;
@@ -803,9 +799,12 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         return;
       }
 
-      // Exclude the checkpoint message itself — it's sent separately as the
-      // anchor, so leaving it in the compressed body would duplicate it.
-      conversation.messages = conversation.messages.filter(m => m.content !== checkpoint.raw);
+      // If a checkpoint exists, exclude that exact message from the
+      // compressed body — it's sent separately as the anchor, so leaving
+      // it in would duplicate it. No checkpoint means nothing to exclude.
+      if (checkpoint) {
+        conversation.messages = conversation.messages.filter(m => m.content !== checkpoint.raw);
+      }
 
       const response = await chrome.runtime.sendMessage({
         action: 'extractAndSave',
@@ -819,11 +818,17 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
       const snapshot = response.snapshot;
       const payload = {
-        _instructions: 'LISA context handoff. Read "checkpoint" first for continuity — decisions, open items, constraints from the prior session. Then use "anchor" and "messages" for full conversation detail. Continue from where the checkpoint left off.',
+        _instructions: checkpoint
+          ? 'LISA context handoff. Read "checkpoint" first for continuity — decisions, open items, constraints from the prior session. Then use "anchor" and "messages" for full conversation detail. Continue from where the checkpoint left off.'
+          : 'LISA context handoff. Read "anchor" for session context, then "messages" for the full conversation. Continue from where it left off.',
         platform: snapshot.platform,
         title: snapshot.title,
         messageCount: snapshot.messageCount,
-        checkpoint: {
+        anchor: snapshot.anchor || null,
+        messages: snapshot.derived?.lisaTokens || []
+      };
+      if (checkpoint) {
+        payload.checkpoint = {
           capturedAtMessage: checkpoint.messageCount,
           capturedAt: checkpoint.capturedAt,
           decisions: checkpoint.decisions,
@@ -831,10 +836,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
           resolved: checkpoint.resolved,
           constraints: checkpoint.constraints,
           keyContext: checkpoint.keyContext
-        },
-        anchor: snapshot.anchor || null,
-        messages: snapshot.derived?.lisaTokens || []
-      };
+        };
+      }
 
       const filename = `lisa-handoff-${targetPlatform}-${Date.now()}.json`;
       this.showToast("Opening new tab and transferring context...");

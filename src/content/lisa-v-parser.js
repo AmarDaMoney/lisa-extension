@@ -1733,7 +1733,13 @@ class LisaVParser {
       title: this.getSmartTitle(),
       extractedAt: new Date().toISOString(),
       messageCount: messages.length,
-      messages: messages
+      messages: messages,
+      // apiMessageCount is only ever set after a successful API capture
+      // (see extractConversation() above) — this was previously missing
+      // entirely, so SemanticAnalyzer.analyze()'s rawExtraction._captureMethod
+      // || 'dom' fallback always labeled the result 'dom' even when the
+      // capture had genuinely succeeded via API moments earlier.
+      _captureMethod: this.apiMessageCount != null ? 'api' : 'dom'
     };
   }
 

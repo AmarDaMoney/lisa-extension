@@ -1312,6 +1312,74 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  // ACM handoff — open a fresh tab on the target platform and inject the
+  // handoff payload as a file, reusing the same injectFileAttachment path
+  // the library's manual inject already uses. A new tab has two race
+  // conditions the manual path doesn't: (1) the tab may not have finished
+  // loading, (2) even after load, the platform's own SPA may not have
+  // mounted its composer/file-input yet. We wait for 'complete', then for
+  // this content script to announce itself via parserReady (with a
+  // fallback timeout so we never hang forever), then attempt injection
+  // with a few retries to absorb the "receiving end does not exist" race.
+  if (request.action === 'acmHandoffToNewTab') {
+    (async () => {
+      try {
+        const { url, fileContent, filename, mimeType } = request;
+        const newTab = await chrome.tabs.create({ url, active: true });
+        const tabId = newTab.id;
+
+        await new Promise((resolve) => {
+          function onUpdated(id, info) {
+            if (id === tabId && info.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(onUpdated);
+              resolve();
+            }
+          }
+          chrome.tabs.onUpdated.addListener(onUpdated);
+          setTimeout(() => {
+            chrome.tabs.onUpdated.removeListener(onUpdated);
+            resolve();
+          }, 15000);
+        });
+
+        // Wait for the content script's parserReady signal — the SPA's
+        // composer/file-input mounts after 'complete', not at it.
+        const readyDeadline = Date.now() + 8000;
+        while (!readyTabs.has(tabId) && Date.now() < readyDeadline) {
+          await new Promise(r => setTimeout(r, 300));
+        }
+
+        let result = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            result = await chrome.tabs.sendMessage(tabId, {
+              action: 'injectFileAttachment',
+              content: fileContent,
+              filename: filename || 'lisa-handoff.json',
+              mimeType: mimeType || 'application/json',
+              _autoInject: true
+            });
+            if (result && result.success) break;
+          } catch (e) {
+            result = { success: false, error: e.message };
+          }
+          await new Promise(r => setTimeout(r, 1200));
+        }
+
+        sendResponse({
+          success: !!(result && result.success),
+          method: result?.method,
+          tabId,
+          error: result?.error
+        });
+      } catch (error) {
+        console.error('[LISA] ACM handoff error:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+
   // ACM Phase 1 — checkpoint signal from content script monitor
   if (request.action === 'acm_checkpoint') {
     const key = `lisa-acm-checkpoint-${request.conversationId}`;

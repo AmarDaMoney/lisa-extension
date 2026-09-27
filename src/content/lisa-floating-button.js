@@ -399,17 +399,7 @@ class LISAFloatingButton {
     let acmItems = '';
     const acmStatus = acm ? acm.getStatus() : null;
     if (acmStatus && acmStatus.conversationId) {
-      const cpLabel = acmStatus.hasCheckpoint ? '🧠 Update Checkpoint' : '🧠 Context Checkpoint';
-      const cpTitle = acmStatus.hasCheckpoint
-        ? 'Refresh the context checkpoint — ask the AI for an updated summary'
-        : 'Ask the AI to summarize key decisions, open items and constraints — zero extra cost';
-      acmItems = `
-        <div class="lisa-menu-item" data-action="checkpoint" title="${cpTitle}">${cpLabel}</div>
-      `;
-      if (acmStatus.messageCount > 0) {
-        acmItems += `<div class="lisa-menu-item" data-action="compress-context" title="Compress conversation via LISA pipeline — copies to clipboard for handoff">🗜️ Compress & Copy</div>`;
-        acmItems += `<div class="lisa-menu-item" data-action="handoff" title="Guided handoff — checkpoint your context and transfer to a fresh session">🔄 Handoff</div>`;
-      }
+      acmItems = `<div class="lisa-menu-item" data-action="handoff" title="Checkpoint your context and hand off to a fresh session">🔄 Handoff</div>`;
     }
 
     menu.innerHTML = `
@@ -442,9 +432,7 @@ class LISAFloatingButton {
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
-      else if (action === "compress-context") this.compressContext();
-      else if (action === "checkpoint") this.contextCheckpoint();
-      else if (action === "handoff") this.contextHandoff();
+      else if (action === "handoff") this.showHandoffPanel();
     });
     
     // Close on outside click
@@ -628,50 +616,6 @@ class LISAFloatingButton {
     }
   }
 
-  async compressContext() {
-    try {
-      this.showToast("Compressing context...");
-
-      let conversation = null;
-
-      if (window.__LISA_CLAUDE_API_CAPTURE) {
-        const isShared = window.location.pathname.startsWith('/share/');
-        conversation = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
-      }
-      if (!conversation && window.__LISA_CHATGPT_API_CAPTURE) {
-        const isShared = window.location.pathname.startsWith('/share/');
-        conversation = await this._captureViaApiWithRetry(window.__LISA_CHATGPT_API_CAPTURE, isShared);
-      }
-
-      if (!conversation || !conversation.messages || conversation.messages.length === 0) {
-        this.showToast("No messages to compress", true);
-        return;
-      }
-
-      const response = await chrome.runtime.sendMessage({
-        action: 'extractAndSave',
-        source: 'acm-compress',
-        data: conversation
-      });
-
-      if (!response || !response.success) {
-        this.showToast("Compression failed: " + (response?.error || "unknown error"), true);
-        return;
-      }
-
-      const snapshot = response.snapshot;
-      const json = JSON.stringify(snapshot, null, 2);
-      await navigator.clipboard.writeText(json);
-
-      const msgCount = conversation.messages.length;
-      const ratio = snapshot.anchor ? 'with anchor' : 'raw';
-      this.showToast(`Compressed & copied (${msgCount} msgs, ${ratio}). Paste into any AI to continue.`);
-    } catch (error) {
-      console.error("[LISA] Compress context error:", error);
-      this.showToast("Could not compress context", true);
-    }
-  }
-
   async contextCheckpoint() {
     const checkpointPrompt = `Quick context checkpoint — I need you to summarize where we are right now. Use this exact format:
 
@@ -701,45 +645,213 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     }
   }
 
-  _buildHandoffBrief(checkpoint) {
-    const platform = window.__lisaACM?._detectPlatform() || 'unknown';
-    const ts = new Date(checkpoint.capturedAt).toLocaleString();
+  // ============================================
+  // HANDOFF — checkpoint + compressed conversation,
+  // injected as a file into a fresh tab on the target platform
+  // ============================================
 
-    let brief = `[LISA Context Transfer — continuing from ${platform} conversation]\n`;
-    brief += `[Captured at message ${checkpoint.messageCount}, ${ts}]\n\n`;
+  showHandoffPanel() {
+    const existing = document.querySelector('.lisa-handoff-panel');
+    if (existing) { existing.remove(); return; }
 
-    const sections = [
-      ['DECISIONS', checkpoint.decisions],
-      ['OPEN', checkpoint.open],
-      ['RESOLVED', checkpoint.resolved],
-      ['CONSTRAINTS', checkpoint.constraints],
-      ['KEY CONTEXT', checkpoint.keyContext],
-    ];
-    for (const [name, items] of sections) {
-      if (items && items.length > 0) {
-        brief += `${name}:\n${items.map(d => `- ${d}`).join('\n')}\n\n`;
+    const acm = window.__lisaACM;
+    const status = acm ? acm.getStatus() : null;
+    const hasCheckpoint = !!(status && status.hasCheckpoint);
+
+    const cpLabel = hasCheckpoint ? 'Update Checkpoint' : 'Create Checkpoint';
+    const cpDesc = hasCheckpoint
+      ? 'Refresh the summary with the AI\'s current understanding'
+      : 'Ask the AI to summarize decisions, open items and constraints';
+
+    const panel = document.createElement('div');
+    panel.className = 'lisa-handoff-panel';
+    panel.innerHTML = `
+      <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Context Handoff</div>
+      <div class="lisa-menu-item" data-action="step1" style="padding:10px 16px;cursor:pointer;">
+        <div style="color:#fafafa;font-size:14px;">① 🧠 ${cpLabel}</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:2px;">${cpDesc}</div>
+      </div>
+      <div class="lisa-menu-item" data-action="step2" style="padding:10px 16px;${hasCheckpoint ? 'cursor:pointer;' : 'cursor:not-allowed;opacity:0.4;'}">
+        <div style="color:#fafafa;font-size:14px;">② 🔄 Compress & Handoff</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:2px;">${hasCheckpoint ? 'Pick a target and transfer' : 'Run step 1 first'}</div>
+      </div>
+    `;
+
+    const btn = this.button.getBoundingClientRect();
+    panel.style.cssText = `
+      position:fixed;
+      bottom:${window.innerHeight - btn.top + 10}px;
+      right:${window.innerWidth - btn.right}px;
+      background:#1f1f23;
+      border:1px solid #3b82f6;
+      border-radius:8px;
+      padding:0;
+      z-index:2147483647;
+      box-shadow:0 4px 20px rgba(0,0,0,0.4);
+      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+      min-width:240px;
+    `;
+    document.body.appendChild(panel);
+
+    panel.addEventListener('click', async (e) => {
+      const item = e.target.closest('.lisa-menu-item');
+      if (!item) return;
+      const action = item.dataset.action;
+
+      if (action === 'step1') {
+        panel.remove();
+        await this.contextCheckpoint();
+        this.showToast("Paste and send it — LISA captures the response automatically. Come back and click Handoff → step 2 when it's ready.");
+      } else if (action === 'step2' && hasCheckpoint) {
+        panel.remove();
+        await this._pickHandoffTarget();
       }
-    }
+    });
 
-    brief += `Continue from where we left off. The above is a checkpoint from our previous session — use it to maintain full continuity. Ask if anything needs clarification before proceeding.`;
-    return brief;
+    setTimeout(() => {
+      document.addEventListener('click', function closePanel(e) {
+        if (!panel.contains(e.target)) {
+          panel.remove();
+          document.removeEventListener('click', closePanel);
+        }
+      });
+    }, 100);
   }
 
-  async contextHandoff() {
+  async _pickHandoffTarget() {
+    const acm = window.__lisaACM;
+    if (!acm) { this.showToast("ACM not available", true); return; }
+
+    const currentPlatform = acm._detectPlatform();
+    const targets = await acm.getHandoffTargets();
+    const platformNames = {
+      claude: 'Claude', chatgpt: 'ChatGPT', gemini: 'Gemini', grok: 'Grok',
+      deepseek: 'DeepSeek', mistral: 'Mistral', copilot: 'Copilot', perplexity: 'Perplexity'
+    };
+
+    const allTargets = [
+      { platform: currentPlatform, url: acm.NEW_CHAT_URLS[currentPlatform], label: `${platformNames[currentPlatform] || currentPlatform} (fresh session)` },
+      ...targets.map(t => ({ ...t, label: platformNames[t.platform] || t.platform }))
+    ];
+
+    const picker = document.createElement('div');
+    picker.className = 'lisa-handoff-panel';
+    picker.innerHTML = `
+      <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Hand off to:</div>
+      ${allTargets.map(t => `
+        <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}" style="padding:10px 16px;color:#fafafa;font-size:14px;cursor:pointer;">
+          ${t.label}
+        </div>
+      `).join('')}
+    `;
+
+    const btn = this.button.getBoundingClientRect();
+    picker.style.cssText = `
+      position:fixed;
+      bottom:${window.innerHeight - btn.top + 10}px;
+      right:${window.innerWidth - btn.right}px;
+      background:#1f1f23;
+      border:1px solid #3b82f6;
+      border-radius:8px;
+      padding:0;
+      z-index:2147483647;
+      box-shadow:0 4px 20px rgba(0,0,0,0.4);
+      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+      min-width:200px;
+    `;
+    document.body.appendChild(picker);
+
+    picker.addEventListener('click', async (e) => {
+      const item = e.target.closest('.lisa-menu-item');
+      if (!item || !item.dataset.url) return;
+      picker.remove();
+      await this._executeHandoff(item.dataset.platform, item.dataset.url);
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', function closePicker(e) {
+        if (!picker.contains(e.target)) {
+          picker.remove();
+          document.removeEventListener('click', closePicker);
+        }
+      });
+    }, 100);
+  }
+
+  async _executeHandoff(targetPlatform, targetUrl) {
     try {
+      this.showToast("Preparing handoff...");
       const acm = window.__lisaACM;
-      if (!acm) {
-        this.showToast("ACM not available", true);
+      const checkpoint = await acm.getCheckpoint();
+      if (!checkpoint) {
+        this.showToast("No checkpoint found — run step 1 first", true);
         return;
       }
 
-      const checkpoint = await acm.getCheckpoint();
-      if (checkpoint) {
-        // Checkpoint exists — go straight to target selection
-        this._guidedStep3_pickTarget(checkpoint);
+      // Extract the live conversation the same way Compress & Copy does
+      let conversation = null;
+      if (window.__LISA_CLAUDE_API_CAPTURE) {
+        const isShared = window.location.pathname.startsWith('/share/');
+        conversation = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
+      }
+      if (!conversation && window.__LISA_CHATGPT_API_CAPTURE) {
+        const isShared = window.location.pathname.startsWith('/share/');
+        conversation = await this._captureViaApiWithRetry(window.__LISA_CHATGPT_API_CAPTURE, isShared);
+      }
+      if (!conversation || !conversation.messages || conversation.messages.length === 0) {
+        this.showToast("No messages to hand off", true);
+        return;
+      }
+
+      // Exclude the checkpoint message itself — it's sent separately as the
+      // anchor, so leaving it in the compressed body would duplicate it.
+      conversation.messages = conversation.messages.filter(m => m.content !== checkpoint.raw);
+
+      const response = await chrome.runtime.sendMessage({
+        action: 'extractAndSave',
+        source: 'acm-handoff',
+        data: conversation
+      });
+      if (!response || !response.success) {
+        this.showToast("Compression failed: " + (response?.error || "unknown error"), true);
+        return;
+      }
+
+      const snapshot = response.snapshot;
+      const payload = {
+        _instructions: 'LISA context handoff. Read "checkpoint" first for continuity — decisions, open items, constraints from the prior session. Then use "anchor" and "messages" for full conversation detail. Continue from where the checkpoint left off.',
+        platform: snapshot.platform,
+        title: snapshot.title,
+        messageCount: snapshot.messageCount,
+        checkpoint: {
+          capturedAtMessage: checkpoint.messageCount,
+          capturedAt: checkpoint.capturedAt,
+          decisions: checkpoint.decisions,
+          open: checkpoint.open,
+          resolved: checkpoint.resolved,
+          constraints: checkpoint.constraints,
+          keyContext: checkpoint.keyContext
+        },
+        anchor: snapshot.anchor || null,
+        messages: snapshot.derived?.lisaTokens || []
+      };
+
+      const filename = `lisa-handoff-${targetPlatform}-${Date.now()}.json`;
+      this.showToast("Opening new tab and transferring context...");
+
+      const injectResult = await chrome.runtime.sendMessage({
+        action: 'acmHandoffToNewTab',
+        url: targetUrl,
+        fileContent: JSON.stringify(payload, null, 2),
+        filename,
+        mimeType: 'application/json'
+      });
+
+      if (injectResult && injectResult.success) {
+        const methodLabel = injectResult.method === 'clipboard' ? 'copied — paste it (Ctrl+V)' : 'injected';
+        this.showToast(`Handoff ${methodLabel} into the new tab.`);
       } else {
-        // No checkpoint yet — start guided flow from step 1
-        this._guidedStep1_explain();
+        this.showToast("Could not auto-transfer — " + (injectResult?.error || "open the new tab and paste manually") , true);
       }
     } catch (error) {
       console.error("[LISA] Handoff error:", error);
@@ -748,7 +860,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
   }
 
   // ============================================
-  // GUIDED FLOW — used for handoff AND onboarding
+  // GUIDED MODAL — reused for first-time onboarding
   // ============================================
 
   _showGuidedModal(content, onClose) {
@@ -784,160 +896,6 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     return { overlay, modal };
   }
 
-  _guidedStep1_explain() {
-    const { overlay, modal } = this._showGuidedModal(`
-      <div style="font-size:20px;margin-bottom:8px;">🧠 Context Handoff</div>
-      <div style="font-size:13px;color:#9ca3af;margin-bottom:16px;line-height:1.5;">
-        LISA will guide you through transferring your conversation context to a fresh session.
-        This keeps the AI sharp — a fresh window with everything that matters.
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
-        <div style="flex:1;padding:8px;border-radius:6px;background:#2563eb22;border:1px solid #2563eb44;text-align:center;">
-          <div style="font-size:16px;">1</div>
-          <div style="font-size:11px;color:#93c5fd;">Checkpoint</div>
-        </div>
-        <div style="flex:1;padding:8px;border-radius:6px;background:#1f1f23;border:1px solid #333;text-align:center;">
-          <div style="font-size:16px;color:#666;">2</div>
-          <div style="font-size:11px;color:#666;">Capture</div>
-        </div>
-        <div style="flex:1;padding:8px;border-radius:6px;background:#1f1f23;border:1px solid #333;text-align:center;">
-          <div style="font-size:16px;color:#666;">3</div>
-          <div style="font-size:11px;color:#666;">Handoff</div>
-        </div>
-      </div>
-      <div style="font-size:13px;color:#d1d5db;margin-bottom:16px;line-height:1.5;">
-        <strong>Step 1:</strong> We'll copy a checkpoint prompt to your clipboard.
-        Paste it into the chat and send it. The AI will summarize the key decisions,
-        open items, and context from your conversation.
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="lisa-guided-cancel" style="padding:8px 16px;border-radius:6px;background:transparent;color:#9ca3af;border:1px solid #333;cursor:pointer;font-size:13px;">Cancel</button>
-        <button class="lisa-guided-next" style="padding:8px 16px;border-radius:6px;background:#2563eb;color:white;border:none;cursor:pointer;font-size:13px;font-weight:600;">Copy Checkpoint Prompt</button>
-      </div>
-    `);
-
-    modal.querySelector('.lisa-guided-cancel').onclick = () => overlay.remove();
-    modal.querySelector('.lisa-guided-next').onclick = async () => {
-      overlay.remove();
-      await this.contextCheckpoint();
-      this._guidedStep2_waitForCapture();
-    };
-  }
-
-  _guidedStep2_waitForCapture() {
-    const acm = window.__lisaACM;
-    if (!acm) return;
-
-    // Listen for checkpoint detection
-    const checkInterval = setInterval(async () => {
-      const cp = await acm.getCheckpoint();
-      if (cp) {
-        clearInterval(checkInterval);
-        clearTimeout(timeout);
-        this._guidedStep2_captured(cp);
-      }
-    }, 2000);
-
-    // Timeout after 3 minutes
-    const timeout = setTimeout(() => {
-      clearInterval(checkInterval);
-      this.showToast("Checkpoint not detected yet. Send the prompt and try Handoff again when ready.");
-    }, 180000);
-
-    // Show waiting indicator after a few seconds
-    setTimeout(() => {
-      const existing = document.querySelector('.lisa-guided-modal');
-      if (!existing) {
-        this._showGuidedModal(`
-          <div style="font-size:20px;margin-bottom:8px;">⏳ Waiting for AI response...</div>
-          <div style="display:flex;gap:8px;margin-bottom:16px;">
-            <div style="flex:1;padding:8px;border-radius:6px;background:#10b98122;border:1px solid #10b98144;text-align:center;">
-              <div style="font-size:16px;">✓</div>
-              <div style="font-size:11px;color:#6ee7b7;">Checkpoint</div>
-            </div>
-            <div style="flex:1;padding:8px;border-radius:6px;background:#2563eb22;border:1px solid #2563eb44;text-align:center;">
-              <div style="font-size:16px;">2</div>
-              <div style="font-size:11px;color:#93c5fd;">Capture</div>
-            </div>
-            <div style="flex:1;padding:8px;border-radius:6px;background:#1f1f23;border:1px solid #333;text-align:center;">
-              <div style="font-size:16px;color:#666;">3</div>
-              <div style="font-size:11px;color:#666;">Handoff</div>
-            </div>
-          </div>
-          <div style="font-size:13px;color:#d1d5db;line-height:1.5;">
-            Paste the checkpoint prompt (Ctrl+V) and send it.
-            LISA will automatically detect the AI's structured response.
-          </div>
-          <div style="margin-top:12px;display:flex;justify-content:flex-end;">
-            <button class="lisa-guided-cancel" style="padding:8px 16px;border-radius:6px;background:transparent;color:#9ca3af;border:1px solid #333;cursor:pointer;font-size:13px;">I'll do it later</button>
-          </div>
-        `);
-        document.querySelector('.lisa-guided-cancel').onclick = () => {
-          clearInterval(checkInterval);
-          clearTimeout(timeout);
-          document.querySelector('.lisa-guided-modal').remove();
-        };
-      }
-    }, 3000);
-  }
-
-  _guidedStep2_captured(checkpoint) {
-    const existing = document.querySelector('.lisa-guided-modal');
-    if (existing) existing.remove();
-
-    const itemCount = (checkpoint.decisions?.length || 0) + (checkpoint.open?.length || 0) +
-      (checkpoint.constraints?.length || 0) + (checkpoint.keyContext?.length || 0);
-
-    const { overlay, modal } = this._showGuidedModal(`
-      <div style="font-size:20px;margin-bottom:8px;">✅ Checkpoint Captured!</div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
-        <div style="flex:1;padding:8px;border-radius:6px;background:#10b98122;border:1px solid #10b98144;text-align:center;">
-          <div style="font-size:16px;">✓</div>
-          <div style="font-size:11px;color:#6ee7b7;">Checkpoint</div>
-        </div>
-        <div style="flex:1;padding:8px;border-radius:6px;background:#10b98122;border:1px solid #10b98144;text-align:center;">
-          <div style="font-size:16px;">✓</div>
-          <div style="font-size:11px;color:#6ee7b7;">Capture</div>
-        </div>
-        <div style="flex:1;padding:8px;border-radius:6px;background:#2563eb22;border:1px solid #2563eb44;text-align:center;">
-          <div style="font-size:16px;">3</div>
-          <div style="font-size:11px;color:#93c5fd;">Handoff</div>
-        </div>
-      </div>
-      <div style="font-size:13px;color:#d1d5db;margin-bottom:16px;line-height:1.5;">
-        LISA captured <strong>${itemCount} items</strong> across decisions, open threads, constraints, and key context.
-        Ready to hand off to a fresh session.
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
-        <button class="lisa-guided-cancel" style="padding:8px 16px;border-radius:6px;background:transparent;color:#9ca3af;border:1px solid #333;cursor:pointer;font-size:13px;">Stay here</button>
-        <button class="lisa-guided-next" style="padding:8px 16px;border-radius:6px;background:#2563eb;color:white;border:none;cursor:pointer;font-size:13px;font-weight:600;">Pick target →</button>
-      </div>
-    `);
-
-    modal.querySelector('.lisa-guided-cancel').onclick = () => {
-      overlay.remove();
-      this.showToast("Checkpoint saved. Use Handoff anytime to continue in a fresh session.");
-    };
-    modal.querySelector('.lisa-guided-next').onclick = () => {
-      overlay.remove();
-      this._guidedStep3_pickTarget(checkpoint);
-    };
-  }
-
-  async _guidedStep3_pickTarget(checkpoint) {
-    const acm = window.__lisaACM;
-    const targets = acm ? await acm.getHandoffTargets() : [];
-    const brief = this._buildHandoffBrief(checkpoint);
-
-    if (targets.length === 0) {
-      await navigator.clipboard.writeText(brief);
-      this.showToast("Handoff brief copied — open a fresh chat and paste it. Set preferred platforms in LISA Settings for one-click handoff.");
-      return;
-    }
-
-    this._showHandoffPicker(targets, brief);
-  }
-
   // First-time user guide — same stepper pattern, educational focus
   showAcmGuide() {
     const { overlay, modal } = this._showGuidedModal(`
@@ -969,111 +927,6 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       try { await chrome.storage.sync.set({ acmGuideSeen: true }); } catch (_) {}
     };
   }
-
-  _showHandoffPicker(targets, brief) {
-    const existing = document.querySelector('.lisa-handoff-picker');
-    if (existing) existing.remove();
-
-    const currentPlatform = window.__lisaACM?._detectPlatform() || 'unknown';
-    const platformNames = {
-      claude: 'Claude', chatgpt: 'ChatGPT', gemini: 'Gemini', grok: 'Grok',
-      deepseek: 'DeepSeek', mistral: 'Mistral', copilot: 'Copilot', perplexity: 'Perplexity'
-    };
-
-    // Include same-platform rebirth option
-    const allTargets = [
-      { platform: currentPlatform, url: window.__lisaACM?.NEW_CHAT_URLS[currentPlatform], label: `${platformNames[currentPlatform] || currentPlatform} (fresh session)` },
-      ...targets.map(t => ({ ...t, label: platformNames[t.platform] || t.platform }))
-    ];
-
-    const picker = document.createElement('div');
-    picker.className = 'lisa-handoff-picker';
-    picker.innerHTML = `
-      <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Handoff to:</div>
-      ${allTargets.map(t => `
-        <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}" style="padding:10px 16px;color:#fafafa;font-size:14px;cursor:pointer;">
-          ${t.label}
-        </div>
-      `).join('')}
-      <div class="lisa-menu-item" data-action="copy-only" style="padding:10px 16px;color:#9ca3af;font-size:13px;cursor:pointer;border-top:1px solid #333;">
-        📋 Just copy to clipboard
-      </div>
-    `;
-
-    const btn = this.button.getBoundingClientRect();
-    picker.style.cssText = `
-      position:fixed;
-      bottom:${window.innerHeight - btn.top + 10}px;
-      right:${window.innerWidth - btn.right}px;
-      background:#1f1f23;
-      border:1px solid #3b82f6;
-      border-radius:8px;
-      padding:0;
-      z-index:2147483647;
-      box-shadow:0 4px 20px rgba(0,0,0,0.4);
-      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-      min-width:200px;
-    `;
-
-    document.body.appendChild(picker);
-
-    picker.addEventListener('click', async (e) => {
-      const item = e.target.closest('.lisa-menu-item');
-      if (!item) return;
-      picker.remove();
-
-      if (item.dataset.action === 'copy-only') {
-        await navigator.clipboard.writeText(brief);
-        this.showToast("Handoff brief copied to clipboard.");
-        return;
-      }
-
-      const url = item.dataset.url;
-      if (url) {
-        await navigator.clipboard.writeText(brief);
-        window.open(url, '_blank');
-        this.showToast(`Handoff copied & new ${platformNames[item.dataset.platform] || ''} tab opened — paste to continue.`);
-      }
-    });
-
-    setTimeout(() => {
-      document.addEventListener('click', function closePicker(e) {
-        if (!picker.contains(e.target)) {
-          picker.remove();
-          document.removeEventListener('click', closePicker);
-        }
-      });
-    }, 100);
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   showToast(message, isError = false, duration = 0) {
     const existing = document.querySelector('.lisa-toast');

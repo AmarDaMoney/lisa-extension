@@ -430,11 +430,30 @@ class LisaProgressiveCapture {
           'button[data-testid*="upload" i]',
         ];
         let attachBtn = null;
+        let matchedSelector = null;
         for (const sel of attachSelectors) {
           attachBtn = document.querySelector(sel);
-          if (attachBtn) break;
+          if (attachBtn) { matchedSelector = sel; break; }
         }
-        if (attachBtn) {
+
+        if (!attachBtn) {
+          // None of our guesses matched — log what's actually near the
+          // composer so the real selector can be read out of devtools
+          // instead of guessed again blind.
+          const composer = document.querySelector('#prompt-textarea, [contenteditable="true"]');
+          const composerRoot = composer ? composer.closest('form') || composer.parentElement?.parentElement : null;
+          const nearbyButtons = composerRoot
+            ? [...composerRoot.querySelectorAll('button')].map(b => ({
+                ariaLabel: b.getAttribute('aria-label'),
+                testId: b.getAttribute('data-testid'),
+                title: b.getAttribute('title'),
+                text: b.textContent?.trim().slice(0, 30)
+              }))
+            : [];
+          console.warn('[LISA] ChatGPT: no attach button matched known selectors. Buttons found near composer:', nearbyButtons);
+        } else {
+          console.debug('[LISA] ChatGPT: attach button found via selector:', matchedSelector);
+
           const origClick = HTMLInputElement.prototype.click;
           let interceptedInput = null;
           HTMLInputElement.prototype.click = function () {
@@ -448,15 +467,19 @@ class LisaProgressiveCapture {
           const revealedInput = interceptedInput || document.querySelector('input[type="file"]');
           // Menu may have opened instead of firing the input directly —
           // close it so it doesn't linger over the composer.
-          if (!revealedInput) document.body.click();
+          if (!revealedInput) {
+            document.body.click();
+            console.warn('[LISA] ChatGPT: attach button clicked but no file input appeared (menu opened instead, or click was intercepted incorrectly).');
+          }
 
           if (revealedInput) {
+            console.debug('[LISA] ChatGPT: file input revealed', interceptedInput ? '(via click intercept)' : '(via direct querySelector)');
             const dt = new DataTransfer();
             fileObjects.forEach(f => dt.items.add(f));
             revealedInput.files = dt.files;
             revealedInput.dispatchEvent(new Event('change', { bubbles: true }));
             revealedInput.dispatchEvent(new Event('input', { bubbles: true }));
-            console.log('[LISA] ChatGPT file injection attempted via reveal-and-intercept');
+            console.log('[LISA] ChatGPT file injection attempted via reveal-and-intercept — check the composer to confirm the file actually attached (React may silently ignore the assignment even when the input itself is real).');
             return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
           }
         }

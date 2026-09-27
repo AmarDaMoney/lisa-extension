@@ -72,19 +72,31 @@ class ClaudeParser {
 
   async extractConversation() {
     // ---- API-FIRST CAPTURE (instant, complete, structured) ----
+    // Retries once after a short delay before accepting DOM fallback — a
+    // one-shot attempt here silently downgraded otherwise-healthy API
+    // captures to DOM quality on any transient hiccup (a slow org-id
+    // lookup, a momentary network blip), with no visible sign to the user
+    // that anything degraded. lisa-floating-button.js's capture path
+    // already retries for exactly this reason; this brings the popup's
+    // path — used by the Compress button and Save to Library — up to the
+    // same reliability instead of being the more fragile of the two.
     if (window.__LISA_CLAUDE_API_CAPTURE) {
-      try {
-        const isShared = window.location.pathname.startsWith('/share/');
-        const apiResult = isShared
-          ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
-          : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
-        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-          console.log('[LISA] API capture success:', apiResult.messageCount, 'messages');
-          return apiResult;
+      const isShared = window.location.pathname.startsWith('/share/');
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const apiResult = isShared
+            ? await window.__LISA_CLAUDE_API_CAPTURE.extractSharedViaAPI()
+            : await window.__LISA_CLAUDE_API_CAPTURE.extractViaAPI();
+          if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+            console.log('[LISA] API capture success:', apiResult.messageCount, 'messages');
+            return apiResult;
+          }
+        } catch (e) {
+          console.warn('[LISA] API capture attempt', attempt + 1, 'failed:', e.message);
         }
-      } catch (e) {
-        console.warn('[LISA] API capture failed, falling back to DOM:', e.message);
+        if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 500));
       }
+      console.warn('[LISA] API capture failed after retry, falling back to DOM');
     }
 
     // ---- DOM FALLBACK (existing logic, unchanged) ----

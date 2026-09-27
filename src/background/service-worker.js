@@ -1,6 +1,6 @@
 // LISA - Semantic Compression Engine
 // Background Service Worker (Manifest V3)
-// v0.52.7 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
+// v0.52.8 - Auto-embed integrity hash for Premium, subscription auto-renewal/cancellation notice
 
 // Shared snapshot schema — one definition of where content lives.
 // Must load before any code that reads snapshots.
@@ -567,7 +567,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.52.7',
+        lisaVersion: '0.52.8',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
@@ -835,7 +835,7 @@ class LISACompressor {
       platform:          conversation.platform || 'unknown',
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
-      generated_by:      'LISA v0.52.7',
+      generated_by:      'LISA v0.52.8',
       key_entities:    this.extractEntities(allText).flatMap(e => e.values).slice(0, 12),
       note:              'Lightweight anchor — raw verbatim format'
     };
@@ -892,7 +892,7 @@ class LISACompressor {
       key_entities:      [...entitySet].slice(0, 12),
       session_intent:    sessionIntent,
       session_register:  register,
-      generated_by:      'LISA v0.52.7'
+      generated_by:      'LISA v0.52.8'
     };
     if (register === 'technical') {
       anchor.files_changed = sessionEvents.files_changed;
@@ -2071,4 +2071,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
   aiPlatformTabs.delete(tabId);
 });
-console.debug('[LISA] Core compression engine initialized v0.52.7');
+console.debug('[LISA] Core compression engine initialized v0.52.8');

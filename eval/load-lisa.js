@@ -30,7 +30,7 @@ function loadLisa() {
       if (prop === 'hasListener') return () => false;
       if (prop === 'get') return (_, cb) => cb && cb({});
       if (prop === 'set') return (_, cb) => cb && cb();
-      if (prop === 'getManifest') return () => ({ version: '0.52.7' });
+      if (prop === 'getManifest') return () => ({ version: '0.52.8' });
       if (prop === 'getURL') return p => p;
       if (prop === 'query') return (_, cb) => { if (cb) cb([]); return []; };
       if (prop === 'create') return noop;

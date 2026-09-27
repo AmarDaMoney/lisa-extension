@@ -423,9 +423,14 @@ class LisaProgressiveCapture {
     if (isChatGPTHost && msg._autoInject) {
       try {
         const attachSelectors = [
+          // Confirmed via live DOM inspection (Sep 2026): ariaLabel "Add
+          // files and more", data-testid "composer-plus-btn". Kept the
+          // earlier guesses as fallback in case ChatGPT A/B tests the label.
+          'button[data-testid="composer-plus-btn"]',
+          'button[aria-label="Add files and more"]',
+          'button[aria-label*="add files" i]',
           'button[aria-label="Attach files"]',
           'button[aria-label*="attach" i]',
-          'button[data-testid="composer-add-button"]',
           'button[data-testid*="attach" i]',
           'button[data-testid*="upload" i]',
         ];
@@ -479,12 +484,40 @@ class LisaProgressiveCapture {
           await new Promise(r => setTimeout(r, 400));
           HTMLInputElement.prototype.click = origClick;
 
-          const revealedInput = interceptedInput || document.querySelector('input[type="file"]');
-          // Menu may have opened instead of firing the input directly —
-          // close it so it doesn't linger over the composer.
+          let revealedInput = interceptedInput || document.querySelector('input[type="file"]');
+
+          // "Add files and more" (its real label) strongly implies a
+          // dropdown, not a direct file-dialog trigger — look for a menu
+          // item to click through to the actual upload option before
+          // giving up, mirroring the two-step pattern Gemini already needed.
           if (!revealedInput) {
-            document.body.click();
-            console.warn('[LISA] ChatGPT: attach button clicked but no file input appeared (menu opened instead, or click was intercepted incorrectly).');
+            const menuItems = [...document.querySelectorAll('[role="menuitem"], [role="menuitemradio"], [role="option"]')];
+            const describeMenuItem = m => ({
+              role: m.getAttribute('role'),
+              text: m.textContent?.trim().slice(0, 40),
+              ariaLabel: m.getAttribute('aria-label')
+            });
+            const uploadItem = menuItems.find(m => /upload|photo|file|computer/i.test(m.textContent || '') || /upload|photo|file|computer/i.test(m.getAttribute('aria-label') || ''));
+
+            if (uploadItem) {
+              console.debug('[LISA] ChatGPT: menu opened, clicking likely upload item:', describeMenuItem(uploadItem));
+              HTMLInputElement.prototype.click = function () {
+                if (this.type === 'file') { interceptedInput = this; return; }
+                return origClick.call(this);
+              };
+              uploadItem.click();
+              await new Promise(r => setTimeout(r, 400));
+              HTMLInputElement.prototype.click = origClick;
+              revealedInput = interceptedInput || document.querySelector('input[type="file"]');
+            }
+
+            if (!revealedInput) {
+              console.warn('[LISA] ChatGPT: attach button opened a menu but no upload item matched, or no input appeared after clicking one.', {
+                menuItemCount: menuItems.length,
+                menuItems: menuItems.slice(0, 20).map(describeMenuItem)
+              });
+              document.body.click(); // close whatever menu is still open
+            }
           }
 
           if (revealedInput) {

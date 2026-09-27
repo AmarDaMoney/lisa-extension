@@ -410,129 +410,31 @@ class LisaProgressiveCapture {
     const files = msg.files || [{ filename: msg.filename, content: msg.content }];
     const mimeType = msg.mimeType || 'text/markdown';
 
-    // ChatGPT: on-demand injects (rebirth/handoff auto-inject) land in a
-    // fresh tab with no live user gesture, so the plain fileInput path
-    // below (guarded off for this case, see Strategy 1) is skipped.
-    // Try the same two-step reveal-and-intercept approach that already
-    // works for Gemini — click the attach button to materialize the real
-    // input, capture it via a click() intercept, then assign via
-    // DataTransfer. ChatGPT's markup shifts often, so this is a
-    // best-effort attempt across a few candidate selectors; any failure
-    // falls straight through to the clipboard fallback below, unchanged.
+    // ChatGPT keeps a real input[type="file"] sitting in the composer's
+    // DOM at all times (CSS-hidden inside a wrapping .hidden div) —
+    // confirmed via live inspection. It is NOT created on-demand the way
+    // an earlier version of this code assumed, and unlike Gemini it needs
+    // no button click to reveal it. The manual library-inject path
+    // already finds and uses this exact same input directly via Strategy
+    // 1 below (it just has a real user gesture backing the click); this
+    // mirrors that for the no-gesture auto-inject case instead of the
+    // click-a-menu dance a previous version tried here.
     const isChatGPTHost = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
     if (isChatGPTHost && msg._autoInject) {
       try {
-        const attachSelectors = [
-          // Confirmed via live DOM inspection (Sep 2026): ariaLabel "Add
-          // files and more", data-testid "composer-plus-btn". Kept the
-          // earlier guesses as fallback in case ChatGPT A/B tests the label.
-          'button[data-testid="composer-plus-btn"]',
-          'button[aria-label="Add files and more"]',
-          'button[aria-label*="add files" i]',
-          'button[aria-label="Attach files"]',
-          'button[aria-label*="attach" i]',
-          'button[data-testid*="attach" i]',
-          'button[data-testid*="upload" i]',
-        ];
-        let attachBtn = null;
-        let matchedSelector = null;
-        for (const sel of attachSelectors) {
-          attachBtn = document.querySelector(sel);
-          if (attachBtn) { matchedSelector = sel; break; }
+        const fileInput = document.querySelector('input[type="file"]');
+        if (fileInput) {
+          const dt = new DataTransfer();
+          fileObjects.forEach(f => dt.items.add(f));
+          fileInput.files = dt.files;
+          fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+          fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. A free-tier upload quota limit, or React ignoring a non-gesture assignment, can both silently stop this from visibly working even though the assignment itself raised no error.');
+          return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
         }
-
-        if (!attachBtn) {
-          // None of our guesses matched. Widen the search instead of
-          // silently coming back empty — the prior version only looked
-          // near a composer found via #prompt-textarea/[contenteditable],
-          // which may not exist yet on a brand-new chat's landing page
-          // (a real possibility here, since this run's URL had no
-          // conversation ID — i.e. this was likely the fresh homepage,
-          // not an in-progress conversation, and its composer markup may
-          // differ). Log both what was found and how the search was
-          // scoped, so the real selector can be read straight out of
-          // devtools instead of guessed a third time.
-          const composer = document.querySelector('#prompt-textarea, [contenteditable="true"], textarea');
-          const composerRoot = composer && (composer.closest('form') || composer.closest('[class*="composer" i]'));
-          const describeBtn = b => ({
-            ariaLabel: b.getAttribute('aria-label'),
-            testId: b.getAttribute('data-testid'),
-            title: b.getAttribute('title'),
-            text: b.textContent?.trim().slice(0, 30)
-          });
-          const nearbyButtons = composerRoot ? [...composerRoot.querySelectorAll('button')].map(describeBtn) : [];
-          const allPageButtons = [...document.querySelectorAll('button')].map(describeBtn);
-          console.warn('[LISA] ChatGPT: no attach button matched known selectors.', {
-            url: window.location.href,
-            composerFound: !!composer,
-            composerTag: composer?.tagName,
-            composerRootFound: !!composerRoot,
-            nearbyButtons,
-            allPageButtonCount: allPageButtons.length,
-            allPageButtons: allPageButtons.slice(0, 40)
-          });
-        } else {
-          console.debug('[LISA] ChatGPT: attach button found via selector:', matchedSelector);
-
-          const origClick = HTMLInputElement.prototype.click;
-          let interceptedInput = null;
-          HTMLInputElement.prototype.click = function () {
-            if (this.type === 'file') { interceptedInput = this; return; }
-            return origClick.call(this);
-          };
-          attachBtn.click();
-          await new Promise(r => setTimeout(r, 400));
-          HTMLInputElement.prototype.click = origClick;
-
-          let revealedInput = interceptedInput || document.querySelector('input[type="file"]');
-
-          // "Add files and more" (its real label) strongly implies a
-          // dropdown, not a direct file-dialog trigger — look for a menu
-          // item to click through to the actual upload option before
-          // giving up, mirroring the two-step pattern Gemini already needed.
-          if (!revealedInput) {
-            const menuItems = [...document.querySelectorAll('[role="menuitem"], [role="menuitemradio"], [role="option"]')];
-            const describeMenuItem = m => ({
-              role: m.getAttribute('role'),
-              text: m.textContent?.trim().slice(0, 40),
-              ariaLabel: m.getAttribute('aria-label')
-            });
-            const uploadItem = menuItems.find(m => /upload|photo|file|computer/i.test(m.textContent || '') || /upload|photo|file|computer/i.test(m.getAttribute('aria-label') || ''));
-
-            if (uploadItem) {
-              console.debug('[LISA] ChatGPT: menu opened, clicking likely upload item:', describeMenuItem(uploadItem));
-              HTMLInputElement.prototype.click = function () {
-                if (this.type === 'file') { interceptedInput = this; return; }
-                return origClick.call(this);
-              };
-              uploadItem.click();
-              await new Promise(r => setTimeout(r, 400));
-              HTMLInputElement.prototype.click = origClick;
-              revealedInput = interceptedInput || document.querySelector('input[type="file"]');
-            }
-
-            if (!revealedInput) {
-              console.warn('[LISA] ChatGPT: attach button opened a menu but no upload item matched, or no input appeared after clicking one.', {
-                menuItemCount: menuItems.length,
-                menuItems: menuItems.slice(0, 20).map(describeMenuItem)
-              });
-              document.body.click(); // close whatever menu is still open
-            }
-          }
-
-          if (revealedInput) {
-            console.debug('[LISA] ChatGPT: file input revealed', interceptedInput ? '(via click intercept)' : '(via direct querySelector)');
-            const dt = new DataTransfer();
-            fileObjects.forEach(f => dt.items.add(f));
-            revealedInput.files = dt.files;
-            revealedInput.dispatchEvent(new Event('change', { bubbles: true }));
-            revealedInput.dispatchEvent(new Event('input', { bubbles: true }));
-            console.log('[LISA] ChatGPT file injection attempted via reveal-and-intercept — check the composer to confirm the file actually attached (React may silently ignore the assignment even when the input itself is real).');
-            return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
-          }
-        }
+        console.warn('[LISA] ChatGPT: no input[type="file"] found in DOM at all — unusual page state.', { url: window.location.href });
       } catch (e) {
-        console.warn('[LISA] ChatGPT file-input reveal failed, falling back to clipboard:', e);
+        console.warn('[LISA] ChatGPT direct file-input assignment failed, falling back to clipboard:', e);
       }
     }
 

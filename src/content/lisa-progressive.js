@@ -1,4 +1,4 @@
-// LISA Progressive Capture — v0.52.7
+// LISA Progressive Capture — v0.52.8
 // Buffers messages as they render, solving virtualisation on ChatGPT and others.
 // Modes: 'off' | 'auto' | 'on'
 //   off  — no observation, standard on-demand capture only
@@ -410,9 +410,34 @@ class LisaProgressiveCapture {
     const files = msg.files || [{ filename: msg.filename, content: msg.content }];
     const mimeType = msg.mimeType || 'text/markdown';
 
-    // ChatGPT: clipboard fallback for non-user-gesture injects (rebirth auto-inject)
-    // Manual library inject has user gesture context and works via file input
+    // ChatGPT keeps a real input[type="file"] sitting in the composer's
+    // DOM at all times (CSS-hidden inside a wrapping .hidden div) —
+    // confirmed via live inspection. It is NOT created on-demand the way
+    // an earlier version of this code assumed, and unlike Gemini it needs
+    // no button click to reveal it. The manual library-inject path
+    // already finds and uses this exact same input directly via Strategy
+    // 1 below (it just has a real user gesture backing the click); this
+    // mirrors that for the no-gesture auto-inject case instead of the
+    // click-a-menu dance a previous version tried here.
     const isChatGPTHost = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
+    if (isChatGPTHost && msg._autoInject) {
+      try {
+        const fileInput = document.querySelector('input[type="file"]');
+        if (fileInput) {
+          const dt = new DataTransfer();
+          fileObjects.forEach(f => dt.items.add(f));
+          fileInput.files = dt.files;
+          fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+          fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. A free-tier upload quota limit, or React ignoring a non-gesture assignment, can both silently stop this from visibly working even though the assignment itself raised no error.');
+          return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
+        }
+        console.warn('[LISA] ChatGPT: no input[type="file"] found in DOM at all — unusual page state.', { url: window.location.href });
+      } catch (e) {
+        console.warn('[LISA] ChatGPT direct file-input assignment failed, falling back to clipboard:', e);
+      }
+    }
+
     if (isChatGPTHost && msg._autoInject) {
       const textContent = msg.content || (files[0] && files[0].content) || '';
       if (textContent) {

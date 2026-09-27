@@ -60,19 +60,26 @@ class ChatGPTParser {
 
   async extractConversation() {
     // ---- API-FIRST CAPTURE (instant, complete, no scroll sweep) ----
+    // Retries once after a short delay — see the matching comment in
+    // claude-parser.js for why a one-shot attempt here was the more
+    // fragile of the extension's two capture paths.
     if (window.__LISA_CHATGPT_API_CAPTURE) {
-      try {
-        const isShared = window.location.pathname.startsWith('/share/');
-        const apiResult = isShared
-          ? await window.__LISA_CHATGPT_API_CAPTURE.extractSharedViaAPI()
-          : await window.__LISA_CHATGPT_API_CAPTURE.extractViaAPI();
-        if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
-          console.log('[LISA] ChatGPT API capture success:', apiResult.messageCount, 'messages');
-          return apiResult;
+      const isShared = window.location.pathname.startsWith('/share/');
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const apiResult = isShared
+            ? await window.__LISA_CHATGPT_API_CAPTURE.extractSharedViaAPI()
+            : await window.__LISA_CHATGPT_API_CAPTURE.extractViaAPI();
+          if (apiResult && apiResult.messages && apiResult.messages.length > 0) {
+            console.log('[LISA] ChatGPT API capture success:', apiResult.messageCount, 'messages');
+            return apiResult;
+          }
+        } catch (e) {
+          console.warn('[LISA] ChatGPT API capture attempt', attempt + 1, 'failed:', e.message);
         }
-      } catch (e) {
-        console.warn('[LISA] ChatGPT API capture failed, falling back to DOM:', e.message);
+        if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 500));
       }
+      console.warn('[LISA] ChatGPT API capture failed after retry, falling back to DOM');
     }
 
     // ---- DOM FALLBACK (existing scroll sweep logic) ----

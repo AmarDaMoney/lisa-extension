@@ -1,5 +1,5 @@
 // LISA Extension - Popup Logic
-// v0.52.7 - Auto-embed integrity hash, auto-renewal/cancellation notice
+// v0.52.8 - Auto-embed integrity hash, auto-renewal/cancellation notice
 
 class LISAPopup {
   constructor() {
@@ -1025,14 +1025,40 @@ class LISAPopup {
           document.getElementById('conceptCount').textContent = conceptCount;
           document.getElementById('relationshipCount').textContent = relationshipCount;
 
-          // Estimate token savings
-          // Raw: sum original message lengths, estimate ~4 chars per token (industry standard)
-          let totalOriginalChars = 0;
+          // Estimate token savings.
+          // "Raw" must mean the conversation as the user experienced it —
+          // not whatever LISA-V's own processing pipeline happens to carry
+          // (e.g. tool_use/tool_result artifacts get folded into message
+          // content there, which can inflate this well past what a human
+          // would call "the conversation", even with zero code/DOM
+          // involved). ACM's monitor already computes a clean estimate
+          // straight from the platform's own API response with no such
+          // transformation — defer to that when it's available and its
+          // message count agrees with what we're about to compress, so
+          // the comparison is honest. Falls back to the old chars-based
+          // estimate (now matching ACM's own 3.5 chars/token constant,
+          // instead of a different divisor that made the two numbers
+          // disagree even before the deeper cause above) when ACM isn't
+          // running for this platform/page.
           const rawMsgs = (this.currentConversation && this.currentConversation.messages) || [];
-          for (const m of rawMsgs) {
-            totalOriginalChars += (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content || '').length);
+          let rawTokenEstimate = null;
+          try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tab && tab.id) {
+              const acmStatus = await this.sendMessageToTab(tab.id, { action: 'acm_getMonitorStatus' }, 3000, 0);
+              if (acmStatus && acmStatus.messageCount === rawMsgs.length && acmStatus.tokenEstimate > 0) {
+                rawTokenEstimate = acmStatus.tokenEstimate;
+              }
+            }
+          } catch (_) { /* ACM not available on this page — fall through */ }
+
+          if (rawTokenEstimate == null) {
+            let totalOriginalChars = 0;
+            for (const m of rawMsgs) {
+              totalOriginalChars += (typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content || '').length);
+            }
+            rawTokenEstimate = Math.round(totalOriginalChars / 3.5);
           }
-          const rawTokenEstimate = Math.round(totalOriginalChars / 4);
           
           // Enriched: the semantic structure is pre-parsed, so receiving AI
           // only needs to read the structured metadata, not re-parse raw text
@@ -1049,8 +1075,12 @@ class LISAPopup {
             ? Math.min(95, Math.max(5, Math.round(preComputedWork * 3 / rawTokenEstimate * 100)))
             : 0;
           
+          const rawTokensSaved = Math.max(0, rawTokenEstimate - enrichedTokenEstimate);
+          const rawTokensSavedPct = rawTokenEstimate > 0 ? Math.round(rawTokensSaved / rawTokenEstimate * 100) : 0;
+
           document.getElementById('rawTokens').textContent = rawTokenEstimate.toLocaleString();
           document.getElementById('enrichedTokens').textContent = enrichedTokenEstimate.toLocaleString();
+          document.getElementById('rawTokensSaved').textContent = rawTokensSaved.toLocaleString() + ' (' + rawTokensSavedPct + '%)';
           document.getElementById('tokensSaved').textContent = '~' + inferenceReduction + '% inference pre-resolved';
           document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
@@ -1241,7 +1271,10 @@ class LISAPopup {
         document.getElementById('enrichedTokens').textContent = '~' + mdTokens.toLocaleString();
         const saved = Math.max(0, rawTokens - mdTokens);
         const savePct = rawTokens > 0 ? Math.round(saved / rawTokens * 100) : 0;
-        document.getElementById('tokensSaved').textContent = '~' + saved.toLocaleString() + ' tokens (' + savePct + '%)';
+        // This mode has no separate inference-cost-saved computation (that
+        // metric is specific to the free-tier local semanticTokens path) —
+        // was previously mislabeled into that slot; belongs in "Tokens saved".
+        document.getElementById('rawTokensSaved').textContent = '~' + saved.toLocaleString() + ' (' + savePct + '%)';
         document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
         document.getElementById('hashingSection').style.display = 'block';
@@ -1429,7 +1462,14 @@ class LISAPopup {
         url: this.compressedData.metadata?.originalUrl || this.compressedData.metadata?.url || window.location.href,
         title: this.compressedData.metadata?.title || 'Compressed Conversation',
         messageCount: this.compressedData.metadata?.messageCount || 0,
-        messages: [],
+        // Raw verbatim messages — without these, saveSnapshot() stores an
+        // empty capture.messages, and every downstream read (download,
+        // inject, markdown-wrap) loses the raw text needed for the
+        // edge-verbatim opening/closing and the compression gate. This was
+        // the actual reason "save to library then download" reverted to
+        // summary-only output while an immediate download (which still had
+        // this.currentConversation in scope) worked correctly.
+        messages: this.currentConversation?.messages || [],
         format: this.compressedData._aiCompressed ? 'ai-compressed' : 'compressed',
         content: this.compressedData
       };
@@ -2110,29 +2150,15 @@ class LISAPopup {
         mimeType = 'application/jsonl';
         extension = 'jsonl';
       } else if (fmt === 'ai-compressed' || fmt === 'compressed') {
-        // Lean export — same filtering as downloadJSON()
+        // Reuse the same buildLeanExport() the Compress button uses — this
+        // used to be a hand-duplicated copy of that logic that drifted out
+        // of sync (missed the edge-verbatim fix entirely, for example).
         const raw = snapshot.capture?.content || snapshot.raw || snapshot;
-        const tokens = raw.semanticTokens || raw.compressed || [];
-        const _leanMsgsLib = tokens.map(t => ({ role: t.role, index: t.index, summary: t.summary }));
-        // Compression gate: if lean >= raw, use verbatim
-        const _rawMsgsLib = snapshot.messages || raw.messages || [];
-        const _useVerbatimLib = _rawMsgsLib.length > 0 && JSON.stringify(_leanMsgsLib).length >= JSON.stringify(_rawMsgsLib.map((m, i) => ({ role: m.role, index: i, content: m.content }))).length;
-        const leanMessages = _useVerbatimLib
-          ? _rawMsgsLib.map((m, i) => ({ role: m.role, index: i, content: m.content }))
-          : _leanMsgsLib;
-        const data = {
-          _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
-          platform: raw.metadata?.platform || 'Unknown',
-          url: raw.metadata?.originalUrl || raw.metadata?.url || '',
-          title: raw.metadata?.title || '',
-          messageCount: raw.metadata?.messageCount || tokens.length,
-          messages: leanMessages,
-          format: fmt,
-          exportedAt: new Date().toISOString(),
-          anchor: raw.anchor || '',
-          semantic_anchors: Object.fromEntries(Object.entries(raw.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest])),
-          session_metadata: raw.session_metadata || {}
-        };
+        const rawMessages = snapshot.capture?.messages || raw.messages || [];
+        const data = buildLeanExport(raw, rawMessages);
+        data.format = fmt; // preserve the original label (ai-compressed vs compressed)
+        data.url = raw.metadata?.originalUrl || raw.metadata?.url || '';
+        data.exportedAt = new Date().toISOString();
         fileContent = JSON.stringify(data, null, 2);
         mimeType = 'application/json';
         extension = 'json';
@@ -2418,36 +2444,17 @@ class LISAPopup {
       } else if (typeof contentData === 'string') {
         rawContent = contentData;
       } else if (typeof contentData === 'object') {
-        // Compressed/AI-compressed: lean export
-        const _r = contentData;
-        const _msgs = (_r.semanticTokens || _r.compressed || []).map(t => ({
-          role: t.role, index: t.index, summary: t.summary
-        }));
-        const _sa = Object.fromEntries(Object.entries(_r.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest]));
-        rawContent = JSON.stringify({
-          _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.',
-          platform: _r.metadata?.platform || platform,
-          title: _r.metadata?.title || title,
-          messageCount: _r.metadata?.messageCount || _msgs.length,
-          messages: _msgs, format: format, anchor: _r.anchor || '',
-          semantic_anchors: _sa, session_metadata: _r.session_metadata || {}
-        }, null, 2);
+        // Reuse buildLeanExport() — this used to be a hand-duplicated copy
+        // that had drifted out of sync (missing both the edge-verbatim fix
+        // and the compression gate entirely).
+        const lean = buildLeanExport(contentData, snapshot.capture?.messages || contentData.messages || []);
+        lean.format = format;
+        rawContent = JSON.stringify(lean, null, 2);
       }
     } else if (snapshot.raw) {
-      // Raw or compressed — lean export
-      const _r = snapshot.raw;
-      const _msgs = (_r.semanticTokens || _r.compressed || []).map(t => ({
-        role: t.role, index: t.index, summary: t.summary
-      }));
-      const _sa = Object.fromEntries(Object.entries(_r.semantic_anchors || {}).map(([k, { content, ...rest }]) => [k, rest]));
-      rawContent = JSON.stringify({
-        _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.',
-        platform: _r.metadata?.platform || platform,
-        title: _r.metadata?.title || title,
-        messageCount: _r.metadata?.messageCount || _msgs.length,
-        messages: _msgs, format: format, anchor: _r.anchor || '',
-        semantic_anchors: _sa, session_metadata: _r.session_metadata || {}
-      }, null, 2);
+      const lean = buildLeanExport(snapshot.raw, snapshot.capture?.messages || snapshot.raw.messages || []);
+      lean.format = format;
+      rawContent = JSON.stringify(lean, null, 2);
     }
 
     if (!rawContent) return null;

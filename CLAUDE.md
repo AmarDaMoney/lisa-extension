@@ -120,9 +120,69 @@ The backend is at `https://lisa-web-backend-production.up.railway.app`. License 
 
 ## Active development
 
-### ACM (Active Context Management) — In Progress
-Branch: `feature/acm`
-Status: Phase 1 (Monitor) built but paused for redesign.
-Concept: Live compression layer that tracks context health during AI conversations.
-Three layers: Monitor → Compress → Inject.
-See project docs `LISA_ACM_SPEC.md` and `LISA_ACM_PRODUCT.md` for full spec.
+### ACM (Active Context Management)
+Branch: `feature/acm`. Concept: keep AI conversations coherent as they grow
+long, without requiring a handoff to a fresh conversation until the user
+actually chooses one. Three layers — Monitor → Extend → Inject — all built
+and working; Inject still has open edges (see below). No separate spec
+doc — this section is the current source of truth; earlier inspiration
+docs (an ACM spec/product doc, a "Phoenix" rebirth spec) were never
+committed to the repo and have since been substantially superseded by
+real testing and iteration — treat any old copies as historical context,
+not current direction.
+
+**Phase 1 — Monitor** (`src/content/acm-monitor.js`). Health dot on the
+floating button (green/yellow/red/critical) from message-count
+thresholds. API-first counting on Claude/ChatGPT via the existing
+`claude-api-capture.js`/`chatgpt-api-capture.js` modules, DOM rescan
+fallback elsewhere. Per-conversation state persisted to
+`chrome.storage.local` under `lisa-acm-<conversationId>` (24h restore).
+
+**Phase 2 — Extend** (checkpoint). A "Context Checkpoint" action copies a
+structured prompt (DECISIONS/OPEN/RESOLVED/CONSTRAINTS/KEY CONTEXT) to
+the clipboard for the user to paste into the live chat — this is Tier 2:
+zero API cost, uses the session's own AI to summarize itself. The
+monitor passively detects the AI's structured response (via the same
+rescan hooks, no polling/blocking UI) and stores it in
+`chrome.storage.local` under `lisa-acm-checkpoint-<conversationId>`
+(rolling history, last 3). Smart toast suggestions fire once per
+health-level transition (yellow/red/critical), not on every rescan.
+
+**Phase 3 — Inject (Handoff)**. Floating button menu has a single
+"Handoff" entry opening a two-step panel: ① Create/Update Checkpoint
+(same prompt as Phase 2), ② Compress & Handoff (works with or without a
+checkpoint — richer with one). Step ② keeps the first 2 and last ~4
+messages verbatim and compresses only the middle, via a dedicated
+service-worker action `compressForHandoff` that chains the *same*
+pipeline the popup's own Compress button uses (`SemanticAnalyzer.analyze`
+→ `LISACompressor.compress` → `buildLeanExport`, the last of which now
+also keeps opening/closing verbatim for every export path, not just
+handoff — see `src/shared/export-builders.js`). This parity was not
+automatic — three duplicate/drifted copies of the lean-export logic
+existed before being consolidated to call the one shared function.
+
+Handoff target platform is chosen from a picker built from
+`ACMMonitor.HANDOFF_COMPAT` (a hand-seeded compatibility matrix — only
+Claude↔ChatGPT/Gemini/Grok are actually tested; other pairs are
+guesses and need real verification before trusting them) intersected
+with the user's platform preferences (set in popup Settings, stored as
+`acmPlatforms`). Picking a target opens a new tab next to the source tab
+(`chrome.tabs.create` with `index`/`windowId` from `sender.tab`) and
+attempts real file injection via the existing `injectFileAttachment`
+path in `lisa-progressive.js` (the same one the library's manual inject
+already used) — not just a clipboard copy. Confirmed working Claude→
+Gemini and Claude→Grok. **ChatGPT auto-inject still falls back to
+clipboard** — the file input itself is confirmed present in ChatGPT's
+DOM at page load (no click-to-reveal needed, unlike Gemini), so the
+open question is whether ChatGPT's React app silently ignores a
+same-input assignment made without a live user gesture, or whether it's
+being masked by hitting the free-tier upload quota — unresolved, revisit
+with a fresh-quota test and the `[LISA] ChatGPT:` console diagnostics
+already in place before trying another fix.
+
+**Known pre-existing dead ends** (not from ACM work, found during a code
+audit): `preCacheConversation` (sent from `lisa-floating-button.js` on
+tab-hide) and `refreshUserTier` (sent from `success.html` post-checkout)
+both have no handler anywhere — harmless no-ops, not regressions, just
+unimplemented. `acm_getStatus` in `service-worker.js` has a handler but
+no caller. Leave as-is unless picking them up deliberately.

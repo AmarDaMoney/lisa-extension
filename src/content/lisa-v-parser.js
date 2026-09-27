@@ -298,22 +298,42 @@ class LisaVParser {
     // that's purely a tool call (no accompanying prose) produced zero blocks
     // above and silently vanished from the export entirely, even though it
     // still counted as 1 message in the API's messageCount.
+    //
+    // Tool results are truncated here, at the source — a single search or
+    // knowledge-base call can return multiple full document excerpts
+    // (confirmed: one real conversation's project_knowledge_search result
+    // alone ran to tens of thousands of characters). Left unbounded, that
+    // text becomes part of this message's .content and flows uncompressed
+    // into every downstream consumer: the raw-conversation token estimate,
+    // the summarized "middle" of a handoff (summarize() still shrinks it,
+    // but from a much larger base than necessary), and worst of all the
+    // verbatim opening/closing window, which copies full raw content with
+    // no summarization at all — a tool-heavy message landing there can
+    // make a "compressed" export larger than the original conversation.
+    const TOOL_RESULT_CHAR_CAP = 500;
     if (Array.isArray(msg.artifacts)) {
       for (const artifact of msg.artifacts) {
         if (artifact.type === 'tool_use') {
+          const inputStr = JSON.stringify(artifact.input);
+          const truncatedInput = inputStr.length > TOOL_RESULT_CHAR_CAP
+            ? inputStr.slice(0, TOOL_RESULT_CHAR_CAP) + `...[truncated, ${inputStr.length} chars total]`
+            : inputStr;
           consolidated.push({
             t: 'tool_use',
             role: role,
-            v: `Tool call: ${artifact.name}\nInput: ${JSON.stringify(artifact.input)}`
+            v: `Tool call: ${artifact.name}\nInput: ${truncatedInput}`
           });
         } else if (artifact.type === 'tool_result') {
           const resultText = typeof artifact.content === 'string'
             ? artifact.content
             : JSON.stringify(artifact.content);
+          const truncatedResult = resultText.length > TOOL_RESULT_CHAR_CAP
+            ? resultText.slice(0, TOOL_RESULT_CHAR_CAP) + `...[truncated, ${resultText.length} chars total]`
+            : resultText;
           consolidated.push({
             t: 'tool_result',
             role: role,
-            v: `Tool result:\n${resultText}`
+            v: `Tool result:\n${truncatedResult}`
           });
         }
       }
@@ -1569,7 +1589,7 @@ class LisaVParser {
         key_entities:      [...entities].slice(0, 10),
         session_register:  register,
         open_tasks:        openTasks,
-        generated_by:      'LISA v0.52.7'
+        generated_by:      'LISA v0.52.8'
       }
     };
   }
@@ -1733,7 +1753,13 @@ class LisaVParser {
       title: this.getSmartTitle(),
       extractedAt: new Date().toISOString(),
       messageCount: messages.length,
-      messages: messages
+      messages: messages,
+      // apiMessageCount is only ever set after a successful API capture
+      // (see extractConversation() above) — this was previously missing
+      // entirely, so SemanticAnalyzer.analyze()'s rawExtraction._captureMethod
+      // || 'dom' fallback always labeled the result 'dom' even when the
+      // capture had genuinely succeeded via API moments earlier.
+      _captureMethod: this.apiMessageCount != null ? 'api' : 'dom'
     };
   }
 

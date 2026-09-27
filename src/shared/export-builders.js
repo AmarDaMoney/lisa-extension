@@ -12,13 +12,31 @@
  * Build the lean JSON export payload from compressed data.
  * Returns the full download-ready object including compression gate.
  */
-function buildLeanExport(compressed, rawMessages) {
+function buildLeanExport(compressed, rawMessages, options = {}) {
   const tokens = compressed.semanticTokens || compressed.messages || compressed.compressed || [];
   const messages = tokens.map(t => ({
     role: t.role,
     index: t.index,
     summary: t.summary
   }));
+
+  // Keep the conversation's opening (how it started) and closing (how it
+  // most recently stood) verbatim instead of summarized — these are
+  // exactly the turns a continuation needs word-for-word, and the token
+  // cost is small next to what compression already saves. Positional
+  // (messages[i] <-> rawMessages[i]), since both come from the same
+  // conversation.messages array in the same order. Skipped when the
+  // caller is compressing a slice of a larger conversation (e.g. the
+  // ACM handoff's middle section) and already owns edge-verbatim
+  // semantics for the real conversation boundaries.
+  if (options.applyEdgeVerbatim !== false && rawMessages && rawMessages.length === messages.length && messages.length > 0) {
+    const n = messages.length;
+    const openingCount = Math.min(2, n);
+    const closingCount = Math.min(4, n - openingCount);
+    const makeVerbatim = (i) => ({ role: messages[i].role, index: messages[i].index, content: rawMessages[i].content });
+    for (let i = 0; i < openingCount; i++) messages[i] = makeVerbatim(i);
+    for (let i = n - closingCount; i < n; i++) messages[i] = makeVerbatim(i);
+  }
 
   const anchors = Object.fromEntries(
     Object.entries(compressed.semantic_anchors || {}).map(([k, { content, ...rest }]) => {
@@ -34,7 +52,7 @@ function buildLeanExport(compressed, rawMessages) {
   );
 
   const leanPayload = {
-    _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns.',
+    _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns; the opening and closing few carry messages[].content verbatim instead.',
     platform: compressed.metadata?.platform || 'Unknown',
     title: compressed.metadata?.title || '',
     messageCount: compressed.metadata?.messageCount || messages.length,

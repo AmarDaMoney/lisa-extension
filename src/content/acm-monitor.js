@@ -397,9 +397,10 @@ const ACMMonitor = {
   },
 
   // Checkpoint response detection — looks for the structured format LISA's
-  // checkpoint prompt asks for (DECISIONS, OPEN, RESOLVED, CONSTRAINTS, KEY CONTEXT).
+  // checkpoint prompt asks for (CURRENT STATE, OBJECTIVE, DECISIONS, OPEN,
+  // RESOLVED, CONSTRAINTS, KEY CONTEXT, NEXT).
   // Runs on every API rescan; only fires once per unique response.
-  _CHECKPOINT_SECTIONS: ['DECISIONS', 'OPEN', 'RESOLVED', 'CONSTRAINTS', 'KEY CONTEXT'],
+  _CHECKPOINT_SECTIONS: ['CURRENT STATE', 'OBJECTIVE', 'DECISIONS', 'OPEN', 'RESOLVED', 'CONSTRAINTS', 'KEY CONTEXT', 'NEXT'],
 
   _detectCheckpointResponse(messages) {
     if (!messages || messages.length === 0) return;
@@ -415,12 +416,13 @@ const ACMMonitor = {
     if (!assistantMsg || !assistantMsg.content) return;
 
     const text = assistantMsg.content;
-    // Quick check: must contain at least 4 of the 5 section headers
+    // Quick check: must contain at least 6 of the 8 section headers
+    // (same ~80% tolerance as before — AIs don't always follow the format exactly)
     let matchCount = 0;
     for (const section of this._CHECKPOINT_SECTIONS) {
       if (text.includes(section + ':')) matchCount++;
     }
-    if (matchCount < 4) return;
+    if (matchCount < 6) return;
 
     // Deduplicate — don't re-store the same checkpoint
     const hash = this._hashText(text);
@@ -475,11 +477,14 @@ const ACMMonitor = {
     if (Object.keys(sections).length < 3) return null;
 
     return {
+      currentState: (sections['CURRENT STATE'] || []).join(' '),
+      objective: (sections['OBJECTIVE'] || []).join(' '),
       decisions: sections['DECISIONS'] || [],
       open: sections['OPEN'] || [],
       resolved: sections['RESOLVED'] || [],
       constraints: sections['CONSTRAINTS'] || [],
       keyContext: sections['KEY CONTEXT'] || [],
+      next: sections['NEXT'] || [],
       raw: text,
       capturedAt: Date.now(),
       messageCount: this.messageCount,

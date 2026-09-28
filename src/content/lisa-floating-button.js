@@ -619,11 +619,14 @@ class LISAFloatingButton {
   async contextCheckpoint() {
     const checkpointPrompt = `Quick context checkpoint — I need you to summarize where we are right now. Use this exact format:
 
+CURRENT STATE: [1-2 lines on what's true right now — what's been built/decided/tried]
+OBJECTIVE: [1 line — the overall goal we're working toward]
 DECISIONS: [list each active decision we've made, one per line]
 OPEN: [list unresolved topics or questions, one per line]
 RESOLVED: [list completed/closed items, one line each]
 CONSTRAINTS: [list rules, requirements, or things to remember]
 KEY CONTEXT: [the 3-5 most important points from our conversation]
+NEXT: [1-3 lines — the concrete next step(s) to pick up with]
 
 Keep it tight — this is for continuity, not a report. Only include what matters for picking up where we left off.`;
 
@@ -847,7 +850,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       const verbatim = m => ({ role: m.role, index: m.index, content: m.content });
       const payload = {
         _instructions: checkpoint
-          ? 'LISA context handoff. Read "checkpoint" first for continuity — decisions, open items, constraints from the prior session. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from where the checkpoint left off.'
+          ? 'LISA context handoff. Read "checkpoint" first for continuity — current state, objective, decisions, open items, constraints, and next steps from the prior session. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from checkpoint.next.'
           : 'LISA context handoff. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from where it left off.',
         platform: conversation.platform,
         title: conversation.title,
@@ -861,11 +864,14 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         payload.checkpoint = {
           capturedAtMessage: checkpoint.messageCount,
           capturedAt: checkpoint.capturedAt,
+          currentState: checkpoint.currentState,
+          objective: checkpoint.objective,
           decisions: checkpoint.decisions,
           open: checkpoint.open,
           resolved: checkpoint.resolved,
           constraints: checkpoint.constraints,
-          keyContext: checkpoint.keyContext
+          keyContext: checkpoint.keyContext,
+          next: checkpoint.next
         };
       }
 

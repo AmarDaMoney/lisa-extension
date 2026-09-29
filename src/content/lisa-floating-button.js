@@ -617,7 +617,7 @@ class LISAFloatingButton {
   }
 
   async contextCheckpoint() {
-    const checkpointPrompt = `Quick context checkpoint — I need you to summarize where we are right now. Use this exact format:
+    const checkpointPrompt = `Quick context checkpoint — I need you to summarize where we are right now. This must cover the ENTIRE conversation from the start, not just what's happened since any earlier checkpoint in this thread — treat this as a full replacement, not a delta. Use this exact format:
 
 CURRENT STATE: [1-2 lines on what's true right now — what's been built/decided/tried]
 OBJECTIVE: [1 line — the overall goal we're working toward]
@@ -737,9 +737,26 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       ...targets.map(t => ({ ...t, label: platformNames[t.platform] || t.platform }))
     ];
 
+    // Two handoff modes: "standard" (fixed opening/closing windows — the
+    // only option when there's no checkpoint yet) and "checkpoint" (the
+    // checkpoint response itself becomes the verbatim anchor, and only the
+    // messages after it get compressed). Recommend the checkpoint mode
+    // whenever one exists, but let the user switch back to standard.
+    const status = acm.getStatus();
+    const hasCheckpoint = !!(status && status.hasCheckpoint);
+    let mode = hasCheckpoint ? 'checkpoint' : 'standard';
+
+    const tabsHtml = hasCheckpoint ? `
+      <div style="display:flex;border-bottom:1px solid #333;">
+        <div class="lisa-handoff-tab" data-mode="checkpoint" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:#3b82f6;border-bottom:2px solid #3b82f6;">Continue from Checkpoint</div>
+        <div class="lisa-handoff-tab" data-mode="standard" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:#9ca3af;border-bottom:2px solid transparent;">Standard</div>
+      </div>
+    ` : '';
+
     const picker = document.createElement('div');
     picker.className = 'lisa-handoff-panel';
     picker.innerHTML = `
+      ${tabsHtml}
       <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Hand off to:</div>
       ${allTargets.map(t => `
         <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}" style="padding:10px 16px;color:#fafafa;font-size:14px;cursor:pointer;">
@@ -765,10 +782,20 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     document.body.appendChild(picker);
 
     picker.addEventListener('click', async (e) => {
+      const tab = e.target.closest('.lisa-handoff-tab');
+      if (tab) {
+        mode = tab.dataset.mode;
+        picker.querySelectorAll('.lisa-handoff-tab').forEach(t => {
+          const active = t.dataset.mode === mode;
+          t.style.color = active ? '#3b82f6' : '#9ca3af';
+          t.style.borderBottomColor = active ? '#3b82f6' : 'transparent';
+        });
+        return;
+      }
       const item = e.target.closest('.lisa-menu-item');
       if (!item || !item.dataset.url) return;
       picker.remove();
-      await this._executeHandoff(item.dataset.platform, item.dataset.url);
+      await this._executeHandoff(item.dataset.platform, item.dataset.url, mode);
     });
 
     setTimeout(() => {
@@ -781,7 +808,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     }, 100);
   }
 
-  async _executeHandoff(targetPlatform, targetUrl) {
+  async _executeHandoff(targetPlatform, targetUrl, mode = 'standard') {
     try {
       this.showToast("Preparing handoff...");
       const acm = window.__lisaACM;
@@ -802,27 +829,55 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         return;
       }
 
-      // Keep the opening (how it started) and closing (how it ended —
-      // typically the checkpoint prompt + the AI's response) verbatim.
-      // Only the middle gets compressed, using compressForHandoff — the
-      // same SemanticAnalyzer -> compress -> buildLeanExport chain the
-      // popup's own Compress button runs, so the handoff's compressed
-      // section matches what "properly compressed by the extension"
-      // actually produces, not a lighter derived shortcut.
       const allMessages = conversation.messages;
       const n = allMessages.length;
-      const openingCount = Math.min(2, n);
-      const closingCount = Math.min(4, n - openingCount);
-      const opening = allMessages.slice(0, openingCount);
-      const closing = closingCount > 0 ? allMessages.slice(n - closingCount) : [];
-      let middle = allMessages.slice(openingCount, n - closingCount);
+      let usedMode = (mode === 'checkpoint' && checkpoint) ? 'checkpoint' : 'standard';
 
-      // Safety net: if a checkpoint exists but its message isn't in the
-      // verbatim closing window (e.g. more messages followed it before
-      // handoff), drop it from the compressed middle so it's never
-      // represented twice.
-      if (checkpoint) {
-        middle = middle.filter(m => m.content !== checkpoint.raw);
+      let opening, closing, middle;
+
+      if (usedMode === 'checkpoint') {
+        // Checkpoint-anchored: the checkpoint response already covers
+        // everything before it (current state, objective, decisions, etc.),
+        // so it replaces "opening" entirely. Only what happened *after* the
+        // checkpoint gets compressed; the last few messages stay verbatim
+        // as usual.
+        const cpIndex = allMessages.findIndex(m => m.content === checkpoint.raw);
+        if (cpIndex === -1) {
+          // Checkpoint message wasn't found in this fresh capture (edited,
+          // regenerated, or paginated out since it was captured) — fall
+          // back to standard slicing rather than guess at a boundary.
+          usedMode = 'standard';
+          this.showToast("Checkpoint message not found in the current transcript — using standard handoff instead.");
+        } else {
+          const afterCheckpoint = n - cpIndex - 1;
+          const closingCount = Math.min(4, afterCheckpoint);
+          opening = [];
+          closing = closingCount > 0 ? allMessages.slice(n - closingCount) : [];
+          middle = allMessages.slice(cpIndex + 1, n - closingCount);
+        }
+      }
+
+      if (usedMode === 'standard') {
+        // Keep the opening (how it started) and closing (how it ended —
+        // typically the checkpoint prompt + the AI's response) verbatim.
+        // Only the middle gets compressed, using compressForHandoff — the
+        // same SemanticAnalyzer -> compress -> buildLeanExport chain the
+        // popup's own Compress button runs, so the handoff's compressed
+        // section matches what "properly compressed by the extension"
+        // actually produces, not a lighter derived shortcut.
+        const openingCount = Math.min(2, n);
+        const closingCount = Math.min(4, n - openingCount);
+        opening = allMessages.slice(0, openingCount);
+        closing = closingCount > 0 ? allMessages.slice(n - closingCount) : [];
+        middle = allMessages.slice(openingCount, n - closingCount);
+
+        // Safety net: if a checkpoint exists but its message isn't in the
+        // verbatim closing window (e.g. more messages followed it before
+        // handoff), drop it from the compressed middle so it's never
+        // represented twice.
+        if (checkpoint) {
+          middle = middle.filter(m => m.content !== checkpoint.raw);
+        }
       }
 
       let middleCompressed = null;
@@ -848,13 +903,21 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       }
 
       const verbatim = m => ({ role: m.role, index: m.index, content: m.content });
+      let instructions;
+      if (usedMode === 'checkpoint') {
+        instructions = 'LISA context handoff (checkpoint-anchored). Read "checkpoint" first — it fully covers everything before it (current state, objective, decisions, open items, constraints, key context, next steps, and the verbatim checkpoint response in checkpoint.raw), so "opening" is intentionally empty. "middleCompressed" covers what happened after the checkpoint; "closing" is the most recent messages, verbatim. Continue from checkpoint.next.';
+      } else if (checkpoint) {
+        instructions = 'LISA context handoff. Read "checkpoint" first for continuity — current state, objective, decisions, open items, constraints, and next steps from the prior session. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from checkpoint.next.';
+      } else {
+        instructions = 'LISA context handoff. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from where it left off.';
+      }
+
       const payload = {
-        _instructions: checkpoint
-          ? 'LISA context handoff. Read "checkpoint" first for continuity — current state, objective, decisions, open items, constraints, and next steps from the prior session. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from checkpoint.next.'
-          : 'LISA context handoff. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from where it left off.',
+        _instructions: instructions,
         platform: conversation.platform,
         title: conversation.title,
         messageCount: n,
+        handoffMode: usedMode,
         opening: opening.map(verbatim),
         middleCompressed,
         closing: closing.map(verbatim),
@@ -871,7 +934,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
           resolved: checkpoint.resolved,
           constraints: checkpoint.constraints,
           keyContext: checkpoint.keyContext,
-          next: checkpoint.next
+          next: checkpoint.next,
+          raw: checkpoint.raw
         };
       }
 

@@ -680,34 +680,40 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     const checkpoint = acm ? await acm.getCheckpoint() : null;
     const hasCheckpoint = !!checkpoint;
 
-    // Handoff mode (step ②'s Standard vs Checkpoint-anchored file slicing)
-    // still depends on a checkpoint actually existing — you can't anchor to
-    // nothing. That's a runtime fact, not a preference, so it stays gated.
-    let mode = hasCheckpoint ? 'checkpoint' : 'standard';
-    const tabsHtml = hasCheckpoint ? `
+    // Step ① is a single "Create/Update Checkpoint" action. Mode 2
+    // (Since Last) only makes sense once a checkpoint already exists to be
+    // "since" — with nothing prior, Mode 1 (Full) is the only option, so
+    // the tab selector itself stays hidden rather than offering a choice
+    // that isn't really one yet.
+    let step1Mode = hasCheckpoint ? 'since-last' : 'full';
+    const step1TabsHtml = hasCheckpoint ? `
+      <div style="display:flex;border-bottom:1px solid #333;">
+        <div class="lisa-step1-tab" data-step1mode="full" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:#9ca3af;border-bottom:2px solid transparent;">Mode 1: Full</div>
+        <div class="lisa-step1-tab" data-step1mode="since-last" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:#3b82f6;border-bottom:2px solid #3b82f6;">Mode 2: Since Last</div>
+      </div>
+    ` : '';
+
+    // Step ②'s Standard vs Checkpoint-anchored file slicing is a separate
+    // choice from step ①'s prompt mode above — still gated the same way,
+    // you can't anchor to a checkpoint that doesn't exist.
+    let step2Mode = hasCheckpoint ? 'checkpoint' : 'standard';
+    const step2TabsHtml = hasCheckpoint ? `
       <div style="display:flex;border-bottom:1px solid #333;">
         <div class="lisa-handoff-tab" data-mode="checkpoint" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:#3b82f6;border-bottom:2px solid #3b82f6;">🧠 Continue from Checkpoint</div>
         <div class="lisa-handoff-tab" data-mode="standard" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:#9ca3af;border-bottom:2px solid transparent;">Standard</div>
       </div>
     ` : '';
 
-    // Step ① is a choice of PROMPT, always offered both ways from the very
-    // first time — unlike step ②'s mode, this doesn't depend on a
-    // checkpoint already existing: picking "Update" with nothing prior just
-    // has the AI describe the conversation so far.
     const panel = document.createElement('div');
     panel.className = 'lisa-handoff-panel';
     panel.innerHTML = `
       <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Context Handoff</div>
-      ${tabsHtml}
-      <div class="lisa-menu-item" data-action="step1-full" style="padding:10px 16px;cursor:pointer;">
-        <div style="color:#fafafa;font-size:14px;">① 🧠 Create Checkpoint (Full)</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:2px;">Ask the AI to summarize the whole conversation so far</div>
+      ${step1TabsHtml}
+      <div class="lisa-menu-item" data-action="step1-create" style="padding:10px 16px;cursor:pointer;">
+        <div style="color:#fafafa;font-size:14px;">① 🧠 ${hasCheckpoint ? 'Create / Update Checkpoint' : 'Create Checkpoint'}</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:2px;">${hasCheckpoint ? 'Ask the AI to summarize — pick a mode above' : 'Ask the AI to summarize the whole conversation so far'}</div>
       </div>
-      <div class="lisa-menu-item" data-action="step1-since" style="padding:10px 16px;cursor:pointer;">
-        <div style="color:#fafafa;font-size:14px;">① 🔄 Update Checkpoint (Since Last)</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:2px;">Ask the AI to summarize only what's happened since the last one</div>
-      </div>
+      ${step2TabsHtml}
       <div class="lisa-menu-item" data-action="step2" style="padding:10px 16px;cursor:pointer;">
         <div style="color:#fafafa;font-size:14px;">② 🔄 Compress & Handoff</div>
         <div style="color:#6b7280;font-size:11px;margin-top:2px;">${hasCheckpoint ? 'Pick a target and transfer' : 'Pick a target — works without a checkpoint too, just leaner with one'}</div>
@@ -731,11 +737,21 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     document.body.appendChild(panel);
 
     panel.addEventListener('click', async (e) => {
+      const step1Tab = e.target.closest('.lisa-step1-tab');
+      if (step1Tab) {
+        step1Mode = step1Tab.dataset.step1mode;
+        panel.querySelectorAll('.lisa-step1-tab').forEach(t => {
+          const active = t.dataset.step1mode === step1Mode;
+          t.style.color = active ? '#3b82f6' : '#9ca3af';
+          t.style.borderBottomColor = active ? '#3b82f6' : 'transparent';
+        });
+        return;
+      }
       const tab = e.target.closest('.lisa-handoff-tab');
       if (tab) {
-        mode = tab.dataset.mode;
+        step2Mode = tab.dataset.mode;
         panel.querySelectorAll('.lisa-handoff-tab').forEach(t => {
-          const active = t.dataset.mode === mode;
+          const active = t.dataset.mode === step2Mode;
           t.style.color = active ? '#3b82f6' : '#9ca3af';
           t.style.borderBottomColor = active ? '#3b82f6' : 'transparent';
         });
@@ -745,13 +761,13 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       if (!item) return;
       const action = item.dataset.action;
 
-      if (action === 'step1-full' || action === 'step1-since') {
+      if (action === 'step1-create') {
         panel.remove();
-        await this.contextCheckpoint(action === 'step1-since' ? 'since-last' : 'full');
+        await this.contextCheckpoint(step1Mode);
         this.showToast("Paste and send it — LISA captures the response automatically. Come back and click Handoff → step 2 when it's ready.");
       } else if (action === 'step2') {
         panel.remove();
-        await this._pickHandoffTarget(mode);
+        await this._pickHandoffTarget(step2Mode);
       }
     });
 

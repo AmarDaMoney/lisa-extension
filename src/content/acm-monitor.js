@@ -560,10 +560,25 @@ const ACMMonitor = {
     } catch (_) {}
   },
 
+  // this.conversationId is only refreshed by the lisa-conversation-changed
+  // event or the 2s URL-poll fallback in _watchNavigation(), so right after
+  // a page load/refresh or an SPA route change it can lag the real URL by
+  // up to one tick. A Handoff-panel open that lands in that window would
+  // read a stale/null id and wrongly conclude no checkpoint exists (or read
+  // the wrong conversation's). Recomputing fresh here — and opportunistically
+  // healing the cached value — keeps checkpoint lookups correct regardless
+  // of whether the poll has caught up yet.
+  _currentConversationId() {
+    const fresh = this._getConversationId();
+    if (fresh && fresh !== this.conversationId) this.conversationId = fresh;
+    return this.conversationId;
+  },
+
   async getCheckpoint() {
-    if (!this.conversationId) return null;
+    const id = this._currentConversationId();
+    if (!id) return null;
     try {
-      const key = `lisa-acm-checkpoint-${this.conversationId}`;
+      const key = `lisa-acm-checkpoint-${id}`;
       const result = await chrome.storage.local.get(key);
       return result[key]?.latest || null;
     } catch (_) {
@@ -576,9 +591,10 @@ const ACMMonitor = {
   // the complete picture (e.g. Handoff) has to read all of them in order,
   // not just the most recent one.
   async getCheckpointHistory() {
-    if (!this.conversationId) return [];
+    const id = this._currentConversationId();
+    if (!id) return [];
     try {
-      const key = `lisa-acm-checkpoint-${this.conversationId}`;
+      const key = `lisa-acm-checkpoint-${id}`;
       const result = await chrome.storage.local.get(key);
       return result[key]?.history || [];
     } catch (_) {

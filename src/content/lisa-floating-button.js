@@ -680,18 +680,19 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     const checkpoint = acm ? await acm.getCheckpoint() : null;
     const hasCheckpoint = !!checkpoint;
 
-    // Step ① is a single "Create/Update Checkpoint" action. Mode 2
-    // (Since Last) only makes sense once a checkpoint already exists to be
-    // "since" — with nothing prior, Mode 1 (Full) is the only option, so
-    // the tab selector itself stays hidden rather than offering a choice
-    // that isn't really one yet.
+    // Step ① is a single "Create/Update Checkpoint" action with both modes
+    // always visible as tabs, from the very first use — Mode 1 tells the
+    // user there's a checkpoint for a fresh full summary, Mode 2 tells them
+    // there's one for a delta once (or if) a previous checkpoint exists.
+    // Picking Mode 2 with nothing prior just has the AI describe the
+    // conversation so far (contextCheckpoint()'s own fallback wording).
     let step1Mode = hasCheckpoint ? 'since-last' : 'full';
-    const step1TabsHtml = hasCheckpoint ? `
+    const step1TabsHtml = `
       <div style="display:flex;border-bottom:1px solid #333;">
-        <div class="lisa-step1-tab" data-step1mode="full" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:#9ca3af;border-bottom:2px solid transparent;">Mode 1: Full</div>
-        <div class="lisa-step1-tab" data-step1mode="since-last" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:#3b82f6;border-bottom:2px solid #3b82f6;">Mode 2: Since Last</div>
+        <div class="lisa-step1-tab" data-step1mode="full" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:${step1Mode === 'full' ? '#3b82f6' : '#9ca3af'};border-bottom:2px solid ${step1Mode === 'full' ? '#3b82f6' : 'transparent'};">Mode 1: Full</div>
+        <div class="lisa-step1-tab" data-step1mode="since-last" style="flex:1;padding:8px 10px;text-align:center;font-size:12px;cursor:pointer;color:${step1Mode === 'since-last' ? '#3b82f6' : '#9ca3af'};border-bottom:2px solid ${step1Mode === 'since-last' ? '#3b82f6' : 'transparent'};">Mode 2: Since Last</div>
       </div>
-    ` : '';
+    `;
 
     // Step ②'s Standard vs Checkpoint-anchored file slicing is a separate
     // choice from step ①'s prompt mode above — still gated the same way,
@@ -710,8 +711,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Context Handoff</div>
       ${step1TabsHtml}
       <div class="lisa-menu-item" data-action="step1-create" style="padding:10px 16px;cursor:pointer;">
-        <div style="color:#fafafa;font-size:14px;">① 🧠 ${hasCheckpoint ? 'Create / Update Checkpoint' : 'Create Checkpoint'}</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:2px;">${hasCheckpoint ? 'Ask the AI to summarize — pick a mode above' : 'Ask the AI to summarize the whole conversation so far'}</div>
+        <div style="color:#fafafa;font-size:14px;">① 🧠 Create / Update Checkpoint</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:2px;">Ask the AI to summarize — pick a mode above</div>
       </div>
       ${step2TabsHtml}
       <div class="lisa-menu-item" data-action="step2" style="padding:10px 16px;cursor:pointer;">

@@ -432,7 +432,7 @@ class LISAFloatingButton {
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
-      else if (action === "handoff") this.showHandoffPanel();
+      else if (action === "handoff") await this.showHandoffPanel();
     });
     
     // Close on outside click
@@ -653,13 +653,17 @@ Keep it tight — this is for continuity, not a report. Only include what matter
   // injected as a file into a fresh tab on the target platform
   // ============================================
 
-  showHandoffPanel() {
+  async showHandoffPanel() {
     const existing = document.querySelector('.lisa-handoff-panel');
     if (existing) { existing.remove(); return; }
 
     const acm = window.__lisaACM;
-    const status = acm ? acm.getStatus() : null;
-    const hasCheckpoint = !!(status && status.hasCheckpoint);
+    // Storage-backed, not acm.getStatus().hasCheckpoint — that flag only
+    // tracks whether a checkpoint was detected during *this* page load
+    // (it resets on every reload) and would wrongly hide the tabs for a
+    // checkpoint saved in an earlier session.
+    const checkpoint = acm ? await acm.getCheckpoint() : null;
+    const hasCheckpoint = !!checkpoint;
 
     const cpLabel = hasCheckpoint ? 'Update Checkpoint' : 'Create Checkpoint';
     const cpDesc = hasCheckpoint
@@ -763,8 +767,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     // Mode is chosen up front in showHandoffPanel(); fall back to a sane
     // default here in case this is ever called directly.
     if (mode !== 'checkpoint' && mode !== 'standard') {
-      const status = acm.getStatus();
-      mode = (status && status.hasCheckpoint) ? 'checkpoint' : 'standard';
+      const storedCheckpoint = await acm.getCheckpoint();
+      mode = storedCheckpoint ? 'checkpoint' : 'standard';
     }
 
     const picker = document.createElement('div');

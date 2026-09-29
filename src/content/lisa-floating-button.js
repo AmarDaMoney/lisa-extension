@@ -641,6 +641,13 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     try {
       await navigator.clipboard.writeText(checkpointPrompt);
 
+      // Tag the mode that produced this prompt so acm-monitor.js can tell
+      // apart a full-reset reply from a since-last delta once the AI
+      // responds — both use an identical response format, only this
+      // scope instruction text differs, so there's no way to infer it
+      // after the fact from the reply alone.
+      if (window.__lisaACM) window.__lisaACM._pendingCheckpointMode = mode;
+
       const editor = document.querySelector(
         'div[contenteditable="true"].ProseMirror, ' +
         '#prompt-textarea, ' +

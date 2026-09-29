@@ -444,8 +444,16 @@ const ACMMonitor = {
     // shouldn't permanently block retrying (e.g. once formatting quirks
     // are fixed) on the same response text.
     this._lastDetectedCheckpointHash = hash;
+
+    // Which prompt produced this reply — set by contextCheckpoint() in
+    // lisa-floating-button.js right when that prompt was copied. Default
+    // to 'full' (the safer, non-destructive-to-context assumption) if
+    // it's missing, e.g. a stale reload wiped the in-memory flag.
+    checkpoint.mode = this._pendingCheckpointMode || 'full';
+    this._pendingCheckpointMode = null;
+
     this._storeCheckpoint(checkpoint);
-    console.debug('[LISA ACM] Checkpoint response detected and stored');
+    console.debug('[LISA ACM] Checkpoint response detected and stored, mode:', checkpoint.mode);
   },
 
   // Strips markdown emphasis/heading/list decoration so header matching
@@ -522,16 +530,29 @@ const ACMMonitor = {
       .filter(l => l.length > 0 && l !== '[' && l !== ']');
   },
 
+  // Full checkpoints already re-cover everything from scratch, so they're
+  // the natural compaction point: a 'full' reset the chain instead of
+  // appending to it. A 'since-last' checkpoint only covers its own delta,
+  // so it has to append — Handoff's checkpoint-anchored mode reconstructs
+  // full context by replaying the whole chain in order via
+  // getCheckpointHistory(). No cap is needed for correctness once resets
+  // happen on every Full; MAX_HISTORY is just a safety ceiling against
+  // pathological unbounded growth if a user never runs Full.
+  MAX_CHECKPOINT_HISTORY: 20,
+
   async _storeCheckpoint(checkpoint) {
     if (!this.conversationId) return;
     try {
       const key = `lisa-acm-checkpoint-${this.conversationId}`;
-      // Keep last 3 checkpoints as history
       const result = await chrome.storage.local.get(key);
       const existing = result[key] || { history: [] };
-      existing.history.push(checkpoint);
-      if (existing.history.length > 3) {
-        existing.history = existing.history.slice(-3);
+      if (checkpoint.mode === 'full') {
+        existing.history = [checkpoint];
+      } else {
+        existing.history.push(checkpoint);
+        if (existing.history.length > this.MAX_CHECKPOINT_HISTORY) {
+          existing.history = existing.history.slice(-this.MAX_CHECKPOINT_HISTORY);
+        }
       }
       existing.latest = checkpoint;
       existing.updatedAt = Date.now();

@@ -416,25 +416,48 @@ const ACMMonitor = {
     if (!assistantMsg || !assistantMsg.content) return;
 
     const text = assistantMsg.content;
-    // Quick check: must contain at least 6 of the 8 section headers
-    // (same ~80% tolerance as before — AIs don't always follow the format exactly)
+    // Quick check: must contain at least 6 of the 8 section headers.
+    // Normalized/uppercased so bolded headers (**CURRENT STATE:**) or
+    // different casing don't cause a false negative here.
+    const normalizedText = this._stripCheckpointMarkdown(text).toUpperCase();
     let matchCount = 0;
     for (const section of this._CHECKPOINT_SECTIONS) {
-      if (text.includes(section + ':')) matchCount++;
+      if (normalizedText.includes(section + ':')) matchCount++;
     }
-    if (matchCount < 6) return;
+    if (matchCount < 6) {
+      console.debug('[LISA ACM] Checkpoint format check failed —', matchCount, 'of', this._CHECKPOINT_SECTIONS.length, 'sections matched');
+      return;
+    }
 
-    // Deduplicate — don't re-store the same checkpoint
+    // Deduplicate — don't re-process the same response twice
     const hash = this._hashText(text);
     if (hash === this._lastDetectedCheckpointHash) return;
-    this._lastDetectedCheckpointHash = hash;
 
     // Parse sections
     const checkpoint = this._parseCheckpointResponse(text);
-    if (!checkpoint) return;
+    if (!checkpoint) {
+      console.debug('[LISA ACM] Checkpoint header count matched but section parsing failed');
+      return;
+    }
 
+    // Only mark as handled once it's actually stored — a parse failure
+    // shouldn't permanently block retrying (e.g. once formatting quirks
+    // are fixed) on the same response text.
+    this._lastDetectedCheckpointHash = hash;
     this._storeCheckpoint(checkpoint);
     console.debug('[LISA ACM] Checkpoint response detected and stored');
+  },
+
+  // Strips markdown emphasis/heading/list decoration so header matching
+  // works whether the AI writes "CURRENT STATE:" plain or bolds/numbers it
+  // ("**CURRENT STATE:**", "### Current State:", "1. Current State:", ...).
+  _stripCheckpointMarkdown(line) {
+    return line
+      .replace(/[*_~`]/g, '')
+      .replace(/^#{1,6}\s*/, '')
+      .replace(/^[-•]\s*/, '')
+      .replace(/^\d+[.)]\s*/, '')
+      .trim();
   },
 
   _parseCheckpointResponse(text) {
@@ -446,11 +469,12 @@ const ACMMonitor = {
     let currentLines = [];
 
     for (const line of lines) {
-      const trimmed = line.trim();
+      const normalized = this._stripCheckpointMarkdown(line);
+      const normalizedUpper = normalized.toUpperCase();
       // Check if this line starts a new section
       let foundSection = null;
       for (const name of this._CHECKPOINT_SECTIONS) {
-        if (trimmed.startsWith(name + ':') || trimmed.startsWith(name + ' :')) {
+        if (normalizedUpper.startsWith(name + ':') || normalizedUpper.startsWith(name + ' :')) {
           foundSection = name;
           break;
         }
@@ -463,10 +487,10 @@ const ACMMonitor = {
         }
         currentSection = foundSection;
         // Capture any inline content after the header
-        const afterHeader = trimmed.substring(trimmed.indexOf(':') + 1).trim();
+        const afterHeader = normalized.substring(normalized.indexOf(':') + 1).trim();
         currentLines = afterHeader ? [afterHeader] : [];
       } else if (currentSection) {
-        currentLines.push(trimmed);
+        currentLines.push(normalized);
       }
     }
     // Save last section

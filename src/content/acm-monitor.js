@@ -550,6 +550,21 @@ const ACMMonitor = {
     }
   },
 
+  // Full chain (oldest first), not just the latest — a "since last
+  // checkpoint" checkpoint only covers the delta, so anything that needs
+  // the complete picture (e.g. Handoff) has to read all of them in order,
+  // not just the most recent one.
+  async getCheckpointHistory() {
+    if (!this.conversationId) return [];
+    try {
+      const key = `lisa-acm-checkpoint-${this.conversationId}`;
+      const result = await chrome.storage.local.get(key);
+      return result[key]?.history || [];
+    } catch (_) {
+      return [];
+    }
+  },
+
   _watchNavigation() {
     // Listen for lisa-progressive's conversation-changed event
     document.addEventListener('lisa-conversation-changed', (e) => {

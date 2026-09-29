@@ -616,8 +616,16 @@ class LISAFloatingButton {
     }
   }
 
-  async contextCheckpoint() {
-    const checkpointPrompt = `Quick context checkpoint — I need you to summarize where we are right now. This must cover the ENTIRE conversation from the start, not just what's happened since any earlier checkpoint in this thread — treat this as a full replacement, not a delta. Use this exact format:
+  // mode: 'full' (summarize everything from the start) or 'since-last'
+  // (summarize only what's happened since your last checkpoint reply in
+  // this thread). Both use the same structured format so detection/parsing
+  // in acm-monitor.js doesn't need to know or care which one produced it.
+  async contextCheckpoint(mode = 'full') {
+    const scopeInstruction = mode === 'since-last'
+      ? `Only cover what's happened SINCE your last checkpoint reply in this thread — don't re-summarize what that one already covered. (If you haven't given one yet, just cover the conversation so far.)`
+      : `This must cover the ENTIRE conversation from the start, not just what's happened since any earlier checkpoint in this thread — treat this as a full replacement, not a delta.`;
+
+    const checkpointPrompt = `Quick context checkpoint — I need you to summarize where we are right now. ${scopeInstruction} Use this exact format:
 
 CURRENT STATE: [1-2 lines on what's true right now — what's been built/decided/tried]
 OBJECTIVE: [1 line — the overall goal we're working toward]
@@ -665,15 +673,9 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     const checkpoint = acm ? await acm.getCheckpoint() : null;
     const hasCheckpoint = !!checkpoint;
 
-    const cpLabel = hasCheckpoint ? 'Update Checkpoint' : 'Create Checkpoint';
-    const cpDesc = hasCheckpoint
-      ? 'Refresh the summary with the AI\'s current understanding'
-      : 'Ask the AI to summarize decisions, open items and constraints';
-
-    // Handoff mode is chosen up front, right alongside the two steps, so
-    // it's visible the moment the panel opens rather than buried inside
-    // the platform picker. Only offered once a checkpoint exists; default
-    // to it since it's the leaner, more accurate option when available.
+    // Handoff mode (step ②'s Standard vs Checkpoint-anchored file slicing)
+    // still depends on a checkpoint actually existing — you can't anchor to
+    // nothing. That's a runtime fact, not a preference, so it stays gated.
     let mode = hasCheckpoint ? 'checkpoint' : 'standard';
     const tabsHtml = hasCheckpoint ? `
       <div style="display:flex;border-bottom:1px solid #333;">
@@ -682,14 +684,22 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       </div>
     ` : '';
 
+    // Step ① is a choice of PROMPT, always offered both ways from the very
+    // first time — unlike step ②'s mode, this doesn't depend on a
+    // checkpoint already existing: picking "Update" with nothing prior just
+    // has the AI describe the conversation so far.
     const panel = document.createElement('div');
     panel.className = 'lisa-handoff-panel';
     panel.innerHTML = `
       <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Context Handoff</div>
       ${tabsHtml}
-      <div class="lisa-menu-item" data-action="step1" style="padding:10px 16px;cursor:pointer;">
-        <div style="color:#fafafa;font-size:14px;">① 🧠 ${cpLabel}</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:2px;">${cpDesc}</div>
+      <div class="lisa-menu-item" data-action="step1-full" style="padding:10px 16px;cursor:pointer;">
+        <div style="color:#fafafa;font-size:14px;">① 🧠 Create Checkpoint (Full)</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:2px;">Ask the AI to summarize the whole conversation so far</div>
+      </div>
+      <div class="lisa-menu-item" data-action="step1-since" style="padding:10px 16px;cursor:pointer;">
+        <div style="color:#fafafa;font-size:14px;">① 🔄 Update Checkpoint (Since Last)</div>
+        <div style="color:#6b7280;font-size:11px;margin-top:2px;">Ask the AI to summarize only what's happened since the last one</div>
       </div>
       <div class="lisa-menu-item" data-action="step2" style="padding:10px 16px;cursor:pointer;">
         <div style="color:#fafafa;font-size:14px;">② 🔄 Compress & Handoff</div>
@@ -728,9 +738,9 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       if (!item) return;
       const action = item.dataset.action;
 
-      if (action === 'step1') {
+      if (action === 'step1-full' || action === 'step1-since') {
         panel.remove();
-        await this.contextCheckpoint();
+        await this.contextCheckpoint(action === 'step1-since' ? 'since-last' : 'full');
         this.showToast("Paste and send it — LISA captures the response automatically. Come back and click Handoff → step 2 when it's ready.");
       } else if (action === 'step2') {
         panel.remove();
@@ -819,7 +829,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     try {
       this.showToast("Preparing handoff...");
       const acm = window.__lisaACM;
-      const checkpoint = await acm.getCheckpoint(); // optional — enriches the handoff when present
+      const checkpoint = await acm.getCheckpoint(); // latest — used to anchor the slicing below
+      const checkpointHistory = checkpoint ? await acm.getCheckpointHistory() : []; // full chain — some may be deltas covering only "since last"
 
       // Extract the live conversation the same way Compress & Copy does
       let conversation = null;
@@ -878,12 +889,12 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         closing = closingCount > 0 ? allMessages.slice(n - closingCount) : [];
         middle = allMessages.slice(openingCount, n - closingCount);
 
-        // Safety net: if a checkpoint exists but its message isn't in the
-        // verbatim closing window (e.g. more messages followed it before
-        // handoff), drop it from the compressed middle so it's never
-        // represented twice.
-        if (checkpoint) {
-          middle = middle.filter(m => m.content !== checkpoint.raw);
+        // Safety net: drop any checkpoint response (the whole chain, not
+        // just the latest) that isn't in the verbatim closing window from
+        // the compressed middle, so none of them end up represented twice.
+        if (checkpointHistory.length > 0) {
+          const checkpointTexts = new Set(checkpointHistory.map(cp => cp.raw));
+          middle = middle.filter(m => !checkpointTexts.has(m.content));
         }
       }
 
@@ -912,9 +923,9 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       const verbatim = m => ({ role: m.role, index: m.index, content: m.content });
       let instructions;
       if (usedMode === 'checkpoint') {
-        instructions = 'LISA context handoff (checkpoint-anchored). Read "checkpoint" first — it fully covers everything before it (current state, objective, decisions, open items, constraints, key context, next steps, and the verbatim checkpoint response in checkpoint.raw), so "opening" is intentionally empty. "middleCompressed" covers what happened after the checkpoint; "closing" is the most recent messages, verbatim. Continue from checkpoint.next.';
+        instructions = 'LISA context handoff (checkpoint-anchored). Read "checkpoints" first, in order — each entry may only cover what happened since the previous one ("since last" checkpoints are deltas, not full restatements), so read the whole array to get the full picture, not just the last entry. Together they fully cover everything before the anchor, so "opening" is intentionally empty. "middleCompressed" covers what happened after the last checkpoint; "closing" is the most recent messages, verbatim. Continue from the last checkpoint entry\'s "next" field.';
       } else if (checkpoint) {
-        instructions = 'LISA context handoff. Read "checkpoint" first for continuity — current state, objective, decisions, open items, constraints, and next steps from the prior session. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from checkpoint.next.';
+        instructions = 'LISA context handoff. Read "checkpoints" first for continuity, in order — each entry may only cover what happened since the previous one, so read the whole array. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from the last checkpoint entry\'s "next" field.';
       } else {
         instructions = 'LISA context handoff. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from where it left off.';
       }
@@ -930,20 +941,20 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         closing: closing.map(verbatim),
         session_metadata: sessionMetadata || undefined
       };
-      if (checkpoint) {
-        payload.checkpoint = {
-          capturedAtMessage: checkpoint.messageCount,
-          capturedAt: checkpoint.capturedAt,
-          currentState: checkpoint.currentState,
-          objective: checkpoint.objective,
-          decisions: checkpoint.decisions,
-          open: checkpoint.open,
-          resolved: checkpoint.resolved,
-          constraints: checkpoint.constraints,
-          keyContext: checkpoint.keyContext,
-          next: checkpoint.next,
-          raw: checkpoint.raw
-        };
+      if (checkpointHistory.length > 0) {
+        payload.checkpoints = checkpointHistory.map(cp => ({
+          capturedAtMessage: cp.messageCount,
+          capturedAt: cp.capturedAt,
+          currentState: cp.currentState,
+          objective: cp.objective,
+          decisions: cp.decisions,
+          open: cp.open,
+          resolved: cp.resolved,
+          constraints: cp.constraints,
+          keyContext: cp.keyContext,
+          next: cp.next,
+          raw: cp.raw
+        }));
       }
 
       const filename = `lisa-handoff-${targetPlatform}-${Date.now()}.json`;

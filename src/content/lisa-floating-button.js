@@ -978,25 +978,40 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         instructions = 'LISA context handoff. "opening" and "closing" are verbatim (how it started, how it ended); "middleCompressed" covers everything in between. Continue from where it left off.';
       }
 
-      const payload = {
-        _instructions: instructions,
-        platform: conversation.platform,
-        title: conversation.title,
-        messageCount: n,
-        handoffMode: usedMode,
-        opening: opening.map(verbatim),
-        closing: closing.map(verbatim)
-      };
-
+      let payload;
       if (usedMode === 'checkpoint') {
-        // Checkpoints are already inline, verbatim, in "middle" — no
-        // separate side-list needed here.
-        payload.middle = middleBlocks;
+        payload = {
+          _instructions: instructions,
+          platform: conversation.platform,
+          title: conversation.title,
+          messageCount: n,
+          handoffMode: usedMode,
+          opening: opening.map(verbatim),
+          middle: middleBlocks, // checkpoints are already inline, verbatim, here — no separate side-list needed
+          closing: closing.map(verbatim)
+        };
       } else {
-        payload.middleCompressed = middleCompressed;
-        payload.session_metadata = sessionMetadata || undefined;
-        if (checkpointHistory.length > 0) {
-          payload.checkpoints = checkpointHistory.map(cp => ({
+        // Drop any checkpoint from the side-list that's already sitting
+        // verbatim in "closing" — a checkpoint round-trip is exactly 2
+        // messages (prompt + reply), and closing grabs the last 4, so the
+        // most recent checkpoint almost always lands there already;
+        // repeating it in "checkpoints" would just duplicate it.
+        const closingTexts = new Set(closing.map(m => m.content));
+        const checkpointsForPayload = checkpointHistory.filter(cp => !closingTexts.has(cp.raw));
+
+        payload = {
+          _instructions: instructions,
+          platform: conversation.platform,
+          title: conversation.title,
+          messageCount: n,
+          handoffMode: usedMode,
+          opening: opening.map(verbatim),
+          middleCompressed,
+          closing: closing.map(verbatim),
+          session_metadata: sessionMetadata || undefined
+        };
+        if (checkpointsForPayload.length > 0) {
+          payload.checkpoints = checkpointsForPayload.map(cp => ({
             capturedAtMessage: cp.messageCount,
             capturedAt: cp.capturedAt,
             currentState: cp.currentState,

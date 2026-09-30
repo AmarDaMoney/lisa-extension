@@ -445,15 +445,8 @@ const ACMMonitor = {
     // are fixed) on the same response text.
     this._lastDetectedCheckpointHash = hash;
 
-    // Which prompt produced this reply — set by contextCheckpoint() in
-    // lisa-floating-button.js right when that prompt was copied. Default
-    // to 'full' (the safer, non-destructive-to-context assumption) if
-    // it's missing, e.g. a stale reload wiped the in-memory flag.
-    checkpoint.mode = this._pendingCheckpointMode || 'full';
-    this._pendingCheckpointMode = null;
-
     this._storeCheckpoint(checkpoint);
-    console.debug('[LISA ACM] Checkpoint response detected and stored, mode:', checkpoint.mode);
+    console.debug('[LISA ACM] Checkpoint response detected and stored');
   },
 
   // Strips markdown emphasis/heading/list decoration so header matching
@@ -530,14 +523,10 @@ const ACMMonitor = {
       .filter(l => l.length > 0 && l !== '[' && l !== ']');
   },
 
-  // Full checkpoints already re-cover everything from scratch, so they're
-  // the natural compaction point: a 'full' reset the chain instead of
-  // appending to it. A 'since-last' checkpoint only covers its own delta,
-  // so it has to append — Handoff's checkpoint-anchored mode reconstructs
-  // full context by replaying the whole chain in order via
-  // getCheckpointHistory(). No cap is needed for correctness once resets
-  // happen on every Full; MAX_HISTORY is just a safety ceiling against
-  // pathological unbounded growth if a user never runs Full.
+  // Handoff finds and splices every mid-conversation checkpoint verbatim
+  // by matching against the full stored chain, so history always appends
+  // rather than ever resetting. MAX_HISTORY is a pure safety ceiling
+  // against pathological unbounded growth, not a correctness cap.
   MAX_CHECKPOINT_HISTORY: 20,
 
   async _storeCheckpoint(checkpoint) {
@@ -546,13 +535,9 @@ const ACMMonitor = {
       const key = `lisa-acm-checkpoint-${this.conversationId}`;
       const result = await chrome.storage.local.get(key);
       const existing = result[key] || { history: [] };
-      if (checkpoint.mode === 'full') {
-        existing.history = [checkpoint];
-      } else {
-        existing.history.push(checkpoint);
-        if (existing.history.length > this.MAX_CHECKPOINT_HISTORY) {
-          existing.history = existing.history.slice(-this.MAX_CHECKPOINT_HISTORY);
-        }
+      existing.history.push(checkpoint);
+      if (existing.history.length > this.MAX_CHECKPOINT_HISTORY) {
+        existing.history = existing.history.slice(-this.MAX_CHECKPOINT_HISTORY);
       }
       existing.latest = checkpoint;
       existing.updatedAt = Date.now();

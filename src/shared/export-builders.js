@@ -8,6 +8,14 @@
  * Node:    module.exports = { buildLeanExport, buildMarkdownExport }
  */
 
+// checkpoint-detect.js is loaded as a global before this file in every
+// browser context that loads this one (manifest.json content_scripts
+// order, popup.html script order, service-worker.js importScripts order)
+// and required here for Node (the eval harness).
+const checkpointDetect = (typeof module !== 'undefined' && module.exports)
+  ? require('./checkpoint-detect')
+  : { detectCheckpointInMessage: typeof detectCheckpointInMessage !== 'undefined' ? detectCheckpointInMessage : () => null };
+
 /**
  * Build the lean JSON export payload from compressed data.
  * Returns the full download-ready object including compression gate.
@@ -36,6 +44,27 @@ function buildLeanExport(compressed, rawMessages, options = {}) {
     const makeVerbatim = (i) => ({ role: messages[i].role, index: messages[i].index, content: rawMessages[i].content });
     for (let i = 0; i < openingCount; i++) messages[i] = makeVerbatim(i);
     for (let i = n - closingCount; i < n; i++) messages[i] = makeVerbatim(i);
+  }
+
+  // Also keep any checkpoint reply verbatim wherever it falls, not just the
+  // edges — matched first against options.checkpointHistory (previously
+  // stored checkpoints the caller fetched from chrome.storage.local), then
+  // as a live-detection fallback for one that was never persisted (or was
+  // lost, e.g. to an extension reinstall) — the same recovery behavior
+  // Handoff already has. Opt-in: only runs when the caller explicitly
+  // passes checkpointHistory (even []), so every other caller of
+  // buildLeanExport (compressForHandoff's per-segment calls, snapshot
+  // re-exports, AI-Compress) is completely unaffected.
+  if (options.checkpointHistory !== undefined && rawMessages && rawMessages.length === messages.length && messages.length > 0) {
+    const checkpointRawSet = new Set(options.checkpointHistory.map(cp => cp.raw));
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].content !== undefined) continue; // already verbatim from the edge pass above
+      const raw = rawMessages[i];
+      const isCheckpoint = checkpointRawSet.has(raw.content) || !!checkpointDetect.detectCheckpointInMessage(raw);
+      if (isCheckpoint) {
+        messages[i] = { role: messages[i].role, index: messages[i].index, content: raw.content };
+      }
+    }
   }
 
   const anchors = Object.fromEntries(

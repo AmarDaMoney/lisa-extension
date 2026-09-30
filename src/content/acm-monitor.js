@@ -398,9 +398,13 @@ const ACMMonitor = {
 
   // Checkpoint response detection — looks for the structured format LISA's
   // checkpoint prompt asks for (CURRENT STATE, OBJECTIVE, DECISIONS, OPEN,
-  // RESOLVED, CONSTRAINTS, KEY CONTEXT, NEXT).
+  // RESOLVED, CONSTRAINTS, KEY CONTEXT, NEXT). The detection logic itself
+  // lives in the shared, DOM-free src/shared/checkpoint-detect.js so
+  // buildLeanExport (background/popup) can reuse the exact same heuristic
+  // — these are thin delegations, kept as methods so existing call sites
+  // here and in lisa-floating-button.js don't need to change.
   // Runs on every API rescan; only fires once per unique response.
-  _CHECKPOINT_SECTIONS: ['CURRENT STATE', 'OBJECTIVE', 'DECISIONS', 'OPEN', 'RESOLVED', 'CONSTRAINTS', 'KEY CONTEXT', 'NEXT'],
+  _CHECKPOINT_SECTIONS: CHECKPOINT_SECTIONS,
 
   _detectCheckpointResponse(messages) {
     if (!messages || messages.length === 0) return;
@@ -443,28 +447,12 @@ const ACMMonitor = {
     console.debug('[LISA ACM] Checkpoint response detected and stored');
   },
 
-  // Strips markdown emphasis/heading/list decoration so header matching
-  // works whether the AI writes "CURRENT STATE:" plain or bolds/numbers it
-  // ("**CURRENT STATE:**", "### Current State:", "1. Current State:", ...).
   _stripCheckpointMarkdown(line) {
-    return line
-      .replace(/[*_~`]/g, '')
-      .replace(/^#{1,6}\s*/, '')
-      .replace(/^[-•]\s*/, '')
-      .replace(/^\d+[.)]\s*/, '')
-      .trim();
+    return stripCheckpointMarkdown(line);
   },
 
-  // How many of the 8 section headers appear in this text. Normalized/
-  // uppercased so bolded headers (**CURRENT STATE:**) or different casing
-  // don't cause a false negative.
   _countCheckpointHeaders(text) {
-    const normalizedText = this._stripCheckpointMarkdown(text).toUpperCase();
-    let matchCount = 0;
-    for (const section of this._CHECKPOINT_SECTIONS) {
-      if (normalizedText.includes(section + ':')) matchCount++;
-    }
-    return matchCount;
+    return countCheckpointHeaders(text);
   },
 
   // Retroactively detects whether a single message (not necessarily the
@@ -475,75 +463,12 @@ const ACMMonitor = {
   // text is still self-identifying even when LISA's memory of it isn't.
   // Pure detector: doesn't touch _lastDetectedCheckpointHash or storage,
   // the caller decides whether to store what it finds.
-  // Scoped to assistant replies only — the checkpoint *request* prompt
-  // itself contains all 8 section labels verbatim as instructions, so
-  // without this it would false-positive on the user's own prompt.
   detectCheckpointInMessage(message) {
-    if (!message || message.role !== 'assistant' || !message.content) return null;
-    if (this._countCheckpointHeaders(message.content) < 6) return null;
-    return this._parseCheckpointResponse(message.content, message.index);
+    return detectCheckpointInMessage(message);
   },
 
   _parseCheckpointResponse(text, messageCount = this.messageCount) {
-    const sections = {};
-
-    // Split text into sections by header
-    const lines = text.split('\n');
-    let currentSection = null;
-    let currentLines = [];
-
-    for (const line of lines) {
-      const normalized = this._stripCheckpointMarkdown(line);
-      const normalizedUpper = normalized.toUpperCase();
-      // Check if this line starts a new section
-      let foundSection = null;
-      for (const name of this._CHECKPOINT_SECTIONS) {
-        if (normalizedUpper.startsWith(name + ':') || normalizedUpper.startsWith(name + ' :')) {
-          foundSection = name;
-          break;
-        }
-      }
-
-      if (foundSection) {
-        // Save previous section
-        if (currentSection) {
-          sections[currentSection] = this._cleanSectionLines(currentLines);
-        }
-        currentSection = foundSection;
-        // Capture any inline content after the header
-        const afterHeader = normalized.substring(normalized.indexOf(':') + 1).trim();
-        currentLines = afterHeader ? [afterHeader] : [];
-      } else if (currentSection) {
-        currentLines.push(normalized);
-      }
-    }
-    // Save last section
-    if (currentSection) {
-      sections[currentSection] = this._cleanSectionLines(currentLines);
-    }
-
-    if (Object.keys(sections).length < 3) return null;
-
-    return {
-      currentState: (sections['CURRENT STATE'] || []).join(' '),
-      objective: (sections['OBJECTIVE'] || []).join(' '),
-      decisions: sections['DECISIONS'] || [],
-      open: sections['OPEN'] || [],
-      resolved: sections['RESOLVED'] || [],
-      constraints: sections['CONSTRAINTS'] || [],
-      keyContext: sections['KEY CONTEXT'] || [],
-      next: sections['NEXT'] || [],
-      raw: text,
-      capturedAt: Date.now(),
-      messageCount,
-      conversationId: this.conversationId
-    };
-  },
-
-  _cleanSectionLines(lines) {
-    return lines
-      .map(l => l.replace(/^[-•*]\s*/, '').trim())
-      .filter(l => l.length > 0 && l !== '[' && l !== ']');
+    return parseCheckpointResponse(text, messageCount);
   },
 
   // Handoff finds and splices every mid-conversation checkpoint verbatim

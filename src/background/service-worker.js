@@ -11,6 +11,7 @@ importScripts('../shared/snapshot-shim.js');
 // buildLeanExport) instead of a lighter lookalike. Neither file touches
 // document/window, so both load safely with no DOM in this context.
 importScripts('../utils/semantic-analyzer.js');
+importScripts('../shared/checkpoint-detect.js');
 importScripts('../shared/export-builders.js');
 
 // Safe text extraction — m.content can be a string, an array of

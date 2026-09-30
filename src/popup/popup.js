@@ -937,6 +937,24 @@ class LISAPopup {
     }
   }
 
+  // Fetches the stored checkpoint chain (if any) for the currently loaded
+  // conversation, for buildLeanExport's checkpointHistory option — direct
+  // chrome.storage.local access from the popup context, same pattern
+  // already used elsewhere in this file (no service-worker round trip
+  // needed). Returns [] rather than throwing if there's no conversationId
+  // or nothing stored yet.
+  async _getCheckpointHistory() {
+    const conversationId = this.currentConversation?.conversationId;
+    if (!conversationId) return [];
+    try {
+      const key = `lisa-acm-checkpoint-${conversationId}`;
+      const result = await chrome.storage.local.get(key);
+      return result[key]?.history || [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   async compressConversation() {
     if (!this.currentConversation) {
       this.showError('Please extract a conversation first');
@@ -1066,7 +1084,7 @@ class LISAPopup {
           // that replace expensive NLP inference on the raw text
           const preComputedWork = entityCount + conceptCount + relationshipCount;
           // Measure what the user actually downloads (lean export), not the full compressedData
-          const _lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || []);
+          const _lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory: await this._getCheckpointHistory() });
           const enrichedTokenEstimate = Math.round((JSON.stringify(_lean.messages).length + JSON.stringify(_lean.anchor).length + JSON.stringify(_lean.semantic_anchors).length + JSON.stringify(_lean.session_metadata).length) / 4);
           // Inference reduction = pre-resolved signals (entities + concepts + relationships)
           // Each signal replaces ~3 tokens of AI inference work (entity resolution, disambiguation, etc.)
@@ -1373,7 +1391,7 @@ class LISAPopup {
 
 
 
-  downloadJSON() {
+  async downloadJSON() {
     if (!this.compressedData) {
       this.showError('No compressed data to download');
       return;
@@ -1391,7 +1409,7 @@ class LISAPopup {
     const title = (this.compressedData.metadata?.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
     const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
-    const lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || []);
+    const lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory: await this._getCheckpointHistory() });
 
     const downloadData = {
       _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensedturns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',

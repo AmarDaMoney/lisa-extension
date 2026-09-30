@@ -1395,8 +1395,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // ACM Phase 1 — checkpoint signal from content script monitor
+  // Key is lisa-acm-<id> (matching acm-monitor.js's own _saveState()), NOT
+  // lisa-acm-checkpoint-<id> — that prefix belongs to the real Phase 2/3
+  // checkpoint chain (_storeCheckpoint/getCheckpoint/getCheckpointHistory)
+  // that Handoff reads. This is a routine, fully-automatic ping distinct
+  // from that user-initiated feature; the two used to collide on the same
+  // key with incompatible shapes, so any sufficiently long conversation
+  // would silently overwrite/wipe its own real checkpoint history.
   if (request.action === 'acm_checkpoint') {
-    const key = `lisa-acm-checkpoint-${request.conversationId}`;
+    const key = `lisa-acm-${request.conversationId}`;
     chrome.storage.local.set({
       [key]: {
         conversationId: request.conversationId,

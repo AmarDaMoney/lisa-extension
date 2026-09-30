@@ -808,18 +808,32 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       // actually land inside it (zero, one, or several — the chain can be
       // any length): compress the conversation between them as usual, but
       // splice each checkpoint back in verbatim, in its real position,
-      // instead of pulling it out into a side list. A chain entry that
-      // isn't found here (edited, regenerated, or paginated out since it
-      // was captured) is simply left as ordinary conversation and
-      // compressed with its segment.
+      // instead of pulling it out into a side list. A message not in the
+      // stored chain (e.g. the extension was uninstalled/reinstalled since
+      // it was captured, wiping chrome.storage.local) is re-tested against
+      // the same checkpoint-format heuristic live detection uses — the
+      // checkpoint's own text is still self-identifying even when LISA's
+      // memory of it isn't. A recovered checkpoint is backfilled into
+      // storage so future handoffs on this conversation don't need to
+      // re-detect it.
       const checkpointRawSet = new Set(checkpointHistory.map(cp => cp.raw));
       const segments = [];
       let segmentStart = 0;
       for (let i = 0; i < middleRange.length; i++) {
-        if (checkpointRawSet.has(middleRange[i].content)) {
+        const msg = middleRange[i];
+        let isCheckpoint = checkpointRawSet.has(msg.content);
+        if (!isCheckpoint) {
+          const recovered = acm.detectCheckpointInMessage(msg);
+          if (recovered) {
+            acm._storeCheckpoint(recovered);
+            checkpointRawSet.add(recovered.raw);
+            isCheckpoint = true;
+          }
+        }
+        if (isCheckpoint) {
           const segment = middleRange.slice(segmentStart, i);
           if (segment.length > 0) segments.push({ type: 'compressed', segment });
-          segments.push({ type: 'checkpoint', message: middleRange[i] });
+          segments.push({ type: 'checkpoint', message: msg });
           segmentStart = i + 1;
         }
       }

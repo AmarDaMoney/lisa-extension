@@ -417,13 +417,7 @@ const ACMMonitor = {
 
     const text = assistantMsg.content;
     // Quick check: must contain at least 6 of the 8 section headers.
-    // Normalized/uppercased so bolded headers (**CURRENT STATE:**) or
-    // different casing don't cause a false negative here.
-    const normalizedText = this._stripCheckpointMarkdown(text).toUpperCase();
-    let matchCount = 0;
-    for (const section of this._CHECKPOINT_SECTIONS) {
-      if (normalizedText.includes(section + ':')) matchCount++;
-    }
+    const matchCount = this._countCheckpointHeaders(text);
     if (matchCount < 6) {
       console.debug('[LISA ACM] Checkpoint format check failed —', matchCount, 'of', this._CHECKPOINT_SECTIONS.length, 'sections matched');
       return;
@@ -461,7 +455,36 @@ const ACMMonitor = {
       .trim();
   },
 
-  _parseCheckpointResponse(text) {
+  // How many of the 8 section headers appear in this text. Normalized/
+  // uppercased so bolded headers (**CURRENT STATE:**) or different casing
+  // don't cause a false negative.
+  _countCheckpointHeaders(text) {
+    const normalizedText = this._stripCheckpointMarkdown(text).toUpperCase();
+    let matchCount = 0;
+    for (const section of this._CHECKPOINT_SECTIONS) {
+      if (normalizedText.includes(section + ':')) matchCount++;
+    }
+    return matchCount;
+  },
+
+  // Retroactively detects whether a single message (not necessarily the
+  // most recent one) is a checkpoint reply, by the same format heuristic
+  // _detectCheckpointResponse uses live. Used by Handoff to recover
+  // checkpoints whose stored history was lost (e.g. an extension
+  // uninstall/reinstall wipes chrome.storage.local) — the checkpoint's own
+  // text is still self-identifying even when LISA's memory of it isn't.
+  // Pure detector: doesn't touch _lastDetectedCheckpointHash or storage,
+  // the caller decides whether to store what it finds.
+  // Scoped to assistant replies only — the checkpoint *request* prompt
+  // itself contains all 8 section labels verbatim as instructions, so
+  // without this it would false-positive on the user's own prompt.
+  detectCheckpointInMessage(message) {
+    if (!message || message.role !== 'assistant' || !message.content) return null;
+    if (this._countCheckpointHeaders(message.content) < 6) return null;
+    return this._parseCheckpointResponse(message.content, message.index);
+  },
+
+  _parseCheckpointResponse(text, messageCount = this.messageCount) {
     const sections = {};
 
     // Split text into sections by header
@@ -512,7 +535,7 @@ const ACMMonitor = {
       next: sections['NEXT'] || [],
       raw: text,
       capturedAt: Date.now(),
-      messageCount: this.messageCount,
+      messageCount,
       conversationId: this.conversationId
     };
   },

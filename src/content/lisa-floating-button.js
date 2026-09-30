@@ -825,7 +825,14 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         if (!isCheckpoint) {
           const recovered = acm.detectCheckpointInMessage(msg);
           if (recovered) {
-            acm._storeCheckpoint(recovered);
+            // Awaited deliberately: _storeCheckpoint does an unsynchronized
+            // read-modify-write on chrome.storage.local (get history, push,
+            // set). Firing multiple calls without awaiting each one would
+            // let their get/set cycles interleave — a conversation with
+            // several recovered checkpoints in one handoff run would race,
+            // and a later write can silently clobber an earlier one before
+            // it's persisted.
+            await acm._storeCheckpoint(recovered);
             checkpointRawSet.add(recovered.raw);
             isCheckpoint = true;
           }

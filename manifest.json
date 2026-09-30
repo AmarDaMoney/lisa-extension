@@ -60,6 +60,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
@@ -76,6 +77,7 @@
         "src/content/lisa-progressive.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"

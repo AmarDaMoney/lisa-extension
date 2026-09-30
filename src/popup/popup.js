@@ -937,14 +937,17 @@ class LISAPopup {
     }
   }
 
-  // Fetches the stored checkpoint chain (if any) for the currently loaded
-  // conversation, for buildLeanExport's checkpointHistory option — direct
-  // chrome.storage.local access from the popup context, same pattern
-  // already used elsewhere in this file (no service-worker round trip
-  // needed). Returns [] rather than throwing if there's no conversationId
-  // or nothing stored yet.
-  async _getCheckpointHistory() {
-    const conversationId = this.currentConversation?.conversationId;
+  // Fetches the stored checkpoint chain (if any) for a conversation, for
+  // buildLeanExport's checkpointHistory option — direct chrome.storage.local
+  // access from the popup context, same pattern already used elsewhere in
+  // this file (no service-worker round trip needed). Defaults to the
+  // currently loaded live conversation's id; pass one explicitly for a
+  // saved snapshot instead (derive it from the snapshot's stored url via
+  // getConversationIdFromUrl, since a snapshot has no live conversationId
+  // of its own — see downloadSnapshot/injectSnapshotAsMarkdown/etc).
+  // Returns [] rather than throwing if there's no conversationId or
+  // nothing stored yet.
+  async _getCheckpointHistory(conversationId = this.currentConversation?.conversationId) {
     if (!conversationId) return [];
     try {
       const key = `lisa-acm-checkpoint-${conversationId}`;
@@ -2091,6 +2094,16 @@ class LISAPopup {
         return;
       }
 
+      // Pre-fetch each snapshot's checkpoint history (keyed by conversation
+      // id derived from its stored url) before the synchronous map() below —
+      // chrome.storage.local access is async, and a plain .map() callback
+      // can't await.
+      const checkpointHistoryBySnapId = new Map();
+      for (const snap of snapshots) {
+        const convId = snap.url ? getConversationIdFromUrl(snap.url)?.id : null;
+        checkpointHistoryBySnapId.set(snap.id, await this._getCheckpointHistory(convId));
+      }
+
       // Convert all selected to inject-ready JSON and combine
       // AI receivers prefer structured JSON over prose markdown (validated Sep 22 2026).
       // buildMarkdownExport kept for human-readable downloads; inject uses JSON.
@@ -2102,12 +2115,12 @@ class LISAPopup {
           // Compressed snapshot: inject as structured JSON (AI-preferred format)
           const compressed = (snap.format === 'compressed' || snap.format === 'ai-compressed') ? (snap.capture?.content || snap.capture || snap) : (snap.raw?.content || snap.raw || snap.content || snap);
           const rawMsgs = snap.capture?.messages || [];
-          const lean = buildLeanExport(compressed, rawMsgs);
+          const lean = buildLeanExport(compressed, rawMsgs, { checkpointHistory: checkpointHistoryBySnapId.get(snap.id) });
           content = JSON.stringify(lean, null, 2);
         } else if (snap.derived?.markdown) {
           content = snap.derived.markdown;
         } else {
-          content = this.wrapRawContentAsMarkdown(snap) || this.convertSnapshotToMarkdown(snap);
+          content = this.wrapRawContentAsMarkdown(snap, checkpointHistoryBySnapId.get(snap.id)) || this.convertSnapshotToMarkdown(snap);
         }
         const isJson = typeof content === 'string' && content.trimStart().startsWith('{');
         const ext = isJson ? '.json' : '.md';
@@ -2173,7 +2186,8 @@ class LISAPopup {
         // of sync (missed the edge-verbatim fix entirely, for example).
         const raw = snapshot.capture?.content || snapshot.raw || snapshot;
         const rawMessages = snapshot.capture?.messages || raw.messages || [];
-        const data = buildLeanExport(raw, rawMessages);
+        const snapConvId = snapshot.url ? getConversationIdFromUrl(snapshot.url)?.id : null;
+        const data = buildLeanExport(raw, rawMessages, { checkpointHistory: await this._getCheckpointHistory(snapConvId) });
         data.format = fmt; // preserve the original label (ai-compressed vs compressed)
         data.url = raw.metadata?.originalUrl || raw.metadata?.url || '';
         data.exportedAt = new Date().toISOString();
@@ -2370,6 +2384,9 @@ class LISAPopup {
         return;
       }
 
+      const snapConvId = snapshot.url ? getConversationIdFromUrl(snapshot.url)?.id : null;
+      const snapCheckpointHistory = await this._getCheckpointHistory(snapConvId);
+
       // Inject as structured JSON — AI receivers prefer it over prose markdown
       // (validated Sep 22 2026). buildMarkdownExport kept for human-readable downloads.
       let injectContent;
@@ -2380,14 +2397,14 @@ class LISAPopup {
         // Compressed snapshot: inject as structured JSON (AI-preferred format)
         const compressed = (snapshot.format === 'compressed' || snapshot.format === 'ai-compressed') ? (snapshot.capture?.content || snapshot.capture || snapshot) : (snapshot.raw?.content || snapshot.raw || snapshot.content || snapshot);
         const rawMsgs = snapshot.capture?.messages || [];
-        const lean = buildLeanExport(compressed, rawMsgs);
+        const lean = buildLeanExport(compressed, rawMsgs, { checkpointHistory: snapCheckpointHistory });
         injectContent = JSON.stringify(lean, null, 2);
       } else if (snapshot.derived?.markdown) {
         // Schema v2: use derived markdown directly (legacy non-compressed)
         injectContent = snapshot.derived.markdown;
       } else {
         // All other formats: wrap with structured header for AI consumption
-        injectContent = this.wrapRawContentAsMarkdown(snapshot) || this.convertSnapshotToMarkdown(snapshot);
+        injectContent = this.wrapRawContentAsMarkdown(snapshot, snapCheckpointHistory) || this.convertSnapshotToMarkdown(snapshot);
       }
       const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
       // Platforms dedupe attachments by filename within a conversation: a
@@ -2439,7 +2456,10 @@ class LISAPopup {
   }
 
 
-  wrapRawContentAsMarkdown(snapshot) {
+  // checkpointHistory: pre-fetched by the caller (this stays synchronous —
+  // chrome.storage.local access doesn't belong inside a method also called
+  // from a plain, synchronous .map() callback in injectSelectedSnapshots).
+  wrapRawContentAsMarkdown(snapshot, checkpointHistory) {
     const version = (chrome.runtime?.getManifest?.().version) || '1.0';
     const platform = snapshot.platform || 'unknown';
     const timestamp = snapshot.savedAt || new Date().toISOString();
@@ -2465,12 +2485,12 @@ class LISAPopup {
         // Reuse buildLeanExport() — this used to be a hand-duplicated copy
         // that had drifted out of sync (missing both the edge-verbatim fix
         // and the compression gate entirely).
-        const lean = buildLeanExport(contentData, snapshot.capture?.messages || contentData.messages || []);
+        const lean = buildLeanExport(contentData, snapshot.capture?.messages || contentData.messages || [], { checkpointHistory });
         lean.format = format;
         rawContent = JSON.stringify(lean, null, 2);
       }
     } else if (snapshot.raw) {
-      const lean = buildLeanExport(snapshot.raw, snapshot.capture?.messages || snapshot.raw.messages || []);
+      const lean = buildLeanExport(snapshot.raw, snapshot.capture?.messages || snapshot.raw.messages || [], { checkpointHistory });
       lean.format = format;
       rawContent = JSON.stringify(lean, null, 2);
     }

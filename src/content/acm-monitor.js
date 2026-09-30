@@ -191,30 +191,13 @@ const ACMMonitor = {
     if (window.lisaProgressive) {
       return window.lisaProgressive.conversationId;
     }
-    // Fallback — extract from URL
-    const host = window.location.hostname;
-    const path = window.location.pathname;
-    const patterns = [
-      [/chatgpt\.com/,            /\/c\/([a-f0-9-]+)/],
-      [/claude\.ai/,              /\/chat\/([a-zA-Z0-9-]+)/],
-      [/gemini\.google/,          /\/app\/([a-zA-Z0-9-]+)/],
-      [/grok\.com/,               /\/c\/([a-zA-Z0-9-]+)/],
-      [/chat\.mistral\.ai/,       /\/chat\/([a-zA-Z0-9-]+)/],
-      [/chat\.deepseek\.com/,     /\/chat\/([a-zA-Z0-9-]+)/],
-      [/perplexity\.ai/,          /\/search\/([a-zA-Z0-9-]+)/],
-      [/poe\.com/,                /\/chat\/([a-zA-Z0-9]+)/],
-      [/huggingface\.co/,         /\/chat\/conversation\/([a-f0-9]+)/],
-      [/meta\.ai/,                /\/prompt\/([a-f0-9-]+)/],
-      [/copilot\.microsoft\.com/, /\/chat\/([a-zA-Z0-9-]+)/],
-    ];
-    for (const [hostRe, pathRe] of patterns) {
-      if (hostRe.test(host)) {
-        const m = path.match(pathRe);
-        const platform = host.replace('www.', '').split('.')[0];
-        return m ? `${platform}-${m[1]}` : `${platform}-${Date.now()}`;
-      }
-    }
-    return `unknown-${Date.now()}`;
+    // Fallback — extract from URL. Pattern table lives in the shared,
+    // DOM-free src/shared/conversation-id.js so popup.js can derive the
+    // same id retroactively from a saved snapshot's stored URL (which has
+    // no window.location to read).
+    const result = getConversationIdFromUrl(window.location.href);
+    if (result?.id) return result.id;
+    return `${result?.platform || 'unknown'}-${Date.now()}`;
   },
 
   _isApiCapturePlatform() {

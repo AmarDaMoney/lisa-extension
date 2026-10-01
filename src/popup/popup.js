@@ -9,6 +9,8 @@ class LISAPopup {
     this.usageStats = {
       exportsToday: 0,
       importsToday: 0,
+      libraryToday: 0,
+      compressToday: 0,
       lastResetDate: null,
       lifetimeFreePool: 100
     };
@@ -138,6 +140,8 @@ class LISAPopup {
         if (!lastReset || this.isNewDay(lastReset, now)) {
           this.usageStats.exportsToday = 0;
           this.usageStats.importsToday = 0;
+          this.usageStats.libraryToday = 0;
+          this.usageStats.compressToday = 0;
           this.usageStats.lastResetDate = now.toISOString();
           await chrome.storage.sync.set({ usageStats: this.usageStats });
         }
@@ -145,6 +149,8 @@ class LISAPopup {
         this.usageStats = {
           exportsToday: 0,
           importsToday: 0,
+          libraryToday: 0,
+          compressToday: 0,
           lastResetDate: new Date().toISOString(),
           lifetimeFreePool: 100
         };
@@ -168,6 +174,10 @@ class LISAPopup {
       this.usageStats.exportsToday++;
     } else if (type === 'import') {
       this.usageStats.importsToday++;
+    } else if (type === 'library') {
+      this.usageStats.libraryToday = (this.usageStats.libraryToday || 0) + 1;
+    } else if (type === 'compress') {
+      this.usageStats.compressToday = (this.usageStats.compressToday || 0) + 1;
     }
     await chrome.storage.sync.set({ usageStats: this.usageStats });
   }
@@ -183,52 +193,57 @@ class LISAPopup {
       return { allowed: true, remaining: pool, pool: true };
     }
 
-    // PAYG credit check — same identifier resolution as compressConversation()'s
-    // deduct and checkFloatingLimit() in lisa-floating-button.js. Previously
-    // missing here entirely: Download JSON/Save to Library never checked or
-    // spent PAYG credits, so a PAYG user hit the flat 5/day cap below despite
-    // the upgrade message (further down) telling them credits would help.
-    try {
-      let identifier = '';
-      const headers = { 'Content-Type': 'application/json' };
-      const token = await new Promise((resolve) => {
-        chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
-      });
-      if (token) {
-        const idResp = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
-        if (idResp.ok) {
-          const idData = await idResp.json();
-          if (idData.sub) identifier = `goog_${idData.sub}`;
-        }
-      }
-      if (!identifier) {
-        const stored = await chrome.storage.sync.get(['creditIdentifier', 'licenseKey']);
-        identifier = stored.creditIdentifier || stored.licenseKey || '';
-      }
-      if (identifier) {
-        if (identifier.startsWith('goog_')) headers['X-Google-Id'] = identifier;
-        else if (identifier.startsWith('email_')) headers['X-Identifier'] = identifier;
-        else headers['X-License-Key'] = identifier;
-        const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', { headers });
-        if (balResp.ok) {
-          const balData = await balResp.json();
-          if (balData.balance > 0) {
-            await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ source: 'extension' })
-            });
-            return { allowed: true, credits: true };
+    // PAYG credit check — same identifier resolution as checkFloatingLimit()
+    // in lisa-floating-button.js. 'export' (Download JSON) is a plain file
+    // download, not a library save — it stays on the free pool/5-day cap
+    // only and never spends a credit. 'library' (Save to Library) and
+    // 'compress' (Compress to LISA JSON) do persist/do real work, so they're
+    // PAYG-eligible like md/lisav/handoff.
+    if (type !== 'export') {
+      try {
+        let identifier = '';
+        const headers = { 'Content-Type': 'application/json' };
+        const token = await new Promise((resolve) => {
+          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+        });
+        if (token) {
+          const idResp = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+          if (idResp.ok) {
+            const idData = await idResp.json();
+            if (idData.sub) identifier = `goog_${idData.sub}`;
           }
         }
+        if (!identifier) {
+          const stored = await chrome.storage.sync.get(['creditIdentifier', 'licenseKey']);
+          identifier = stored.creditIdentifier || stored.licenseKey || '';
+        }
+        if (identifier) {
+          if (identifier.startsWith('goog_')) headers['X-Google-Id'] = identifier;
+          else if (identifier.startsWith('email_')) headers['X-Identifier'] = identifier;
+          else headers['X-License-Key'] = identifier;
+          const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', { headers });
+          if (balResp.ok) {
+            const balData = await balResp.json();
+            if (balData.balance > 0) {
+              await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ source: 'extension' })
+              });
+              return { allowed: true, credits: true };
+            }
+          }
+        }
+      } catch (e) {
+        console.debug('[LISA] PAYG credit check failed:', e);
       }
-    } catch (e) {
-      console.debug('[LISA] PAYG credit check failed:', e);
     }
 
     const limits = {
       export: { max: 5, current: this.usageStats.exportsToday },
-      import: { max: 5, current: this.usageStats.importsToday }
+      import: { max: 5, current: this.usageStats.importsToday },
+      library: { max: 5, current: this.usageStats.libraryToday || 0 },
+      compress: { max: 5, current: this.usageStats.compressToday || 0 }
     };
     const limit = limits[type];
     if (limit.current >= limit.max) {
@@ -1007,11 +1022,13 @@ class LISAPopup {
       this.showError('Please extract a conversation first');
       return;
     }
-    // Compress is a free preview/check step (message count, token estimate,
-    // compression ratio) — it doesn't persist anything to the library, so it
-    // never costs a PAYG credit or touches the welcome pool. Metering happens
-    // at save time instead (Save to Library / Save as Markdown / Save
-    // LISA-Verbatim).
+    const limitCheck = await this.checkUsageLimits('compress');
+    if (!limitCheck.allowed) {
+      this.showError(limitCheck.message);
+      this.openUpgradeModal();
+      return;
+    }
+
     this.showLoading('Compressing to LISA format...');
 
     try {
@@ -1118,6 +1135,15 @@ class LISAPopup {
         
         // Show language indicator
         this.showLanguageIndicator(this.compressedData.session_metadata?.language);
+
+        await this.updateUsageStats('compress');
+        this.setupUI(); // Refresh button texts with new count
+
+        if (this.userTier === 'free') {
+          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - (this.usageStats.compressToday || 0);
+          const poolActive = (this.usageStats.lifetimeFreePool ?? 0) > 0;
+          this.updatePlatformStatus(`${remaining} ${poolActive ? 'welcome credits' : 'free compressions'} remaining`, true);
+        }
 
         this.hideLoading();
       } else {
@@ -1475,7 +1501,7 @@ class LISAPopup {
       return;
     }
 
-    const limitCheck = await this.checkUsageLimits('export');
+    const limitCheck = await this.checkUsageLimits('library');
     if (!limitCheck.allowed) {
       this.showError(limitCheck.message);
       this.openUpgradeModal();
@@ -1511,17 +1537,17 @@ class LISAPopup {
       this.hideLoading();
 
       if (response && response.success) {
-        await this.updateUsageStats('export');
+        await this.updateUsageStats('library');
         this.setupUI(); // Refresh button texts with new count
-        
+
         this.updatePlatformStatus('✅ Saved to library!', true);
         this.loadSnapshots();
-        
-        // Show remaining exports for free users
+
+        // Show remaining saves for free users
         if (this.userTier === 'free') {
-          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
+          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - (this.usageStats.libraryToday || 0);
           const poolActive = (this.usageStats.lifetimeFreePool ?? 0) > 0;
-          this.updatePlatformStatus(`✅ Saved! ${remaining} ${poolActive ? 'welcome credits' : 'free exports'} remaining`, true);
+          this.updatePlatformStatus(`✅ Saved! ${remaining} ${poolActive ? 'welcome credits' : 'free saves'} remaining`, true);
         }
       } else {
         this.showError(response?.error || 'Failed to save');
@@ -1960,7 +1986,7 @@ class LISAPopup {
       await chrome.storage.local.clear();
       
       this.userTier = 'free';
-      this.usageStats = { exportsToday: 0, importsToday: 0 };
+      this.usageStats = { exportsToday: 0, importsToday: 0, libraryToday: 0, compressToday: 0 };
       
       // Reset UI
       document.getElementById('licenseKeyInput').value = '';

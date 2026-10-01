@@ -1012,6 +1012,31 @@ class LISAPopup {
     }
   }
 
+  // Shared with the FAB's Handoff-panel nudge via the same
+  // acmCheckpointNudgeDismissed flag — one idea ("no checkpoint yet"),
+  // dismissed once, suppressed everywhere.
+  async _maybeShowCheckpointNudge(checkpointHistory) {
+    const el = document.getElementById('checkpointNudge');
+    if (!el) return;
+    if (checkpointHistory.length > 0) { el.style.display = 'none'; return; }
+    try {
+      const { acmCheckpointNudgeDismissed } = await chrome.storage.sync.get(['acmCheckpointNudgeDismissed']);
+      if (acmCheckpointNudgeDismissed) { el.style.display = 'none'; return; }
+    } catch (_) {
+      return;
+    }
+    el.style.display = 'block';
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:rgba(255,255,255,0.5);padding:4px 2px 8px;">
+        <span>💡 No checkpoint yet — checkpointing first (on the page, via LISA → Handoff) improves export quality.</span>
+        <span id="dismissCheckpointNudge" style="cursor:pointer;flex-shrink:0;">✕</span>
+      </div>`;
+    document.getElementById('dismissCheckpointNudge').addEventListener('click', () => {
+      el.style.display = 'none';
+      chrome.storage.sync.set({ acmCheckpointNudgeDismissed: true });
+    });
+  }
+
   async compressConversation() {
     if (!this.currentConversation) {
       this.showError('Please extract a conversation first');
@@ -1106,7 +1131,8 @@ class LISAPopup {
           // that replace expensive NLP inference on the raw text
           const preComputedWork = entityCount + conceptCount + relationshipCount;
           // Measure what the user actually downloads (lean export), not the full compressedData
-          const _lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory: await this._getCheckpointHistory() });
+          const checkpointHistory = await this._getCheckpointHistory();
+          const _lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory });
           const enrichedTokenEstimate = Math.round((JSON.stringify(_lean.messages).length + JSON.stringify(_lean.anchor).length + JSON.stringify(_lean.semantic_anchors).length + JSON.stringify(_lean.session_metadata).length) / 4);
           // Inference reduction = pre-resolved signals (entities + concepts + relationships)
           // Each signal replaces ~3 tokens of AI inference work (entity resolution, disambiguation, etc.)
@@ -1131,6 +1157,8 @@ class LISAPopup {
         
         // Show language indicator
         this.showLanguageIndicator(this.compressedData.session_metadata?.language);
+
+        await this._maybeShowCheckpointNudge(checkpointHistory);
 
         await this.updateUsageStats('compress');
         this.setupUI(); // Refresh button texts with new count

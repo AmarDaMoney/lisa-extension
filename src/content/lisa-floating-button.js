@@ -292,6 +292,13 @@ class LISAFloatingButton {
       .lisa-menu-item:hover {
         background: #3b82f6;
       }
+      .lisa-menu-section-label {
+        padding: 6px 16px 2px;
+        font-size: 10px;
+        letter-spacing: 0.05em;
+        color: #6b7280;
+        text-transform: uppercase;
+      }
       .lisa-switch-modal {
         position: fixed;
         inset: 0;
@@ -410,11 +417,14 @@ class LISAFloatingButton {
     console.debug('[LISA] Floating button removed');
   }
 
-  showActionMenu() {
+  // Two switchable layouts for comparison — see _buildMenuLayout1/2 below.
+  // Temporary A/B tool: once one is picked, delete the other, this switcher,
+  // and the acmFabLayout storage key.
+  async showActionMenu() {
     // Remove existing menu if any
     const existing = document.querySelector(".lisa-action-menu");
     if (existing) { existing.remove(); return; }
-    
+
     const menu = document.createElement("div");
     menu.className = "lisa-action-menu";
 
@@ -435,19 +445,19 @@ class LISAFloatingButton {
       `;
     }
 
-    let acmItems = '';
     const acmStatus = acm ? acm.getStatus() : null;
-    if (acmStatus && acmStatus.conversationId) {
-      acmItems = `<div class="lisa-menu-item" data-action="handoff" title="Checkpoint your context and hand off to a fresh session">🔄 Handoff</div>`;
-    }
 
-    menu.innerHTML = `
-      ${acmStatusHtml}
-      <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
-      <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
-      ${acmItems}
-    `;
-    
+    let layout = 1;
+    try {
+      const { acmFabLayout } = await chrome.storage.sync.get(['acmFabLayout']);
+      layout = acmFabLayout === 2 ? 2 : 1;
+    } catch (_) {}
+
+    const bodyHtml = layout === 2
+      ? this._buildMenuLayout2(acmStatusHtml, acmStatus)
+      : this._buildMenuLayout1(acmStatusHtml, acmStatus);
+    menu.innerHTML = this._buildLayoutSwitcher(layout) + bodyHtml;
+
     // Position near the button
     const btn = this.button.getBoundingClientRect();
     menu.style.cssText = `
@@ -462,18 +472,24 @@ class LISAFloatingButton {
       box-shadow: 0 4px 20px rgba(0,0,0,0.4);
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     `;
-    
+
     document.body.appendChild(menu);
-    
+
     // Handle clicks
     menu.addEventListener("click", async (e) => {
+      const layoutPill = e.target.closest('[data-layout]');
+      if (layoutPill) {
+        await this._setFabLayout(parseInt(layoutPill.dataset.layout, 10));
+        return;
+      }
       const action = e.target.dataset?.action;
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
       else if (action === "handoff") await this.showHandoffPanel();
+      else if (action === "checkpoint") await this.contextCheckpoint();
     });
-    
+
     // Close on outside click
     setTimeout(() => {
       document.addEventListener("click", function closeMenu(e) {
@@ -485,6 +501,57 @@ class LISAFloatingButton {
     }, 100);
   }
 
+  // Layout 1 — today's flat list, reordered: Handoff second-to-last,
+  // Checkpoint last.
+  _buildMenuLayout1(acmStatusHtml, acmStatus) {
+    const gated = acmStatus && acmStatus.conversationId;
+    return `
+      ${acmStatusHtml}
+      <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
+      <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
+      ${gated ? `<div class="lisa-menu-item" data-action="handoff" title="Checkpoint your context and hand off to a fresh session">🔄 Handoff</div>` : ''}
+      ${gated ? `<div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>` : ''}
+    `;
+  }
+
+  // Layout 2 — grouped into Save / Context sections, same 4 actions.
+  _buildMenuLayout2(acmStatusHtml, acmStatus) {
+    const gated = acmStatus && acmStatus.conversationId;
+    return `
+      ${acmStatusHtml}
+      <div class="lisa-menu-section-label">Save</div>
+      <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Markdown</div>
+      <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 LISA-Verbatim</div>
+      ${gated ? `
+      <div class="lisa-menu-section-label">Context</div>
+      <div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>
+      <div class="lisa-menu-item" data-action="handoff" title="Checkpoint your context and hand off to a fresh session">🔄 Handoff</div>
+      ` : ''}
+    `;
+  }
+
+  _buildLayoutSwitcher(currentLayout) {
+    const pill = (n) => {
+      const active = currentLayout === n;
+      return `<span data-layout="${n}" style="cursor:pointer;padding:2px 8px;border-radius:10px;font-size:10px;${active ? 'background:#3b82f6;color:#fff;' : 'color:#6b7280;'}">${n}</span>`;
+    };
+    return `
+      <div style="padding:6px 16px 8px;border-bottom:1px solid #333;display:flex;align-items:center;gap:6px;">
+        <span style="color:#6b7280;font-size:10px;">Layout</span>
+        ${pill(1)}
+        ${pill(2)}
+      </div>
+    `;
+  }
+
+  async _setFabLayout(n) {
+    try {
+      await chrome.storage.sync.set({ acmFabLayout: n });
+    } catch (_) {}
+    const menu = document.querySelector('.lisa-action-menu');
+    if (menu) menu.remove();
+    await this.showActionMenu();
+  }
 
   // One retry before giving up on the API — see the matching helper in
   // lisa-v-parser.js for why (a transient failure shouldn't silently
@@ -696,10 +763,26 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     const existing = document.querySelector('.lisa-handoff-panel');
     if (existing) { existing.remove(); return; }
 
+    const acm = window.__lisaACM;
+    let showNudge = false;
+    try {
+      const [{ acmCheckpointNudgeDismissed }, checkpointHistory] = await Promise.all([
+        chrome.storage.sync.get(['acmCheckpointNudgeDismissed']),
+        acm ? acm.getCheckpointHistory() : Promise.resolve([])
+      ]);
+      showNudge = !acmCheckpointNudgeDismissed && checkpointHistory.length === 0;
+    } catch (_) {}
+
     const panel = document.createElement('div');
     panel.className = 'lisa-handoff-panel';
     panel.innerHTML = `
       <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Context Handoff</div>
+      ${showNudge ? `
+      <div class="lisa-handoff-nudge" style="padding:6px 16px 8px;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span>💡 No checkpoint yet — checkpointing first makes this handoff richer.</span>
+        <span class="lisa-nudge-dismiss" style="cursor:pointer;color:#6b7280;flex-shrink:0;">✕</span>
+      </div>
+      ` : ''}
       <div class="lisa-menu-item" data-action="step1-create" style="padding:10px 16px;cursor:pointer;">
         <div style="color:#fafafa;font-size:14px;">① 🧠 Create / Update Checkpoint</div>
         <div style="color:#6b7280;font-size:11px;margin-top:2px;">Ask the AI to summarize where things stand</div>
@@ -727,6 +810,12 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     document.body.appendChild(panel);
 
     panel.addEventListener('click', async (e) => {
+      if (e.target.closest('.lisa-nudge-dismiss')) {
+        try { await chrome.storage.sync.set({ acmCheckpointNudgeDismissed: true }); } catch (_) {}
+        const nudge = panel.querySelector('.lisa-handoff-nudge');
+        if (nudge) nudge.remove();
+        return;
+      }
       const item = e.target.closest('.lisa-menu-item');
       if (!item) return;
       const action = item.dataset.action;

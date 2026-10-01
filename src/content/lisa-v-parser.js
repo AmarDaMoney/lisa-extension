@@ -587,7 +587,23 @@ class LisaVParser {
     }
 
     if (scroller) {
+      // Scroll-UP sweep first, in small steps with real 'scroll' events and
+      // waits — same pattern already used for Poe/HuggingChat/Grok's
+      // virtualized lists. A single instant `scrollTop = 0` jump (the old
+      // behavior here) lands past whatever the epitaxy virtualizer has
+      // actually mounted for a long conversation, so it never backfills the
+      // earliest entries and they're silently dropped unless the user had
+      // already scrolled to the top by hand before exporting.
+      collectVisible();
+      const stepUp = scroller.clientHeight * 0.6;
+      for (let i = 0; i < 200 && scroller.scrollTop > 0; i++) {
+        scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        await new Promise(r => setTimeout(r, 250));
+        collectVisible();
+      }
       scroller.scrollTop = 0;
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
       await new Promise(r => setTimeout(r, 500));
       collectVisible();
       const step = scroller.clientHeight * 0.6;

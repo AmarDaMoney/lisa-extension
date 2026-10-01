@@ -1007,48 +1007,11 @@ class LISAPopup {
       this.showError('Please extract a conversation first');
       return;
     }
-    // PAYG credit check and deduct
-    if (this.userTier !== 'premium') {
-      try {
-        let identifier = '';
-        const headers = { 'Content-Type': 'application/json' };
-        try {
-          const token = await new Promise((resolve) => {
-            chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
-          });
-          if (token) {
-            const r = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
-            if (r.ok) {
-              const d = await r.json();
-              if (d.sub) identifier = `goog_${d.sub}`;
-            }
-          }
-        } catch (e) {}
-        if (!identifier) {
-          const stored = await chrome.storage.sync.get('creditIdentifier');
-          identifier = stored.creditIdentifier || '';
-        }
-        if (identifier) {
-          if (identifier.startsWith('goog_')) headers['X-Google-Id'] = identifier;
-          else if (identifier.startsWith('email_')) headers['X-Identifier'] = identifier;
-          else headers['X-License-Key'] = identifier;
-          const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', { headers });
-          if (balResp.ok) {
-            const balData = await balResp.json();
-            if (balData.balance > 0) {
-              await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ source: 'extension' })
-              });
-            }
-          }
-        }
-      } catch (e) {
-        console.debug('[LISA] PAYG credit check failed:', e);
-      }
-    }
-
+    // Compress is a free preview/check step (message count, token estimate,
+    // compression ratio) — it doesn't persist anything to the library, so it
+    // never costs a PAYG credit or touches the welcome pool. Metering happens
+    // at save time instead (Save to Library / Save as Markdown / Save
+    // LISA-Verbatim).
     this.showLoading('Compressing to LISA format...');
 
     try {

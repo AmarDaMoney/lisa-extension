@@ -299,6 +299,24 @@ class LISAFloatingButton {
         color: #6b7280;
         text-transform: uppercase;
       }
+      .lisa-menu-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: #1f1f23;
+        border-radius: 8px;
+        transform-origin: top;
+        display: none;
+      }
+      .lisa-menu-overlay.lisa-menu-overlay--open {
+        display: block;
+        animation: lisa-menu-unfold 0.22s ease;
+      }
+      @keyframes lisa-menu-unfold {
+        from { opacity: 0; transform: scaleY(0.85) translateY(-6px); }
+        to { opacity: 1; transform: scaleY(1) translateY(0); }
+      }
       .lisa-switch-modal {
         position: fixed;
         inset: 0;
@@ -524,7 +542,14 @@ class LISAFloatingButton {
     const bodyHtml = layout === 2
       ? this._buildMenuLayout2(acmStatusHtml, acmStatus)
       : this._buildMenuLayout1(acmStatusHtml, acmStatus);
-    menu.innerHTML = this._buildLayoutSwitcher(layout) + bodyHtml;
+    // .lisa-menu-main holds the real content; .lisa-menu-overlay is an
+    // empty sibling _showHandoffDestinations() populates and unfolds on
+    // top of it, so Handoff never destroys/replaces the main menu — it
+    // just gets covered, then uncovered again when everything closes.
+    menu.innerHTML = `
+      <div class="lisa-menu-main">${this._buildLayoutSwitcher(layout)}${bodyHtml}</div>
+      <div class="lisa-menu-overlay"></div>
+    `;
   }
 
   // Layout 1 — today's flat list, reordered: Handoff second-to-last,
@@ -778,13 +803,25 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
   // Goes straight to destination-picking — Checkpoint is its own standalone
   // FAB menu item now, so the old two-step wizard (create checkpoint, then
-  // pick a target) was pure redundancy. Renders into the SAME menu element
-  // the main FAB menu already created (see showActionMenu()) rather than
-  // closing it and opening a separate panel — stays visually "the same
-  // menu," same position, same outside-click-close listener.
+  // pick a target) was pure redundancy. Unfolds .lisa-menu-overlay (an
+  // empty sibling _renderMainMenuInto() already created) on top of the
+  // main menu instead of replacing its content — the main menu stays
+  // intact underneath, just covered, same position, same outside-click-
+  // close listener.
   async _showHandoffDestinations(menu) {
     const acm = window.__lisaACM;
     if (!acm) { this.showToast("ACM not available", true); menu.remove(); return; }
+
+    const overlay = menu.querySelector('.lisa-menu-overlay');
+    if (!overlay) { menu.remove(); return; }
+
+    // Belt-and-suspenders: the overlay covers .lisa-menu-main visually, but
+    // if its content is ever shorter than the main menu's, make sure a
+    // stray click can't still reach something underneath (e.g. the layout
+    // switcher). The only way out of this state is picking a destination
+    // or closing the whole menu, so there's no "undo" path to wire up.
+    const mainEl = menu.querySelector('.lisa-menu-main');
+    if (mainEl) mainEl.style.pointerEvents = 'none';
 
     let showNudge = false;
     try {
@@ -808,7 +845,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       ...targets.map(t => ({ ...t, label: platformNames[t.platform] || t.platform }))
     ];
 
-    menu.innerHTML = `
+    overlay.innerHTML = `
       <div style="padding:8px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Hand off to:</div>
       ${showNudge ? `
       <div class="lisa-handoff-nudge" style="padding:6px 16px;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -822,6 +859,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         </div>
       `).join('')}
     `;
+    overlay.classList.add('lisa-menu-overlay--open');
   }
 
   async _executeHandoff(targetPlatform, targetUrl) {

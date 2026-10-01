@@ -9,7 +9,6 @@ class LISAPopup {
     this.usageStats = {
       exportsToday: 0,
       importsToday: 0,
-      libraryToday: 0,
       compressToday: 0,
       lastResetDate: null,
       lifetimeFreePool: 100
@@ -140,7 +139,6 @@ class LISAPopup {
         if (!lastReset || this.isNewDay(lastReset, now)) {
           this.usageStats.exportsToday = 0;
           this.usageStats.importsToday = 0;
-          this.usageStats.libraryToday = 0;
           this.usageStats.compressToday = 0;
           this.usageStats.lastResetDate = now.toISOString();
           await chrome.storage.sync.set({ usageStats: this.usageStats });
@@ -149,7 +147,6 @@ class LISAPopup {
         this.usageStats = {
           exportsToday: 0,
           importsToday: 0,
-          libraryToday: 0,
           compressToday: 0,
           lastResetDate: new Date().toISOString(),
           lifetimeFreePool: 100
@@ -174,8 +171,6 @@ class LISAPopup {
       this.usageStats.exportsToday++;
     } else if (type === 'import') {
       this.usageStats.importsToday++;
-    } else if (type === 'library') {
-      this.usageStats.libraryToday = (this.usageStats.libraryToday || 0) + 1;
     } else if (type === 'compress') {
       this.usageStats.compressToday = (this.usageStats.compressToday || 0) + 1;
     }
@@ -194,11 +189,12 @@ class LISAPopup {
     }
 
     // PAYG credit check — same identifier resolution as checkFloatingLimit()
-    // in lisa-floating-button.js. 'export' (Download JSON) is a plain file
-    // download, not a library save — it stays on the free pool/5-day cap
-    // only and never spends a credit. 'library' (Save to Library) and
-    // 'compress' (Compress to LISA JSON) do persist/do real work, so they're
-    // PAYG-eligible like md/lisav/handoff.
+    // in lisa-floating-button.js. 'export' (Download JSON) and Save to
+    // Library (same 'export' type/counter) are plain output steps — the
+    // actual compression work already happened and was already charged (or
+    // not) when Compress ran, so neither spends a second credit here. Only
+    // 'compress' (Compress to LISA JSON, which does the real work) is
+    // PAYG-eligible, same as md/lisav/handoff.
     if (type !== 'export') {
       try {
         let identifier = '';
@@ -242,7 +238,6 @@ class LISAPopup {
     const limits = {
       export: { max: 5, current: this.usageStats.exportsToday },
       import: { max: 5, current: this.usageStats.importsToday },
-      library: { max: 5, current: this.usageStats.libraryToday || 0 },
       compress: { max: 5, current: this.usageStats.compressToday || 0 }
     };
     const limit = limits[type];
@@ -1127,6 +1122,7 @@ class LISAPopup {
           document.getElementById('enrichedTokens').textContent = enrichedTokenEstimate.toLocaleString();
           document.getElementById('rawTokensSaved').textContent = rawTokensSaved.toLocaleString() + ' (' + rawTokensSavedPct + '%)';
           document.getElementById('tokensSaved').textContent = '~' + inferenceReduction + '% inference pre-resolved';
+          document.getElementById('inferenceSavedRow').style.display = '';
           document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
 
@@ -1328,7 +1324,12 @@ class LISAPopup {
         // This mode has no separate inference-cost-saved computation (that
         // metric is specific to the free-tier local semanticTokens path) —
         // was previously mislabeled into that slot; belongs in "Tokens saved".
+        // Hide the row outright rather than leaving it unset: compressionInfo
+        // is the same shared block local Compress uses, so running AI
+        // Compress right after a local Compress left that row showing the
+        // stale local-run value underneath the fresh AI numbers.
         document.getElementById('rawTokensSaved').textContent = '~' + saved.toLocaleString() + ' (' + savePct + '%)';
+        document.getElementById('inferenceSavedRow').style.display = 'none';
         document.getElementById('compressionInfo').style.display = 'block';
         document.getElementById('downloadSection').style.display = 'block';
         document.getElementById('hashingSection').style.display = 'block';
@@ -1501,7 +1502,7 @@ class LISAPopup {
       return;
     }
 
-    const limitCheck = await this.checkUsageLimits('library');
+    const limitCheck = await this.checkUsageLimits('export');
     if (!limitCheck.allowed) {
       this.showError(limitCheck.message);
       this.openUpgradeModal();
@@ -1537,17 +1538,17 @@ class LISAPopup {
       this.hideLoading();
 
       if (response && response.success) {
-        await this.updateUsageStats('library');
+        await this.updateUsageStats('export');
         this.setupUI(); // Refresh button texts with new count
 
         this.updatePlatformStatus('✅ Saved to library!', true);
         this.loadSnapshots();
 
-        // Show remaining saves for free users
+        // Show remaining exports for free users
         if (this.userTier === 'free') {
-          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - (this.usageStats.libraryToday || 0);
+          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
           const poolActive = (this.usageStats.lifetimeFreePool ?? 0) > 0;
-          this.updatePlatformStatus(`✅ Saved! ${remaining} ${poolActive ? 'welcome credits' : 'free saves'} remaining`, true);
+          this.updatePlatformStatus(`✅ Saved! ${remaining} ${poolActive ? 'welcome credits' : 'free exports'} remaining`, true);
         }
       } else {
         this.showError(response?.error || 'Failed to save');
@@ -1986,7 +1987,7 @@ class LISAPopup {
       await chrome.storage.local.clear();
       
       this.userTier = 'free';
-      this.usageStats = { exportsToday: 0, importsToday: 0, libraryToday: 0, compressToday: 0 };
+      this.usageStats = { exportsToday: 0, importsToday: 0, compressToday: 0 };
       
       // Reset UI
       document.getElementById('licenseKeyInput').value = '';

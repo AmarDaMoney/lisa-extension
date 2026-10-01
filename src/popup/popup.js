@@ -172,7 +172,7 @@ class LISAPopup {
     await chrome.storage.sync.set({ usageStats: this.usageStats });
   }
 
-  checkUsageLimits(type) {
+  async checkUsageLimits(type) {
     if (this.userTier === 'premium') {
       return { allowed: true };
     }
@@ -182,6 +182,50 @@ class LISAPopup {
     if (pool > 0) {
       return { allowed: true, remaining: pool, pool: true };
     }
+
+    // PAYG credit check — same identifier resolution as compressConversation()'s
+    // deduct and checkFloatingLimit() in lisa-floating-button.js. Previously
+    // missing here entirely: Download JSON/Save to Library never checked or
+    // spent PAYG credits, so a PAYG user hit the flat 5/day cap below despite
+    // the upgrade message (further down) telling them credits would help.
+    try {
+      let identifier = '';
+      const headers = { 'Content-Type': 'application/json' };
+      const token = await new Promise((resolve) => {
+        chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+      });
+      if (token) {
+        const idResp = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+        if (idResp.ok) {
+          const idData = await idResp.json();
+          if (idData.sub) identifier = `goog_${idData.sub}`;
+        }
+      }
+      if (!identifier) {
+        const stored = await chrome.storage.sync.get(['creditIdentifier', 'licenseKey']);
+        identifier = stored.creditIdentifier || stored.licenseKey || '';
+      }
+      if (identifier) {
+        if (identifier.startsWith('goog_')) headers['X-Google-Id'] = identifier;
+        else if (identifier.startsWith('email_')) headers['X-Identifier'] = identifier;
+        else headers['X-License-Key'] = identifier;
+        const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', { headers });
+        if (balResp.ok) {
+          const balData = await balResp.json();
+          if (balData.balance > 0) {
+            await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ source: 'extension' })
+            });
+            return { allowed: true, credits: true };
+          }
+        }
+      }
+    } catch (e) {
+      console.debug('[LISA] PAYG credit check failed:', e);
+    }
+
     const limits = {
       export: { max: 5, current: this.usageStats.exportsToday },
       import: { max: 5, current: this.usageStats.importsToday }
@@ -1400,7 +1444,7 @@ class LISAPopup {
       return;
     }
 
-    const limitCheck = this.checkUsageLimits('export');
+    const limitCheck = await this.checkUsageLimits('export');
     if (!limitCheck.allowed) {
       this.showError(limitCheck.message);
         this.openUpgradeModal();
@@ -1468,7 +1512,7 @@ class LISAPopup {
       return;
     }
 
-    const limitCheck = this.checkUsageLimits('export');
+    const limitCheck = await this.checkUsageLimits('export');
     if (!limitCheck.allowed) {
       this.showError(limitCheck.message);
       this.openUpgradeModal();

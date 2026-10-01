@@ -116,11 +116,12 @@ class LISAFloatingButton {
       const today = new Date().toISOString().slice(0, 10);
       
       if (result[dateKey] !== today) {
-        await chrome.storage.sync.set({ 
+        await chrome.storage.sync.set({
           [dateKey]: today,
           floating_lisav_today: 0,
           floating_rawjson_today: 0,
-          floating_md_today: 0
+          floating_md_today: 0,
+          floating_handoff_today: 0
         });
         return { allowed: true, remaining: 5 };
       }
@@ -142,7 +143,7 @@ class LISAFloatingButton {
 
   async incrementFloatingLimit(type) {
     if (this.isPremium) return;
-    
+
     try {
       const result = await chrome.storage.sync.get(['usageStats']);
       const stats = result.usageStats || { exportsToday: 0, importsToday: 0, lifetimeFreePool: 100 };
@@ -150,11 +151,23 @@ class LISAFloatingButton {
         stats.lifetimeFreePool--;
         await chrome.storage.sync.set({ usageStats: stats });
         return stats.lifetimeFreePool;
-      } else {
-        stats.exportsToday = (stats.exportsToday || 0) + 1;
-        await chrome.storage.sync.set({ usageStats: stats });
-        return 5 - stats.exportsToday;
       }
+      // Pool exhausted — bump this action's own daily counter (the same
+      // floating_{type}_today / floating_limit_date keys checkFloatingLimit's
+      // local fallback reads), not the shared usageStats.exportsToday. That
+      // used to be a bug: md/lisav all funneled into exportsToday regardless
+      // of type, so checkFloatingLimit's per-type read never actually saw an
+      // increment and the local fallback never blocked anything. Re-checks
+      // the date here too in case today's rollover reset hasn't run yet for
+      // this specific type.
+      const storageKey = `floating_${type}_today`;
+      const dateKey = 'floating_limit_date';
+      const dateResult = await chrome.storage.sync.get([storageKey, dateKey]);
+      const today = new Date().toISOString().slice(0, 10);
+      const count = dateResult[dateKey] === today ? (dateResult[storageKey] || 0) : 0;
+      const newCount = count + 1;
+      await chrome.storage.sync.set({ [dateKey]: today, [storageKey]: newCount });
+      return 5 - newCount;
     } catch (error) {
       console.debug('[LISA] Limit increment error:', error);
     }
@@ -774,6 +787,17 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
   async _executeHandoff(targetPlatform, targetUrl) {
     try {
+      // Same free-tier metering as Save as Markdown / Save LISA-Verbatim —
+      // its own 5/day bucket once the shared lifetime pool is spent. Checked
+      // before any work starts so a blocked attempt doesn't waste a capture
+      // + compression pass.
+      const limitCheck = await this.checkFloatingLimit('handoff');
+      if (!limitCheck.allowed) {
+        this.showToast(limitCheck.message, true);
+        this.showUpgradePrompt();
+        return;
+      }
+
       this.showToast("Preparing handoff...");
       const acm = window.__lisaACM;
       const checkpointHistory = await acm.getCheckpointHistory(); // full chain, oldest first — [] if none exist
@@ -903,6 +927,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       });
 
       if (injectResult && injectResult.success) {
+        await this.incrementFloatingLimit('handoff');
         const methodLabel = injectResult.method === 'clipboard' ? 'copied — paste it (Ctrl+V)' : 'injected';
         this.showToast(`Handoff ${methodLabel} into the new tab.`);
       } else {

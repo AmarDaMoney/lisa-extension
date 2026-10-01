@@ -383,21 +383,6 @@ class LISAPopup {
       this.updatePlatformStatus(`✅ ${platform} detected`, true);
       document.getElementById('extractBtn').disabled = false;
 
-      // Checkpoint nudge belongs here — before Export/Compress even starts,
-      // not after. Derive the conversation id straight from the tab's URL
-      // (same shared helper acm-monitor.js uses) so this works without
-      // waiting for an extraction.
-      try {
-        const convResult = getConversationIdFromUrl(url);
-        if (convResult && convResult.id) {
-          const checkpointHistory = await this._getCheckpointHistory(convResult.id);
-          await this._maybeShowCheckpointNudge(checkpointHistory);
-        } else {
-          const nudgeEl = document.getElementById('checkpointNudge');
-          if (nudgeEl) nudgeEl.style.display = 'none';
-        }
-      } catch (_) {}
-
       // Quick language detection from page sample
       this.detectLanguageFromPage(tab.id);
     } catch (error) {
@@ -1025,31 +1010,6 @@ class LISAPopup {
     } catch (_) {
       return [];
     }
-  }
-
-  // Shared with the FAB's Handoff-panel nudge via the same
-  // acmCheckpointNudgeDismissed flag — one idea ("no checkpoint yet"),
-  // dismissed once, suppressed everywhere.
-  async _maybeShowCheckpointNudge(checkpointHistory) {
-    const el = document.getElementById('checkpointNudge');
-    if (!el) return;
-    if (checkpointHistory.length > 0) { el.style.display = 'none'; return; }
-    try {
-      const { acmCheckpointNudgeDismissed } = await chrome.storage.sync.get(['acmCheckpointNudgeDismissed']);
-      if (acmCheckpointNudgeDismissed) { el.style.display = 'none'; return; }
-    } catch (_) {
-      return;
-    }
-    el.style.display = 'block';
-    el.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:rgba(255,255,255,0.5);padding:4px 2px 8px;">
-        <span>💡 No checkpoint yet — checkpointing first (on the page, via LISA → Handoff) improves export quality.</span>
-        <span id="dismissCheckpointNudge" style="cursor:pointer;flex-shrink:0;">✕</span>
-      </div>`;
-    document.getElementById('dismissCheckpointNudge').addEventListener('click', () => {
-      el.style.display = 'none';
-      chrome.storage.sync.set({ acmCheckpointNudgeDismissed: true });
-    });
   }
 
   async compressConversation() {

@@ -276,12 +276,6 @@ class LISAFloatingButton {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      .lisa-menu-acm-status {
-        padding: 6px 16px;
-        border-bottom: 1px solid #333;
-        display: flex;
-        align-items: center;
-      }
       .lisa-menu-item {
         padding: 8px 16px;
         color: #fafafa;
@@ -292,6 +286,15 @@ class LISAFloatingButton {
       .lisa-menu-item:hover {
         background: #3b82f6;
       }
+      .lisa-menu-item.lisa-menu-pair {
+        flex: 1;
+        text-align: center;
+        font-size: 12px;
+        border-right: 1px solid #333;
+      }
+      .lisa-menu-item.lisa-menu-pair:last-child {
+        border-right: none;
+      }
       .lisa-menu-section-label {
         padding: 6px 16px 2px;
         font-size: 10px;
@@ -299,23 +302,9 @@ class LISAFloatingButton {
         color: #6b7280;
         text-transform: uppercase;
       }
-      .lisa-menu-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        background: #1f1f23;
-        border-radius: 8px;
-        transform-origin: top;
-        display: none;
-      }
-      .lisa-menu-overlay.lisa-menu-overlay--open {
-        display: block;
-        animation: lisa-menu-unfold 0.22s ease;
-      }
       @keyframes lisa-menu-unfold {
-        from { opacity: 0; transform: scaleY(0.85) translateY(-6px); }
-        to { opacity: 1; transform: scaleY(1) translateY(0); }
+        from { opacity: 0; transform: scale(0.95) translateY(-6px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
       }
       .lisa-switch-modal {
         position: fixed;
@@ -439,12 +428,11 @@ class LISAFloatingButton {
   // Temporary A/B tool: once one is picked, delete the other, this switcher,
   // and the acmFabLayout storage key.
   //
-  // One persistent menu element for its whole lifecycle (main menu ->
-  // layout switch -> Handoff destinations): switching layout or opening
-  // Handoff just replaces this element's innerHTML in place rather than
-  // removing it and creating a new, separately-positioned panel. That keeps
-  // it visually "the same FAB menu" throughout and means there's only ever
-  // one outside-click-close listener to manage, not one per panel.
+  // This element persists across a layout switch (innerHTML swap, same
+  // outside-click-close listener throughout) but NOT across Handoff —
+  // picking Handoff opens a genuinely separate panel on top of this one
+  // (see _showHandoffDestinations()) rather than replacing this menu's
+  // content, so it stays visible underneath/beside it.
   async showActionMenu() {
     // Remove existing menu if any
     const existing = document.querySelector(".lisa-action-menu");
@@ -479,20 +467,10 @@ class LISAFloatingButton {
         await this._renderMainMenuInto(menu);
         return;
       }
-      if (e.target.closest('.lisa-nudge-dismiss')) {
-        try { await chrome.storage.sync.set({ acmCheckpointNudgeDismissed: true }); } catch (_) {}
-        const nudge = menu.querySelector('.lisa-handoff-nudge');
-        if (nudge) nudge.remove();
-        return;
-      }
-      const targetItem = e.target.closest('[data-url]');
-      if (targetItem) {
-        menu.remove();
-        await this._executeHandoff(targetItem.dataset.platform, targetItem.dataset.url);
-        return;
-      }
       const action = e.target.dataset?.action;
       if (action === "handoff") {
+        // Opens a separate, independent panel overlapping this one — see
+        // _showHandoffDestinations(). menu stays open underneath/beside it.
         await this._showHandoffDestinations(menu);
         return;
       }
@@ -514,23 +492,7 @@ class LISAFloatingButton {
   }
 
   async _renderMainMenuInto(menu) {
-    // Build ACM status line
-    let acmStatusHtml = '';
     const acm = window.__lisaACM;
-    if (acm) {
-      const status = acm.getStatus();
-      const levelColors = { green: '#4ade80', yellow: '#facc15', red: '#f87171', critical: '#ef4444' };
-      const levelLabels = { green: 'Healthy', yellow: 'Building pressure', red: 'Refresh recommended', critical: 'Context degrading' };
-      const dotColor = levelColors[status.healthLevel] || '#4ade80';
-      const label = levelLabels[status.healthLevel] || 'Healthy';
-      acmStatusHtml = `
-        <div class="lisa-menu-acm-status" title="ACM Context Health">
-          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};margin-right:6px;vertical-align:middle;"></span>
-          <span style="color:#9ca3af;font-size:12px;">${status.messageCount} msgs · ~${status.tokenEstimate.toLocaleString()} tokens · ${label}</span>
-        </div>
-      `;
-    }
-
     const acmStatus = acm ? acm.getStatus() : null;
 
     let layout = 1;
@@ -540,36 +502,63 @@ class LISAFloatingButton {
     } catch (_) {}
 
     const bodyHtml = layout === 2
-      ? this._buildMenuLayout2(acmStatusHtml, acmStatus)
-      : this._buildMenuLayout1(acmStatusHtml, acmStatus);
-    // .lisa-menu-main holds the real content; .lisa-menu-overlay is an
-    // empty sibling _showHandoffDestinations() populates and unfolds on
-    // top of it, so Handoff never destroys/replaces the main menu — it
-    // just gets covered, then uncovered again when everything closes.
-    menu.innerHTML = `
-      <div class="lisa-menu-main">${this._buildLayoutSwitcher(layout)}${bodyHtml}</div>
-      <div class="lisa-menu-overlay"></div>
+      ? this._buildMenuLayout2(acmStatus)
+      : this._buildMenuLayout1(acmStatus);
+    menu.innerHTML = this._buildMenuHeader(acmStatus, layout) + bodyHtml;
+  }
+
+  // One combined row for both layouts: ACM status (left) + layout switcher
+  // (right) instead of two separate stacked rows — a real row-count cut,
+  // not just padding.
+  _buildMenuHeader(acmStatus, currentLayout) {
+    const levelColors = { green: '#4ade80', yellow: '#facc15', red: '#f87171', critical: '#ef4444' };
+    const dotColor = levelColors[acmStatus?.healthLevel] || '#4ade80';
+    const statusHtml = acmStatus ? `
+      <span style="color:#9ca3af;font-size:11px;display:flex;align-items:center;gap:4px;">
+        <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};display:inline-block;"></span>
+        ${acmStatus.messageCount} msgs · ~${acmStatus.tokenEstimate.toLocaleString()}t
+      </span>
+    ` : '<span></span>';
+
+    const pill = (n) => {
+      const active = currentLayout === n;
+      return `<span data-layout="${n}" style="cursor:pointer;padding:2px 8px;border-radius:10px;font-size:10px;${active ? 'background:#3b82f6;color:#fff;' : 'color:#6b7280;'}">${n}</span>`;
+    };
+
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 16px;border-bottom:1px solid #333;gap:8px;">
+        ${statusHtml}
+        <span style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+          <span style="color:#6b7280;font-size:9px;">Layout</span>
+          ${pill(1)}
+          ${pill(2)}
+        </span>
+      </div>
     `;
   }
 
-  // Layout 1 — today's flat list, reordered: Handoff second-to-last,
-  // Checkpoint last.
-  _buildMenuLayout1(acmStatusHtml, acmStatus) {
+  // Layout 1 — compact paired rows: Save actions on one row, Context
+  // actions (Checkpoint + Handoff) on another, instead of 4 stacked rows.
+  _buildMenuLayout1(acmStatus) {
     const gated = acmStatus && acmStatus.conversationId;
     return `
-      ${acmStatusHtml}
-      <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
-      <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
-      ${gated ? `<div class="lisa-menu-item" data-action="handoff" title="Pick a destination and hand off your context">🔄 Handoff</div>` : ''}
-      ${gated ? `<div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>` : ''}
+      <div style="display:flex;">
+        <div class="lisa-menu-item lisa-menu-pair" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Markdown</div>
+        <div class="lisa-menu-item lisa-menu-pair" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 LISA-V</div>
+      </div>
+      ${gated ? `
+      <div style="display:flex;">
+        <div class="lisa-menu-item lisa-menu-pair" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>
+        <div class="lisa-menu-item lisa-menu-pair" data-action="handoff" title="Pick a destination and hand off your context">🔄 Handoff</div>
+      </div>
+      ` : ''}
     `;
   }
 
   // Layout 2 — grouped into Save / Context sections, same 4 actions.
-  _buildMenuLayout2(acmStatusHtml, acmStatus) {
+  _buildMenuLayout2(acmStatus) {
     const gated = acmStatus && acmStatus.conversationId;
     return `
-      ${acmStatusHtml}
       <div class="lisa-menu-section-label">Save</div>
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 LISA-Verbatim</div>
@@ -578,20 +567,6 @@ class LISAFloatingButton {
       <div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>
       <div class="lisa-menu-item" data-action="handoff" title="Pick a destination and hand off your context">🔄 Handoff</div>
       ` : ''}
-    `;
-  }
-
-  _buildLayoutSwitcher(currentLayout) {
-    const pill = (n) => {
-      const active = currentLayout === n;
-      return `<span data-layout="${n}" style="cursor:pointer;padding:2px 8px;border-radius:10px;font-size:10px;${active ? 'background:#3b82f6;color:#fff;' : 'color:#6b7280;'}">${n}</span>`;
-    };
-    return `
-      <div style="padding:4px 16px 5px;border-bottom:1px solid #333;display:flex;align-items:center;gap:6px;">
-        <span style="color:#6b7280;font-size:10px;">Layout</span>
-        ${pill(1)}
-        ${pill(2)}
-      </div>
     `;
   }
 
@@ -803,34 +778,19 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
   // Goes straight to destination-picking — Checkpoint is its own standalone
   // FAB menu item now, so the old two-step wizard (create checkpoint, then
-  // pick a target) was pure redundancy. Unfolds .lisa-menu-overlay (an
-  // empty sibling _renderMainMenuInto() already created) on top of the
-  // main menu instead of replacing its content — the main menu stays
-  // intact underneath, just covered, same position, same outside-click-
-  // close listener.
+  // pick a target) was pure redundancy. Builds a genuinely separate panel
+  // (own element, own position, own close listener) that overlaps `menu`
+  // without touching it — `menu` is never removed or altered here, so it
+  // stays visible exactly as it was. The two panels close independently:
+  // picking a destination removes both; clicking outside just this panel
+  // (including back onto `menu` itself) closes only this one, leaving
+  // `menu`'s own click/outside-click handling to do its normal thing.
   async _showHandoffDestinations(menu) {
+    const existing = document.querySelector('.lisa-handoff-dest-panel');
+    if (existing) { existing.remove(); return; }
+
     const acm = window.__lisaACM;
-    if (!acm) { this.showToast("ACM not available", true); menu.remove(); return; }
-
-    const overlay = menu.querySelector('.lisa-menu-overlay');
-    if (!overlay) { menu.remove(); return; }
-
-    // Belt-and-suspenders: the overlay covers .lisa-menu-main visually, but
-    // if its content is ever shorter than the main menu's, make sure a
-    // stray click can't still reach something underneath (e.g. the layout
-    // switcher). The only way out of this state is picking a destination
-    // or closing the whole menu, so there's no "undo" path to wire up.
-    const mainEl = menu.querySelector('.lisa-menu-main');
-    if (mainEl) mainEl.style.pointerEvents = 'none';
-
-    let showNudge = false;
-    try {
-      const [{ acmCheckpointNudgeDismissed }, checkpointHistory] = await Promise.all([
-        chrome.storage.sync.get(['acmCheckpointNudgeDismissed']),
-        acm.getCheckpointHistory()
-      ]);
-      showNudge = !acmCheckpointNudgeDismissed && checkpointHistory.length === 0;
-    } catch (_) {}
+    if (!acm) { this.showToast("ACM not available", true); return; }
 
     const currentPlatform = acm._detectPlatform();
     const targets = await acm.getHandoffTargets();
@@ -845,21 +805,56 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       ...targets.map(t => ({ ...t, label: platformNames[t.platform] || t.platform }))
     ];
 
-    overlay.innerHTML = `
+    const destPanel = document.createElement('div');
+    destPanel.className = 'lisa-handoff-dest-panel';
+    destPanel.innerHTML = `
       <div style="padding:8px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Hand off to:</div>
-      ${showNudge ? `
-      <div class="lisa-handoff-nudge" style="padding:6px 16px;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <span>💡 No checkpoint yet — checkpointing first makes this handoff richer.</span>
-        <span class="lisa-nudge-dismiss" style="cursor:pointer;color:#6b7280;flex-shrink:0;">✕</span>
+      <div style="padding:6px 16px;font-size:11px;color:rgba(255,255,255,0.5);border-bottom:1px solid #333;">
+        💡 Tip: checkpointing first makes this handoff richer.
       </div>
-      ` : ''}
       ${allTargets.map(t => `
         <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}">
           ${t.label}
         </div>
       `).join('')}
     `;
-    overlay.classList.add('lisa-menu-overlay--open');
+
+    // Anchored off the main menu's own box (not the FAB button), offset
+    // up-and-left so it visibly overlaps rather than exactly coincides —
+    // reads as "a second card over the first," not "the same box."
+    const menuRect = menu.getBoundingClientRect();
+    destPanel.style.cssText = `
+      position: fixed;
+      bottom: ${window.innerHeight - menuRect.bottom + 20}px;
+      right: ${window.innerWidth - menuRect.right + 16}px;
+      background: #1f1f23;
+      border: 1px solid #3b82f6;
+      border-radius: 8px;
+      padding: 0;
+      z-index: 2147483647;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      min-width: 200px;
+      animation: lisa-menu-unfold 0.2s ease;
+    `;
+    document.body.appendChild(destPanel);
+
+    destPanel.addEventListener('click', async (e) => {
+      const targetItem = e.target.closest('[data-url]');
+      if (!targetItem) return;
+      destPanel.remove();
+      menu.remove();
+      await this._executeHandoff(targetItem.dataset.platform, targetItem.dataset.url);
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', function closeDestPanel(e) {
+        if (!destPanel.contains(e.target)) {
+          destPanel.remove();
+          document.removeEventListener('click', closeDestPanel);
+        }
+      });
+    }, 100);
   }
 
   async _executeHandoff(targetPlatform, targetUrl) {

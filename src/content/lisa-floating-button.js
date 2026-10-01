@@ -53,27 +53,38 @@ class LISAFloatingButton {
       const pool = poolResult.usageStats?.lifetimeFreePool ?? 0;
       if (pool > 0) return { allowed: true, remaining: pool, pool: true };
     } catch (e) { /* fall through to daily limits */ }
-    // PAYG credit check
+    // PAYG credit check. /api/credits/balance is GET-only and reads the
+    // identity from a header, not a POST body with the raw OAuth token —
+    // this used to send a POST with { token } in the body, which the
+    // backend rejects outright, so this block always silently no-op'd and
+    // Handoff/md/lisav never actually checked or spent PAYG credits. Fixed
+    // to resolve the token to a goog_<sub> identifier first and send it the
+    // same way popup.js's compressConversation()/loadCreditBalance() do.
     try {
       const token = await new Promise((resolve) => {
         chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
       });
       if (token) {
-        const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
-        });
-        if (balResp.ok) {
-          const balData = await balResp.json();
-          if (balData.balance > 0) {
-            // Deduct 1 credit and allow
-            await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token, source: 'extension' })
+        const idResp = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
+        if (idResp.ok) {
+          const idData = await idResp.json();
+          if (idData.sub) {
+            const googleId = `goog_${idData.sub}`;
+            const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
+              headers: { 'X-Google-Id': googleId }
             });
-            return { allowed: true, credits: true };
+            if (balResp.ok) {
+              const balData = await balResp.json();
+              if (balData.balance > 0) {
+                // Deduct 1 credit and allow
+                await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-Google-Id': googleId },
+                  body: JSON.stringify({ source: 'extension' })
+                });
+                return { allowed: true, credits: true };
+              }
+            }
           }
         }
       }

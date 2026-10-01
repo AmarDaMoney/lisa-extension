@@ -382,7 +382,22 @@ class LISAPopup {
 
       this.updatePlatformStatus(`✅ ${platform} detected`, true);
       document.getElementById('extractBtn').disabled = false;
-      
+
+      // Checkpoint nudge belongs here — before Export/Compress even starts,
+      // not after. Derive the conversation id straight from the tab's URL
+      // (same shared helper acm-monitor.js uses) so this works without
+      // waiting for an extraction.
+      try {
+        const convResult = getConversationIdFromUrl(url);
+        if (convResult && convResult.id) {
+          const checkpointHistory = await this._getCheckpointHistory(convResult.id);
+          await this._maybeShowCheckpointNudge(checkpointHistory);
+        } else {
+          const nudgeEl = document.getElementById('checkpointNudge');
+          if (nudgeEl) nudgeEl.style.display = 'none';
+        }
+      } catch (_) {}
+
       // Quick language detection from page sample
       this.detectLanguageFromPage(tab.id);
     } catch (error) {
@@ -969,11 +984,6 @@ class LISAPopup {
         document.getElementById('detectedPlatform').textContent = response.data.platform || 'Unknown';
         document.getElementById('extractedInfo').style.display = 'block';
         document.getElementById('compressSection').style.display = 'block';
-
-        // Checkpoint nudge belongs here, before the user ever clicks
-        // Compress — not after, which is too late to act on.
-        const checkpointHistory = await this._getCheckpointHistory(response.data.conversationId);
-        await this._maybeShowCheckpointNudge(checkpointHistory);
 
         // Detect language from extracted content
         const sampleText = (response.data.messages || []).map(m => m.content || '').join(' ').substring(0, 500);

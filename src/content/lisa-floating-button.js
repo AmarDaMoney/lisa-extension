@@ -277,13 +277,13 @@ class LISAFloatingButton {
         to { opacity: 1; transform: translateY(0); }
       }
       .lisa-menu-acm-status {
-        padding: 8px 16px;
+        padding: 6px 16px;
         border-bottom: 1px solid #333;
         display: flex;
         align-items: center;
       }
       .lisa-menu-item {
-        padding: 10px 16px;
+        padding: 8px 16px;
         color: #fafafa;
         font-size: 14px;
         cursor: pointer;
@@ -420,6 +420,13 @@ class LISAFloatingButton {
   // Two switchable layouts for comparison — see _buildMenuLayout1/2 below.
   // Temporary A/B tool: once one is picked, delete the other, this switcher,
   // and the acmFabLayout storage key.
+  //
+  // One persistent menu element for its whole lifecycle (main menu ->
+  // layout switch -> Handoff destinations): switching layout or opening
+  // Handoff just replaces this element's innerHTML in place rather than
+  // removing it and creating a new, separately-positioned panel. That keeps
+  // it visually "the same FAB menu" throughout and means there's only ever
+  // one outside-click-close listener to manage, not one per panel.
   async showActionMenu() {
     // Remove existing menu if any
     const existing = document.querySelector(".lisa-action-menu");
@@ -427,7 +434,68 @@ class LISAFloatingButton {
 
     const menu = document.createElement("div");
     menu.className = "lisa-action-menu";
+    await this._renderMainMenuInto(menu);
 
+    // Position near the button
+    const btn = this.button.getBoundingClientRect();
+    menu.style.cssText = `
+      position: fixed;
+      bottom: ${window.innerHeight - btn.top + 10}px;
+      right: ${window.innerWidth - btn.right}px;
+      background: #1f1f23;
+      border: 1px solid #3b82f6;
+      border-radius: 8px;
+      padding: 6px 0;
+      z-index: 2147483647;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    `;
+
+    document.body.appendChild(menu);
+
+    // Handle clicks
+    menu.addEventListener("click", async (e) => {
+      const layoutPill = e.target.closest('[data-layout]');
+      if (layoutPill) {
+        try { await chrome.storage.sync.set({ acmFabLayout: parseInt(layoutPill.dataset.layout, 10) }); } catch (_) {}
+        await this._renderMainMenuInto(menu);
+        return;
+      }
+      if (e.target.closest('.lisa-nudge-dismiss')) {
+        try { await chrome.storage.sync.set({ acmCheckpointNudgeDismissed: true }); } catch (_) {}
+        const nudge = menu.querySelector('.lisa-handoff-nudge');
+        if (nudge) nudge.remove();
+        return;
+      }
+      const targetItem = e.target.closest('[data-url]');
+      if (targetItem) {
+        menu.remove();
+        await this._executeHandoff(targetItem.dataset.platform, targetItem.dataset.url);
+        return;
+      }
+      const action = e.target.dataset?.action;
+      if (action === "handoff") {
+        await this._showHandoffDestinations(menu);
+        return;
+      }
+      menu.remove();
+      if (action === "save-md") this.saveAsMarkdown();
+      else if (action === "save-lisav") this.saveLisaV();
+      else if (action === "checkpoint") await this.contextCheckpoint();
+    });
+
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener("click", function closeMenu(e) {
+        if (!menu.contains(e.target)) {
+          menu.remove();
+          document.removeEventListener("click", closeMenu);
+        }
+      });
+    }, 100);
+  }
+
+  async _renderMainMenuInto(menu) {
     // Build ACM status line
     let acmStatusHtml = '';
     const acm = window.__lisaACM;
@@ -457,48 +525,6 @@ class LISAFloatingButton {
       ? this._buildMenuLayout2(acmStatusHtml, acmStatus)
       : this._buildMenuLayout1(acmStatusHtml, acmStatus);
     menu.innerHTML = this._buildLayoutSwitcher(layout) + bodyHtml;
-
-    // Position near the button
-    const btn = this.button.getBoundingClientRect();
-    menu.style.cssText = `
-      position: fixed;
-      bottom: ${window.innerHeight - btn.top + 10}px;
-      right: ${window.innerWidth - btn.right}px;
-      background: #1f1f23;
-      border: 1px solid #3b82f6;
-      border-radius: 8px;
-      padding: 8px 0;
-      z-index: 2147483647;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    `;
-
-    document.body.appendChild(menu);
-
-    // Handle clicks
-    menu.addEventListener("click", async (e) => {
-      const layoutPill = e.target.closest('[data-layout]');
-      if (layoutPill) {
-        await this._setFabLayout(parseInt(layoutPill.dataset.layout, 10));
-        return;
-      }
-      const action = e.target.dataset?.action;
-      menu.remove();
-      if (action === "save-md") this.saveAsMarkdown();
-      else if (action === "save-lisav") this.saveLisaV();
-      else if (action === "handoff") await this._pickHandoffTarget();
-      else if (action === "checkpoint") await this.contextCheckpoint();
-    });
-
-    // Close on outside click
-    setTimeout(() => {
-      document.addEventListener("click", function closeMenu(e) {
-        if (!menu.contains(e.target)) {
-          menu.remove();
-          document.removeEventListener("click", closeMenu);
-        }
-      });
-    }, 100);
   }
 
   // Layout 1 — today's flat list, reordered: Handoff second-to-last,
@@ -536,21 +562,12 @@ class LISAFloatingButton {
       return `<span data-layout="${n}" style="cursor:pointer;padding:2px 8px;border-radius:10px;font-size:10px;${active ? 'background:#3b82f6;color:#fff;' : 'color:#6b7280;'}">${n}</span>`;
     };
     return `
-      <div style="padding:6px 16px 8px;border-bottom:1px solid #333;display:flex;align-items:center;gap:6px;">
+      <div style="padding:4px 16px 5px;border-bottom:1px solid #333;display:flex;align-items:center;gap:6px;">
         <span style="color:#6b7280;font-size:10px;">Layout</span>
         ${pill(1)}
         ${pill(2)}
       </div>
     `;
-  }
-
-  async _setFabLayout(n) {
-    try {
-      await chrome.storage.sync.set({ acmFabLayout: n });
-    } catch (_) {}
-    const menu = document.querySelector('.lisa-action-menu');
-    if (menu) menu.remove();
-    await this.showActionMenu();
   }
 
   // One retry before giving up on the API — see the matching helper in
@@ -761,13 +778,13 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
   // Goes straight to destination-picking — Checkpoint is its own standalone
   // FAB menu item now, so the old two-step wizard (create checkpoint, then
-  // pick a target) was pure redundancy.
-  async _pickHandoffTarget() {
+  // pick a target) was pure redundancy. Renders into the SAME menu element
+  // the main FAB menu already created (see showActionMenu()) rather than
+  // closing it and opening a separate panel — stays visually "the same
+  // menu," same position, same outside-click-close listener.
+  async _showHandoffDestinations(menu) {
     const acm = window.__lisaACM;
-    if (!acm) { this.showToast("ACM not available", true); return; }
-
-    const existing = document.querySelector('.lisa-handoff-panel');
-    if (existing) { existing.remove(); return; }
+    if (!acm) { this.showToast("ACM not available", true); menu.remove(); return; }
 
     let showNudge = false;
     try {
@@ -791,60 +808,20 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       ...targets.map(t => ({ ...t, label: platformNames[t.platform] || t.platform }))
     ];
 
-    const picker = document.createElement('div');
-    picker.className = 'lisa-handoff-panel';
-    picker.innerHTML = `
-      <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Hand off to:</div>
+    menu.innerHTML = `
+      <div style="padding:8px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Hand off to:</div>
       ${showNudge ? `
-      <div class="lisa-handoff-nudge" style="padding:6px 16px 8px;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <div class="lisa-handoff-nudge" style="padding:6px 16px;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between;align-items:center;gap:8px;">
         <span>💡 No checkpoint yet — checkpointing first makes this handoff richer.</span>
         <span class="lisa-nudge-dismiss" style="cursor:pointer;color:#6b7280;flex-shrink:0;">✕</span>
       </div>
       ` : ''}
       ${allTargets.map(t => `
-        <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}" style="padding:10px 16px;color:#fafafa;font-size:14px;cursor:pointer;">
+        <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}">
           ${t.label}
         </div>
       `).join('')}
     `;
-
-    const btn = this.button.getBoundingClientRect();
-    picker.style.cssText = `
-      position:fixed;
-      bottom:${window.innerHeight - btn.top + 10}px;
-      right:${window.innerWidth - btn.right}px;
-      background:#1f1f23;
-      border:1px solid #3b82f6;
-      border-radius:8px;
-      padding:0;
-      z-index:2147483647;
-      box-shadow:0 4px 20px rgba(0,0,0,0.4);
-      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-      min-width:200px;
-    `;
-    document.body.appendChild(picker);
-
-    picker.addEventListener('click', async (e) => {
-      if (e.target.closest('.lisa-nudge-dismiss')) {
-        try { await chrome.storage.sync.set({ acmCheckpointNudgeDismissed: true }); } catch (_) {}
-        const nudge = picker.querySelector('.lisa-handoff-nudge');
-        if (nudge) nudge.remove();
-        return;
-      }
-      const item = e.target.closest('.lisa-menu-item');
-      if (!item || !item.dataset.url) return;
-      picker.remove();
-      await this._executeHandoff(item.dataset.platform, item.dataset.url);
-    });
-
-    setTimeout(() => {
-      document.addEventListener('click', function closePicker(e) {
-        if (!picker.contains(e.target)) {
-          picker.remove();
-          document.removeEventListener('click', closePicker);
-        }
-      });
-    }, 100);
   }
 
   async _executeHandoff(targetPlatform, targetUrl) {

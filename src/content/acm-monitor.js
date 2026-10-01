@@ -53,6 +53,9 @@ const ACMMonitor = {
     mistral:   { claude: true, chatgpt: true, mistral: true },
     copilot:   { claude: true, chatgpt: true },
     perplexity:{ claude: true, chatgpt: true },
+    huggingchat:{ claude: true, chatgpt: true },
+    metaai:    { claude: true, chatgpt: true },
+    poe:       { claude: true, chatgpt: true },
   },
 
   // New chat URLs per platform
@@ -102,6 +105,9 @@ const ACMMonitor = {
     if (host.includes('mistral.ai')) return 'mistral';
     if (host.includes('copilot.microsoft')) return 'copilot';
     if (host.includes('perplexity.ai')) return 'perplexity';
+    if (host.includes('huggingface.co')) return 'huggingchat';
+    if (host.includes('meta.ai')) return 'metaai';
+    if (host.includes('poe.com')) return 'poe';
     return 'unknown';
   },
 
@@ -215,6 +221,7 @@ const ACMMonitor = {
     const host = window.location.hostname;
     if (host.includes('claude.ai') && !window.location.pathname.startsWith('/code/')) return true;
     if (host.includes('chatgpt.com')) return true;
+    if (host.includes('perplexity.ai')) return true;
     return false;
   },
 
@@ -222,6 +229,9 @@ const ACMMonitor = {
     const host = window.location.hostname;
     if (host.includes('claude.ai')) return window.__LISA_CLAUDE_API_CAPTURE || null;
     if (host.includes('chatgpt.com')) return window.__LISA_CHATGPT_API_CAPTURE || null;
+    // Same { messageCount, messages: [{role, content}] } contract as Claude/
+    // ChatGPT's capture modules — perplexity-api-main.js already produces it.
+    if (host.includes('perplexity.ai')) return window.__LISA_PERPLEXITY_API_CAPTURE || null;
     return null;
   },
 

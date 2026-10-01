@@ -970,6 +970,11 @@ class LISAPopup {
         document.getElementById('extractedInfo').style.display = 'block';
         document.getElementById('compressSection').style.display = 'block';
 
+        // Checkpoint nudge belongs here, before the user ever clicks
+        // Compress — not after, which is too late to act on.
+        const checkpointHistory = await this._getCheckpointHistory(response.data.conversationId);
+        await this._maybeShowCheckpointNudge(checkpointHistory);
+
         // Detect language from extracted content
         const sampleText = (response.data.messages || []).map(m => m.content || '').join(' ').substring(0, 500);
         this.showLanguageIndicator(this.detectLanguage(sampleText));
@@ -1157,8 +1162,6 @@ class LISAPopup {
         
         // Show language indicator
         this.showLanguageIndicator(this.compressedData.session_metadata?.language);
-
-        await this._maybeShowCheckpointNudge(checkpointHistory);
 
         await this.updateUsageStats('compress');
         this.setupUI(); // Refresh button texts with new count

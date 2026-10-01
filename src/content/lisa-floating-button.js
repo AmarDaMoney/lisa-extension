@@ -486,7 +486,7 @@ class LISAFloatingButton {
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
-      else if (action === "handoff") await this.showHandoffPanel();
+      else if (action === "handoff") await this._pickHandoffTarget();
       else if (action === "checkpoint") await this.contextCheckpoint();
     });
 
@@ -509,7 +509,7 @@ class LISAFloatingButton {
       ${acmStatusHtml}
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Save as Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 Save LISA-Verbatim</div>
-      ${gated ? `<div class="lisa-menu-item" data-action="handoff" title="Checkpoint your context and hand off to a fresh session">🔄 Handoff</div>` : ''}
+      ${gated ? `<div class="lisa-menu-item" data-action="handoff" title="Pick a destination and hand off your context">🔄 Handoff</div>` : ''}
       ${gated ? `<div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>` : ''}
     `;
   }
@@ -525,7 +525,7 @@ class LISAFloatingButton {
       ${gated ? `
       <div class="lisa-menu-section-label">Context</div>
       <div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>
-      <div class="lisa-menu-item" data-action="handoff" title="Checkpoint your context and hand off to a fresh session">🔄 Handoff</div>
+      <div class="lisa-menu-item" data-action="handoff" title="Pick a destination and hand off your context">🔄 Handoff</div>
       ` : ''}
     `;
   }
@@ -759,90 +759,24 @@ Keep it tight — this is for continuity, not a report. Only include what matter
   // injected as a file into a fresh tab on the target platform
   // ============================================
 
-  async showHandoffPanel() {
+  // Goes straight to destination-picking — Checkpoint is its own standalone
+  // FAB menu item now, so the old two-step wizard (create checkpoint, then
+  // pick a target) was pure redundancy.
+  async _pickHandoffTarget() {
+    const acm = window.__lisaACM;
+    if (!acm) { this.showToast("ACM not available", true); return; }
+
     const existing = document.querySelector('.lisa-handoff-panel');
     if (existing) { existing.remove(); return; }
 
-    const acm = window.__lisaACM;
     let showNudge = false;
     try {
       const [{ acmCheckpointNudgeDismissed }, checkpointHistory] = await Promise.all([
         chrome.storage.sync.get(['acmCheckpointNudgeDismissed']),
-        acm ? acm.getCheckpointHistory() : Promise.resolve([])
+        acm.getCheckpointHistory()
       ]);
       showNudge = !acmCheckpointNudgeDismissed && checkpointHistory.length === 0;
     } catch (_) {}
-
-    const panel = document.createElement('div');
-    panel.className = 'lisa-handoff-panel';
-    panel.innerHTML = `
-      <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Context Handoff</div>
-      ${showNudge ? `
-      <div class="lisa-handoff-nudge" style="padding:6px 16px 8px;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <span>💡 No checkpoint yet — checkpointing first makes this handoff richer.</span>
-        <span class="lisa-nudge-dismiss" style="cursor:pointer;color:#6b7280;flex-shrink:0;">✕</span>
-      </div>
-      ` : ''}
-      <div class="lisa-menu-item" data-action="step1-create" style="padding:10px 16px;cursor:pointer;">
-        <div style="color:#fafafa;font-size:14px;">① 🧠 Create / Update Checkpoint</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:2px;">Ask the AI to summarize where things stand</div>
-      </div>
-      <div class="lisa-menu-item" data-action="step2" style="padding:10px 16px;cursor:pointer;">
-        <div style="color:#fafafa;font-size:14px;">② 🔄 Compress & Handoff</div>
-        <div style="color:#6b7280;font-size:11px;margin-top:2px;">Pick a target and transfer — any mid-conversation checkpoints are kept verbatim</div>
-      </div>
-    `;
-
-    const btn = this.button.getBoundingClientRect();
-    panel.style.cssText = `
-      position:fixed;
-      bottom:${window.innerHeight - btn.top + 10}px;
-      right:${window.innerWidth - btn.right}px;
-      background:#1f1f23;
-      border:1px solid #3b82f6;
-      border-radius:8px;
-      padding:0;
-      z-index:2147483647;
-      box-shadow:0 4px 20px rgba(0,0,0,0.4);
-      font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-      min-width:240px;
-    `;
-    document.body.appendChild(panel);
-
-    panel.addEventListener('click', async (e) => {
-      if (e.target.closest('.lisa-nudge-dismiss')) {
-        try { await chrome.storage.sync.set({ acmCheckpointNudgeDismissed: true }); } catch (_) {}
-        const nudge = panel.querySelector('.lisa-handoff-nudge');
-        if (nudge) nudge.remove();
-        return;
-      }
-      const item = e.target.closest('.lisa-menu-item');
-      if (!item) return;
-      const action = item.dataset.action;
-
-      if (action === 'step1-create') {
-        panel.remove();
-        await this.contextCheckpoint();
-        this.showToast("Paste and send it — LISA captures the response automatically. Come back and click Handoff → step 2 when it's ready.");
-      } else if (action === 'step2') {
-        panel.remove();
-        await this._pickHandoffTarget();
-      }
-    });
-
-    setTimeout(() => {
-      document.addEventListener('click', function closePanel(e) {
-        if (!panel.contains(e.target)) {
-          panel.remove();
-          document.removeEventListener('click', closePanel);
-        }
-      });
-    }, 100);
-  }
-
-  async _pickHandoffTarget() {
-    const acm = window.__lisaACM;
-    if (!acm) { this.showToast("ACM not available", true); return; }
 
     const currentPlatform = acm._detectPlatform();
     const targets = await acm.getHandoffTargets();
@@ -861,6 +795,12 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     picker.className = 'lisa-handoff-panel';
     picker.innerHTML = `
       <div style="padding:10px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Hand off to:</div>
+      ${showNudge ? `
+      <div class="lisa-handoff-nudge" style="padding:6px 16px 8px;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span>💡 No checkpoint yet — checkpointing first makes this handoff richer.</span>
+        <span class="lisa-nudge-dismiss" style="cursor:pointer;color:#6b7280;flex-shrink:0;">✕</span>
+      </div>
+      ` : ''}
       ${allTargets.map(t => `
         <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}" style="padding:10px 16px;color:#fafafa;font-size:14px;cursor:pointer;">
           ${t.label}
@@ -885,6 +825,12 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     document.body.appendChild(picker);
 
     picker.addEventListener('click', async (e) => {
+      if (e.target.closest('.lisa-nudge-dismiss')) {
+        try { await chrome.storage.sync.set({ acmCheckpointNudgeDismissed: true }); } catch (_) {}
+        const nudge = picker.querySelector('.lisa-handoff-nudge');
+        if (nudge) nudge.remove();
+        return;
+      }
       const item = e.target.closest('.lisa-menu-item');
       if (!item || !item.dataset.url) return;
       picker.remove();

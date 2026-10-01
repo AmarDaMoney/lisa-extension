@@ -58,9 +58,17 @@ class LISAFloatingButton {
     // this used to send a POST with { token } in the body, which the
     // backend rejects outright, so this block always silently no-op'd and
     // Handoff/md/lisav never actually checked or spent PAYG credits. Fixed
-    // to resolve the token to a goog_<sub> identifier first and send it the
-    // same way popup.js's compressConversation()/loadCreditBalance() do.
+    // to resolve an identifier the same way popup.js's
+    // compressConversation()/loadCreditBalance() do: Google identity first,
+    // then (since this block previously only ever tried Google) a stored
+    // creditIdentifier/licenseKey fallback — without that fallback, a PAYG
+    // user whose credits are tied to a license key, not Google, would never
+    // have them checked here at all and would always just hit the free
+    // daily-5 cap instead.
     try {
+      let identifier = '';
+      const headers = { 'Content-Type': 'application/json' };
+
       const token = await new Promise((resolve) => {
         chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
       });
@@ -68,23 +76,30 @@ class LISAFloatingButton {
         const idResp = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
         if (idResp.ok) {
           const idData = await idResp.json();
-          if (idData.sub) {
-            const googleId = `goog_${idData.sub}`;
-            const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
-              headers: { 'X-Google-Id': googleId }
+          if (idData.sub) identifier = `goog_${idData.sub}`;
+        }
+      }
+      if (!identifier) {
+        const stored = await chrome.storage.sync.get(['creditIdentifier', 'licenseKey']);
+        identifier = stored.creditIdentifier || stored.licenseKey || '';
+      }
+
+      if (identifier) {
+        if (identifier.startsWith('goog_')) headers['X-Google-Id'] = identifier;
+        else if (identifier.startsWith('email_')) headers['X-Identifier'] = identifier;
+        else headers['X-License-Key'] = identifier;
+
+        const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', { headers });
+        if (balResp.ok) {
+          const balData = await balResp.json();
+          if (balData.balance > 0) {
+            // Deduct 1 credit and allow
+            await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ source: 'extension' })
             });
-            if (balResp.ok) {
-              const balData = await balResp.json();
-              if (balData.balance > 0) {
-                // Deduct 1 credit and allow
-                await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'X-Google-Id': googleId },
-                  body: JSON.stringify({ source: 'extension' })
-                });
-                return { allowed: true, credits: true };
-              }
-            }
+            return { allowed: true, credits: true };
           }
         }
       }

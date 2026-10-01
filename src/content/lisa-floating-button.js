@@ -759,7 +759,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     const targets = await acm.getHandoffTargets();
     const platformNames = {
       claude: 'Claude', chatgpt: 'ChatGPT', gemini: 'Gemini', grok: 'Grok',
-      deepseek: 'DeepSeek', mistral: 'Mistral', copilot: 'Copilot', perplexity: 'Perplexity'
+      deepseek: 'DeepSeek', mistral: 'Mistral', copilot: 'Copilot', perplexity: 'Perplexity',
+      huggingchat: 'HuggingChat', metaai: 'Meta AI', poe: 'Poe', claudecode: 'Claude Code'
     };
 
     const allTargets = [

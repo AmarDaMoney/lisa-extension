@@ -41,9 +41,12 @@ const ACMMonitor = {
   // Platform compatibility matrix for handoff — which targets receive well
   // from which source. Built from testing; will grow as we verify more pairs.
   // true = tested and works, false = tested and problematic, absent = untested
+  // Untested entries (anything beyond claude<->chatgpt/gemini/grok) are
+  // best-guess, same as the pre-existing deepseek/mistral/copilot/perplexity
+  // rows — verify with real file auto-inject before trusting, see CLAUDE.md.
   HANDOFF_COMPAT: {
-    claude:    { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true },
-    chatgpt:   { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true },
+    claude:    { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true, huggingchat: true, metaai: true, poe: true, claudecode: true },
+    chatgpt:   { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true, huggingchat: true, metaai: true, poe: true, claudecode: true },
     gemini:    { claude: true, chatgpt: true, gemini: true },
     grok:      { claude: true, chatgpt: true, grok: true },
     deepseek:  { claude: true, chatgpt: true, deepseek: true },
@@ -54,14 +57,22 @@ const ACMMonitor = {
 
   // New chat URLs per platform
   NEW_CHAT_URLS: {
-    claude:     'https://claude.ai/new',
-    chatgpt:    'https://chatgpt.com/',
-    gemini:     'https://gemini.google.com/app',
-    grok:       'https://grok.com/',
-    deepseek:   'https://chat.deepseek.com/',
-    mistral:    'https://chat.mistral.ai/chat',
-    copilot:    'https://copilot.microsoft.com/',
-    perplexity: 'https://www.perplexity.ai/',
+    claude:      'https://claude.ai/new',
+    chatgpt:     'https://chatgpt.com/',
+    gemini:      'https://gemini.google.com/app',
+    grok:        'https://grok.com/',
+    deepseek:    'https://chat.deepseek.com/',
+    mistral:     'https://chat.mistral.ai/chat',
+    copilot:     'https://copilot.microsoft.com/',
+    perplexity:  'https://www.perplexity.ai/',
+    huggingchat: 'https://huggingface.co/chat/',
+    metaai:      'https://www.meta.ai/',
+    poe:         'https://poe.com/',
+    // Can only ever be a handoff TARGET, never a source: acm-monitor's own
+    // init() bails out on claude.ai/code/* (no API capture, virtualized DOM
+    // generic selector-counting can't handle — see init() below), so this
+    // platform never shows the Handoff menu itself.
+    claudecode:  'https://claude.ai/code/',
   },
 
   async getHandoffTargets() {

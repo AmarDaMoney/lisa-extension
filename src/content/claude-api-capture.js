@@ -224,6 +224,17 @@
       || null;
 
     var branchMessages = walkBranchToLeaf(chatMessages, leafUuid);
+    // Diagnostic for the "handoff only contains 2 messages" report — this
+    // will show whether the API returned the full conversation but the
+    // wrong (short) branch got walked, or chatMessages itself was already
+    // short. Safe to remove once the real cause is confirmed from a live
+    // console.
+    console.log('[LISA] extractViaAPI branch resolution:', {
+      totalChatMessages: chatMessages.length,
+      leafSource: leafSource,
+      leafUuid: leafUuid,
+      resolvedBranchLength: branchMessages.length
+    });
     if (!branchMessages.length) {
       console.warn('[LISA] Could not resolve active branch');
       return null;

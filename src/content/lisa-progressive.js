@@ -417,82 +417,18 @@ class LisaProgressiveCapture {
     const files = msg.files || [{ filename: msg.filename, content: msg.content }];
     const mimeType = msg.mimeType || 'text/markdown';
 
-    // ChatGPT keeps a real input[type="file"] sitting in the composer's
-    // DOM at all times (CSS-hidden inside a wrapping .hidden div) —
-    // confirmed via live inspection. It is NOT created on-demand the way
-    // an earlier version of this code assumed, and unlike Gemini it needs
-    // no button click to reveal it. The manual library-inject path
-    // already finds and uses this exact same input directly via Strategy
-    // 1 below (it just has a real user gesture backing the click); this
-    // mirrors that for the no-gesture auto-inject case instead of the
-    // click-a-menu dance a previous version tried here.
-    const isChatGPTHost = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
-    if (isChatGPTHost && msg._autoInject) {
-      try {
-        const fileInput = document.querySelector('input[type="file"]');
-        if (fileInput) {
-          const dt = new DataTransfer();
-          fileObjects.forEach(f => dt.items.add(f));
-          fileInput.files = dt.files;
-          fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-          fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-          console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. A free-tier upload quota limit, or React ignoring a non-gesture assignment, can both silently stop this from visibly working even though the assignment itself raised no error.');
-          return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
-        }
-        console.warn('[LISA] ChatGPT: no input[type="file"] found in DOM at all — unusual page state.', { url: window.location.href });
-      } catch (e) {
-        console.warn('[LISA] ChatGPT direct file-input assignment failed, falling back to clipboard:', e);
-      }
-    }
-
-    if (isChatGPTHost && msg._autoInject) {
-      const textContent = msg.content || (files[0] && files[0].content) || '';
-      if (textContent) {
-        try {
-          // Use navigator.clipboard (reliable) with textarea fallback
-          let copied = false;
-          try {
-            await navigator.clipboard.writeText(textContent);
-            copied = true;
-          } catch (navErr) {
-            const ta = document.createElement('textarea');
-            ta.value = textContent;
-            ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
-            document.body.appendChild(ta);
-            ta.focus();
-            ta.select();
-            copied = document.execCommand('copy');
-            ta.remove();
-          }
-          if (!copied) throw new Error('Clipboard write failed');
-          const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
-          if (editor) editor.focus();
-          const toast = document.createElement('div');
-          toast.id = 'lisa-paste-prompt';
-          Object.assign(toast.style, {
-            position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
-            zIndex: '100001', background: 'rgba(15,15,20,0.95)', color: '#fbbf24',
-            padding: '14px 24px', borderRadius: '10px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
-            fontSize: '14px', fontWeight: '500',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-            border: '1px solid rgba(251,191,36,0.3)'
-          });
-          toast.textContent = '\u{1F4CB} Handoff copied — press Ctrl+V (Cmd+V) to paste';
-          document.body.appendChild(toast);
-          setTimeout(() => toast.remove(), 8000);
-          return { success: true, method: 'clipboard', count: 1 };
-        } catch (e) {
-          console.warn('[LISA] ChatGPT clipboard fallback failed:', e);
-        }
-      }
-    }
-
-    // Create File objects
+    // Create File objects — up front: the ChatGPT path below needs them too.
+    // (It used to reference this before the declaration, a TDZ
+    // ReferenceError the try/catch swallowed, so ChatGPT's file path never
+    // actually ran and every handoff silently fell back to clipboard text.)
     const fileObjects = files.map(f => {
       const blob = new Blob([f.content], { type: mimeType });
       return new File([blob], f.filename, { type: mimeType, lastModified: Date.now() });
     });
+
+    if (/chatgpt\.com|chat\.openai\.com/.test(window.location.hostname) && msg._autoInject) {
+      return this._injectChatGPT(msg, files, fileObjects);
+    }
 
     // Strategy 1: Find the platform's file input and set files
     // ChatGPT creates input[type=file] on-demand — click the attach button first
@@ -669,6 +605,138 @@ class LisaProgressiveCapture {
     }
 
     return { success: false, error: 'No file input, drop target, or composer found on this platform' };
+  }
+
+  // ── ChatGPT handoff injection ──
+  // A browser can't put a real *file* on the OS clipboard (only text,
+  // HTML, PNG), so "Ctrl+V pastes a file" is done here instead: each step
+  // checks whether ChatGPT actually took the file, and the last one turns
+  // the user's own Ctrl+V into a file attachment.
+  //   1. Synthetic paste carrying the file on the composer — ChatGPT's
+  //      paste handler calls preventDefault when it accepts files, which
+  //      is a synchronous, reliable "it worked" signal.
+  //   2. Hidden input[type=file] assignment (no success signal available).
+  //   3. Text on the clipboard + a one-shot paste intercept: the user's
+  //      real (trusted) Ctrl+V is swapped for a file paste if ChatGPT
+  //      accepts one; otherwise it passes through untouched as text.
+  async _injectChatGPT(msg, files, fileObjects) {
+    let editor = null;
+    for (let i = 0; i < 20 && !editor; i++) {
+      editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
+      if (!editor) await new Promise(r => setTimeout(r, 500));
+    }
+
+    if (editor && this._pasteFilesInto(editor, fileObjects)) {
+      console.log('[LISA] ChatGPT: handoff attached via file paste');
+      this._showPageToast('\u{1F4CE} Handoff attached as a file');
+      return { success: true, method: 'chatgpt-pasteFile', count: fileObjects.length };
+    }
+    console.log('[LISA] ChatGPT: synthetic file paste not accepted' + (editor ? '' : ' (no composer found)'));
+
+    let inputTried = false;
+    try {
+      const fileInput = document.querySelector('input[type="file"]');
+      if (fileInput) {
+        const dt = new DataTransfer();
+        fileObjects.forEach(f => dt.items.add(f));
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+        inputTried = true;
+        console.log('[LISA] ChatGPT: file assigned to composer input — check the composer for a file chip');
+      }
+    } catch (e) {
+      console.warn('[LISA] ChatGPT file-input assignment failed:', e);
+    }
+
+    const textContent = msg.content || (files[0] && files[0].content) || '';
+    let copied = false;
+    if (textContent) {
+      try {
+        await navigator.clipboard.writeText(textContent);
+        copied = true;
+      } catch (_) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = textContent;
+          ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          copied = document.execCommand('copy');
+          ta.remove();
+        } catch (_) {}
+      }
+    }
+    this._armPasteIntercept(fileObjects);
+    if (editor) editor.focus();
+    this._showPageToast(inputTried
+      ? '\u{1F4CB} Handoff ready — if no file appears in the message box, press Ctrl+V (Cmd+V)'
+      : '\u{1F4CB} Handoff ready — press Ctrl+V (Cmd+V) in the message box');
+    return { success: true, method: copied ? 'clipboard' : 'chatgpt-pasteIntercept', count: 1 };
+  }
+
+  // Dispatches a paste carrying files; returns true if the page's paste
+  // handler accepted them (called preventDefault).
+  _pasteFilesInto(target, fileObjects) {
+    try {
+      const dt = new DataTransfer();
+      fileObjects.forEach(f => dt.items.add(f));
+      if (target.focus) target.focus();
+      const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+      if (!ev.clipboardData) Object.defineProperty(ev, 'clipboardData', { value: dt });
+      target.dispatchEvent(ev);
+      return ev.defaultPrevented;
+    } catch (e) {
+      console.warn('[LISA] file paste dispatch failed:', e);
+      return false;
+    }
+  }
+
+  // One-shot: the next real paste in this tab (within 10 min) becomes a
+  // file attachment if the page accepts it; otherwise it's left alone.
+  _armPasteIntercept(fileObjects) {
+    this._pendingPasteFiles = { files: fileObjects, expires: Date.now() + 10 * 60 * 1000 };
+    if (this._pasteInterceptInstalled) return;
+    this._pasteInterceptInstalled = true;
+    document.addEventListener('paste', (e) => {
+      const pending = this._pendingPasteFiles;
+      if (!pending || !e.isTrusted) return; // ignore our own synthetic paste
+      this._pendingPasteFiles = null;
+      if (Date.now() > pending.expires) return;
+      const target = (e.target && e.target.closest &&
+                      e.target.closest('#prompt-textarea, [contenteditable="true"], textarea'))
+                     || document.querySelector('#prompt-textarea, div[contenteditable="true"]');
+      if (!target) return;
+      if (this._pasteFilesInto(target, pending.files)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        console.log('[LISA] ChatGPT: Ctrl+V converted into a file attachment');
+        this._showPageToast('\u{1F4CE} Handoff attached as a file');
+      } else {
+        console.log('[LISA] ChatGPT: page did not accept a file paste — pasting as text');
+      }
+    }, true);
+  }
+
+  _showPageToast(text) {
+    try {
+      document.getElementById('lisa-paste-prompt')?.remove();
+      const toast = document.createElement('div');
+      toast.id = 'lisa-paste-prompt';
+      Object.assign(toast.style, {
+        position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+        zIndex: '100001', background: 'rgba(15,15,20,0.95)', color: '#fbbf24',
+        padding: '14px 24px', borderRadius: '10px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+        fontSize: '14px', fontWeight: '500',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        border: '1px solid rgba(251,191,36,0.3)'
+      });
+      toast.textContent = text;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 8000);
+    } catch (_) {}
   }
 
   watchNavigation() {

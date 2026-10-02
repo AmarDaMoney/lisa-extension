@@ -172,14 +172,19 @@ with the user's platform preferences (set in popup Settings, stored as
 attempts real file injection via the existing `injectFileAttachment`
 path in `lisa-progressive.js` (the same one the library's manual inject
 already used) — not just a clipboard copy. Confirmed working Claude→
-Gemini and Claude→Grok. **ChatGPT auto-inject still falls back to
-clipboard** — the file input itself is confirmed present in ChatGPT's
-DOM at page load (no click-to-reveal needed, unlike Gemini), so the
-open question is whether ChatGPT's React app silently ignores a
-same-input assignment made without a live user gesture, or whether it's
-being masked by hitting the free-tier upload quota — unresolved, revisit
-with a fresh-quota test and the `[LISA] ChatGPT:` console diagnostics
-already in place before trying another fix.
+Gemini and Claude→Grok. **ChatGPT** (`_injectChatGPT` in
+`lisa-progressive.js`): the old "falls back to clipboard" behaviour was
+mostly a bug — the ChatGPT block referenced `fileObjects` before its
+`const` declaration (TDZ ReferenceError swallowed by try/catch), so the
+file path never ran. Now: (1) synthetic `paste` carrying the File on
+`#prompt-textarea` — success = the page called `preventDefault`;
+(2) hidden `input[type=file]` assignment; (3) text on the clipboard plus
+a one-shot capture-phase paste intercept that swaps the user's real
+Ctrl+V for a file paste when the page accepts one, else lets the text
+through. A web page/extension cannot put a real *file* on the OS
+clipboard (Chrome allows text/HTML/PNG only) — the intercept is the
+substitute. Which step worked is logged as `[LISA] ChatGPT: …`. Live
+verification pending.
 
 ### Claude Code capture (claude.ai/code/*)
 API-first via `window.__LISA_CLAUDE_CODE_API_CAPTURE` in

@@ -939,7 +939,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
       if (injectResult && injectResult.success) {
         await this.incrementFloatingLimit('handoff');
-        const methodLabel = injectResult.method === 'clipboard' ? 'copied — paste it (Ctrl+V)' : 'injected';
+        const waitsForPaste = injectResult.method === 'clipboard' || injectResult.method === 'chatgpt-pasteIntercept';
+        const methodLabel = waitsForPaste ? 'ready — press Ctrl+V' : 'injected';
         this.showToast(`Handoff ${methodLabel} into the new tab.`);
       } else {
         this.showToast("Could not auto-transfer — " + (injectResult?.error || "open the new tab and paste manually") , true);

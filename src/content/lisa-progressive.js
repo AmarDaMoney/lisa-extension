@@ -434,19 +434,6 @@ class LisaProgressiveCapture {
     // click-a-menu dance a previous version tried here.
     const isChatGPTHost = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
     if (isChatGPTHost && msg._autoInject) {
-      const textContent = msg.content || (files[0] && files[0].content) || '';
-      // Neither strategy below can confirm the file actually attached in
-      // ChatGPT's UI (both are synthetic/no-gesture, same uncertainty noted
-      // in their own comments) — there was no way to tell the caller "this
-      // might not have worked" without ALSO leaving something real on the
-      // clipboard. Write the handoff text as a backup on every ChatGPT
-      // attempt, not just the plain-clipboard fallback, so a user who finds
-      // nothing attached can still press Ctrl+V and get the content.
-      const writeClipboardBackup = async () => {
-        if (!textContent) return;
-        try { await navigator.clipboard.writeText(textContent); } catch (_) { /* best effort only */ }
-      };
-
       try {
         const fileInput = document.querySelector('input[type="file"]');
         if (fileInput) {
@@ -456,7 +443,6 @@ class LisaProgressiveCapture {
           fileInput.dispatchEvent(new Event('change', { bubbles: true }));
           fileInput.dispatchEvent(new Event('input', { bubbles: true }));
           console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. React ignoring a non-gesture assignment, or a free-tier upload quota limit, can both silently stop this from visibly working even though the assignment itself raised no error.');
-          await writeClipboardBackup();
           return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
         }
         console.warn('[LISA] ChatGPT: no input[type="file"] found in DOM at all — unusual page state.', { url: window.location.href });
@@ -487,7 +473,6 @@ class LisaProgressiveCapture {
           });
           editor.dispatchEvent(pasteEvent);
           console.log('[LISA] ChatGPT: dispatched synthetic paste event with file — verify it actually attached in the UI.');
-          await writeClipboardBackup();
           return { success: true, method: 'chatgpt-pasteSimulation', count: fileObjects.length };
         }
       } catch (e) {

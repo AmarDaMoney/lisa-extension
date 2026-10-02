@@ -630,14 +630,13 @@ class LisaVParser {
       // growing moments later (observed live: one run caught only 37 of 90
       // messages checking scrollHeight alone, then the full 90 on an
       // immediate retry). So don't trust a single up-sweep's settle check:
-      // run full up+down rounds and only stop once the collected item
-      // count itself stops changing for two rounds in a row — any history
-      // that finishes loading during or after one round's down-sweep gets
-      // picked up when the next round climbs back to the top again.
+      // run a full up+down round, and if it added anything new, run
+      // another. Stop the moment a round adds nothing — on an
+      // already-loaded conversation that's the very next round, not a
+      // fixed number of rounds every time.
       collectVisible();
-      let lastItemCount = -1;
-      let stableRounds = 0;
-      for (let round = 0; round < 6 && stableRounds < 2; round++) {
+      let lastItemCount = items.size;
+      for (let round = 0; round < 6; round++) {
         const stepUp = scroller.clientHeight * 0.6;
         for (let u = 0; u < 200 && scroller.scrollTop > 0; u++) {
           scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
@@ -677,11 +676,7 @@ class LisaVParser {
           lastScrollTop = scroller.scrollTop;
         }
 
-        if (items.size === lastItemCount) {
-          stableRounds++;
-        } else {
-          stableRounds = 0;
-        }
+        if (items.size === lastItemCount) break;
         lastItemCount = items.size;
       }
       scroller.style.overflowAnchor = originalAnchor;

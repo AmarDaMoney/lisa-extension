@@ -64,6 +64,13 @@ class LisaProgressiveCapture {
   getConversationId() {
     const host = window.location.hostname;
     const path = window.location.pathname;
+    // Claude Code sessions live under claude.ai too — must be checked
+    // before the generic claude.ai /chat/ pattern below, which would
+    // otherwise give every /code/ page load a fresh random id.
+    if (/claude\.ai/.test(host) && path.startsWith('/code/')) {
+      const cc = path.match(/\/code\/(session_[a-zA-Z0-9]+)/);
+      return cc ? `claudecode-${cc[1]}` : `claudecode-${Date.now()}`;
+    }
     const patterns = [
       [/chatgpt\.com/,             /\/c\/([a-f0-9-]+)/],
       [/claude\.ai/,               /\/chat\/([a-zA-Z0-9-]+)/],

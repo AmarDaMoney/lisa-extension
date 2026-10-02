@@ -24,11 +24,21 @@ if (typeof ClaudeCodeParser !== 'undefined') {
 // Sub-agent traffic (parent_tool_use_id set) is skipped for the same reason.
 var LISA_CC_API_VERSION = '2023-06-01';
 
+// Per-session cache so repeat calls (the ACM monitor re-checks on page
+// activity; exports/handoffs reuse it) only fetch what's new. Pages are
+// newest-first and the log is append-only, so paging stops at the first
+// already-known event — usually after a single request instead of ~100+.
+// Only conversation-bearing events are kept in memory; every id is kept
+// so the stop check works.
+var lisaCCEventCache = {};
+
 async function lisaClaudeCodeFetchAllEvents(sessionId) {
   var base = '/v1/code/sessions/' + encodeURIComponent(sessionId) + '/events';
+  var cache = lisaCCEventCache[sessionId] || null;
   var events = [];
   var cursor = null;
   var pages = 0;
+  var reachedKnown = false;
   do {
     var resp = await fetch(base + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''), {
       method: 'GET',
@@ -38,13 +48,32 @@ async function lisaClaudeCodeFetchAllEvents(sessionId) {
     if (!resp.ok) throw new Error('events ' + resp.status);
     var json = await resp.json();
     var data = Array.isArray(json.data) ? json.data : [];
-    for (var i = 0; i < data.length; i++) events.push(data[i]);
+    for (var i = 0; i < data.length; i++) {
+      if (cache && data[i] && data[i].event_id && cache.ids.has(data[i].event_id)) { reachedKnown = true; break; }
+      events.push(data[i]);
+    }
     pages++;
+    if (reachedKnown) break;
     // A cursor that doesn't advance would loop forever — stop instead.
     if (json.next_cursor && json.next_cursor === cursor) break;
     cursor = json.next_cursor || null;
   } while (cursor && pages < 1000);
-  return { events: events, pages: pages };
+
+  // Only commit a cache built from a complete walk (or a clean join onto
+  // an existing one) — a walk cut short by the page cap must not be
+  // treated as the full history next time.
+  var complete = reachedKnown || !cursor;
+  var ids = cache && reachedKnown ? cache.ids : new Set();
+  var kept = [];
+  for (var k = 0; k < events.length; k++) {
+    var ev = events[k];
+    if (!ev) continue;
+    if (ev.event_id) ids.add(ev.event_id);
+    if (ev.event_type === 'user' || ev.event_type === 'assistant') kept.push(ev);
+  }
+  var all = cache && reachedKnown ? kept.concat(cache.events) : kept;
+  if (complete) lisaCCEventCache[sessionId] = { ids: ids, events: all };
+  return { events: all, pages: pages, totalIds: ids.size };
 }
 
 function lisaClaudeCodeTextOf(message) {
@@ -124,19 +153,23 @@ async function lisaClaudeCodeExtractViaAPI() {
   var sessionId = m[1];
   var fetched = await lisaClaudeCodeFetchAllEvents(sessionId);
   var messages = lisaClaudeCodeEventsToMessages(fetched.events);
-  console.log('[LISA CC] API capture: ' + messages.length + ' messages from ' +
-              fetched.events.length + ' events / ' + fetched.pages + ' pages');
+  // Full walks are worth seeing; the monitor's 1-page incremental checks
+  // would otherwise flood the console.
+  (fetched.pages > 3 ? console.log : console.debug)(
+    '[LISA CC] API capture: ' + messages.length + ' messages from ' +
+    fetched.totalIds + ' events / ' + fetched.pages + ' page(s) fetched');
   if (messages.length === 0) return null;
   return {
     platform: 'Claude Code',
     conversationId: sessionId,
     url: window.location.href,
-    title: null, // caller fills from the page title bar
+    title: (typeof claudeCodeParser !== 'undefined' && claudeCodeParser)
+      ? claudeCodeParser.extractTitle() : (document.title || 'Claude Code Session'),
     extractedAt: new Date().toISOString(),
     messageCount: messages.length,
     messages: messages,
     _captureMethod: 'api-code-events',
-    _totalEvents: fetched.events.length
+    _totalEvents: fetched.totalIds
   };
 }
 // Same shape as __LISA_CLAUDE_API_CAPTURE so LisaVParser's existing
@@ -371,10 +404,7 @@ class ClaudeCodeParser {
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         var apiResult = await lisaClaudeCodeExtractViaAPI();
-        if (apiResult) {
-          apiResult.title = this.extractTitle();
-          return apiResult;
-        }
+        if (apiResult) return apiResult;
       } catch (err) {
         console.warn('[LISA CC] API capture attempt ' + (attempt + 1) + ' failed:', err && err.message);
       }

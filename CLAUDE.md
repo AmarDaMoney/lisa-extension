@@ -195,6 +195,16 @@ arrivals at the top bring nothing. Both `LisaVParser` (popup + FAB) and
 `ClaudeCodeParser` use these — don't re-duplicate them. Console lines
 `[LISA CC] …` show which path ran.
 
+Events are cached per session (append-only log, newest-first paging
+stops at the first known event), so repeat calls cost ~1 request. That
+is what lets ACM run on Claude Code: `acm-monitor.js` (injected there via
+the claude.ai/* entry) treats `/code/` as platform `claudecode`, an API
+platform fed by the same capture module, and Handoff uses it as a
+source. Conversation id is `claudecode-session_…` (lisa-progressive.js
+and shared/conversation-id.js) — stable across reloads, so checkpoints
+persist. Claude Code as a handoff *source* is untested live beyond the
+first rounds; treat its HANDOFF_COMPAT row as a best guess.
+
 **Known pre-existing dead ends** (not from ACM work, found during a code
 audit): `preCacheConversation` (sent from `lisa-floating-button.js` on
 tab-hide) and `refreshUserTier` (sent from `success.html` post-checkout)

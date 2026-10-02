@@ -56,6 +56,9 @@ const ACMMonitor = {
     huggingchat:{ claude: true, chatgpt: true },
     metaai:    { claude: true, chatgpt: true },
     poe:       { claude: true, chatgpt: true },
+    // Claude Code as a source: same receivers as Claude chat (untested
+    // beyond what Claude's own row already reflects).
+    claudecode:{ claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true, huggingchat: true, metaai: true, poe: true },
   },
 
   // New chat URLs per platform
@@ -71,10 +74,6 @@ const ACMMonitor = {
     huggingchat: 'https://huggingface.co/chat/',
     metaai:      'https://www.meta.ai/',
     poe:         'https://poe.com/',
-    // Can only ever be a handoff TARGET, never a source: acm-monitor's own
-    // init() bails out on claude.ai/code/* (no API capture, virtualized DOM
-    // generic selector-counting can't handle — see init() below), so this
-    // platform never shows the Handoff menu itself.
     claudecode:  'https://claude.ai/code/',
   },
 
@@ -97,6 +96,7 @@ const ACMMonitor = {
 
   _detectPlatform() {
     const host = window.location.hostname;
+    if (host.includes('claude.ai') && window.location.pathname.startsWith('/code/')) return 'claudecode';
     if (host.includes('claude.ai')) return 'claude';
     if (host.includes('chatgpt.com')) return 'chatgpt';
     if (host.includes('gemini.google')) return 'gemini';
@@ -112,14 +112,11 @@ const ACMMonitor = {
   },
 
   async init() {
-    // https://claude.ai/code/* also matches the broader https://claude.ai/*
-    // manifest pattern, so this script gets injected there too via that
-    // second block even though it's deliberately left out of the
-    // claude.ai/code/* one (no API capture exists for Claude Code, and its
-    // DOM is virtualized in a way generic selector-counting can't handle).
-    if (window.location.hostname.includes('claude.ai') && window.location.pathname.startsWith('/code/')) {
-      return;
-    }
+    // On claude.ai/code/* this script arrives via the broader claude.ai/*
+    // manifest entry (injected after the /code/ entry, so claude-code-
+    // parser.js's __LISA_CLAUDE_CODE_API_CAPTURE already exists). Claude
+    // Code counts come from that session-events API (incrementally cached
+    // — usually one request per re-check), never the virtualized DOM.
 
     try {
       const stored = await chrome.storage.sync.get(['acmThresholds', 'acmEnabled']);
@@ -219,7 +216,7 @@ const ACMMonitor = {
 
   _isApiCapturePlatform() {
     const host = window.location.hostname;
-    if (host.includes('claude.ai') && !window.location.pathname.startsWith('/code/')) return true;
+    if (host.includes('claude.ai')) return true; // chat API, or Claude Code session events
     if (host.includes('chatgpt.com')) return true;
     if (host.includes('perplexity.ai')) return true;
     return false;
@@ -227,6 +224,7 @@ const ACMMonitor = {
 
   _getApiCapture() {
     const host = window.location.hostname;
+    if (host.includes('claude.ai') && window.location.pathname.startsWith('/code/')) return window.__LISA_CLAUDE_CODE_API_CAPTURE || null;
     if (host.includes('claude.ai')) return window.__LISA_CLAUDE_API_CAPTURE || null;
     if (host.includes('chatgpt.com')) return window.__LISA_CHATGPT_API_CAPTURE || null;
     // Same { messageCount, messages: [{role, content}] } contract as Claude/

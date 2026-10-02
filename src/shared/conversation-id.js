@@ -26,6 +26,12 @@ function getConversationIdFromUrl(urlString) {
     return null;
   }
 
+  // Claude Code — before the generic claude.ai /chat/ entry (same host).
+  if (/claude\.ai/.test(host) && path.startsWith('/code/')) {
+    const cc = path.match(/\/code\/(session_[a-zA-Z0-9]+)/);
+    return { platform: 'claudecode', id: cc ? `claudecode-${cc[1]}` : null };
+  }
+
   const patterns = [
     [/chatgpt\.com/,            /\/c\/([a-f0-9-]+)/],
     [/claude\.ai/,              /\/chat\/([a-zA-Z0-9-]+)/],

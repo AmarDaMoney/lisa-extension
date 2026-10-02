@@ -812,7 +812,10 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
       // Extract the live conversation the same way Compress & Copy does
       let conversation = null;
-      if (window.__LISA_CLAUDE_API_CAPTURE) {
+      if (window.__LISA_CLAUDE_CODE_API_CAPTURE && window.location.pathname.startsWith('/code/')) {
+        conversation = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_CODE_API_CAPTURE, false);
+      }
+      if (!conversation && window.__LISA_CLAUDE_API_CAPTURE) {
         const isShared = window.location.pathname.startsWith('/share/');
         conversation = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
       }

@@ -434,6 +434,33 @@ class LisaProgressiveCapture {
     // click-a-menu dance a previous version tried here.
     const isChatGPTHost = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
     if (isChatGPTHost && msg._autoInject) {
+      // The new ChatGPT tab is opened with `active: true` (service worker's
+      // acmHandoffToNewTab), so it already has focus by the time any of
+      // this runs — the SOURCE tab's own "Handoff copied" toast (shown
+      // later by _executeHandoff in lisa-floating-button.js) renders into a
+      // tab that's now in the background and invisible to the user. That's
+      // the actual reason the Ctrl+V prompt kept going unnoticed no matter
+      // which strategy fired. Show it here instead, directly in the tab the
+      // user is actually looking at.
+      const showPasteToast = () => {
+        const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
+        if (editor) editor.focus();
+        const toast = document.createElement('div');
+        toast.id = 'lisa-paste-prompt';
+        Object.assign(toast.style, {
+          position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: '100001', background: 'rgba(15,15,20,0.95)', color: '#fbbf24',
+          padding: '14px 24px', borderRadius: '10px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+          fontSize: '14px', fontWeight: '500',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          border: '1px solid rgba(251,191,36,0.3)'
+        });
+        toast.textContent = '\u{1F4CB} Handoff copied — press Ctrl+V (Cmd+V) to paste';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 8000);
+      };
+
       try {
         const fileInput = document.querySelector('input[type="file"]');
         if (fileInput) {
@@ -443,6 +470,7 @@ class LisaProgressiveCapture {
           fileInput.dispatchEvent(new Event('change', { bubbles: true }));
           fileInput.dispatchEvent(new Event('input', { bubbles: true }));
           console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. React ignoring a non-gesture assignment, or a free-tier upload quota limit, can both silently stop this from visibly working even though the assignment itself raised no error.');
+          showPasteToast();
           return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
         }
         console.warn('[LISA] ChatGPT: no input[type="file"] found in DOM at all — unusual page state.', { url: window.location.href });
@@ -473,14 +501,13 @@ class LisaProgressiveCapture {
           });
           editor.dispatchEvent(pasteEvent);
           console.log('[LISA] ChatGPT: dispatched synthetic paste event with file — verify it actually attached in the UI.');
+          showPasteToast();
           return { success: true, method: 'chatgpt-pasteSimulation', count: fileObjects.length };
         }
       } catch (e) {
         console.warn('[LISA] ChatGPT paste-simulation failed, falling back to clipboard:', e);
       }
-    }
 
-    if (isChatGPTHost && msg._autoInject) {
       const textContent = msg.content || (files[0] && files[0].content) || '';
       if (textContent) {
         try {
@@ -500,22 +527,7 @@ class LisaProgressiveCapture {
             ta.remove();
           }
           if (!copied) throw new Error('Clipboard write failed');
-          const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
-          if (editor) editor.focus();
-          const toast = document.createElement('div');
-          toast.id = 'lisa-paste-prompt';
-          Object.assign(toast.style, {
-            position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
-            zIndex: '100001', background: 'rgba(15,15,20,0.95)', color: '#fbbf24',
-            padding: '14px 24px', borderRadius: '10px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
-            fontSize: '14px', fontWeight: '500',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-            border: '1px solid rgba(251,191,36,0.3)'
-          });
-          toast.textContent = '\u{1F4CB} Handoff copied \u2014 press Ctrl+V (Cmd+V) to paste';
-          document.body.appendChild(toast);
-          setTimeout(() => toast.remove(), 8000);
+          showPasteToast();
           return { success: true, method: 'clipboard', count: 1 };
         } catch (e) {
           console.warn('[LISA] ChatGPT clipboard fallback failed:', e);

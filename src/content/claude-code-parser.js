@@ -144,62 +144,48 @@ class ClaudeCodeParser {
       // actually mounted for a long conversation, so it never backfills the
       // earliest entries and they're silently dropped unless the user had
       // already scrolled to the top by hand before exporting.
-      //
-      // Claude Code's own app can lazily load older history into its
-      // client-side state as you approach the top, and that load can
-      // straddle more than the moment scrollTop first hits 0 — a height
-      // that looks settled after a short quiet window can still resume
-      // growing moments later (observed live: one run caught only 37 of 90
-      // messages checking scrollHeight alone, then the full 90 on an
-      // immediate retry). So don't trust a single up-sweep's settle check:
-      // run a full up+down round, and if it added anything new, run
-      // another. Stop the moment a round adds nothing — on an
-      // already-loaded conversation that's the very next round, not a
-      // fixed number of rounds every time.
       this.collectVisibleItems(items);
-      var lastItemCount = items.size;
-      for (var round = 0; round < 6; round++) {
-        var stepUp = scroller.clientHeight * 0.6;
-        for (var u = 0; u < 200 && scroller.scrollTop > 0; u++) {
-          scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
-          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-          await new Promise(function(r) { setTimeout(r, 250); });
-          this.collectVisibleItems(items);
-        }
-        scroller.scrollTop = 0;
+      var stepUp = scroller.clientHeight * 0.6;
+      for (var u = 0; u < 200 && scroller.scrollTop > 0; u++) {
+        scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
         scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        // A fixed wait here guesses how long Claude Code's own lazy
-        // history load takes. Poll scrollHeight instead and only move on
-        // once it's stopped growing for a few checks in a row, capped so a
-        // conversation with nothing left to load doesn't stall. This is
-        // just the first-pass filter per round — the outer item-count
-        // check above is what actually catches a load that resumes later.
-        var settleHeight = -1;
-        var settleStable = 0;
-        for (var s = 0; s < 15 && settleStable < 3; s++) {
-          await new Promise(function(r) { setTimeout(r, 400); });
-          if (scroller.scrollHeight === settleHeight) {
-            settleStable++;
-          } else {
-            settleStable = 0;
-          }
-          settleHeight = scroller.scrollHeight;
-        }
+        await new Promise(function(r) { setTimeout(r, 250); });
         this.collectVisibleItems(items);
+      }
+      scroller.scrollTop = 0;
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
 
-        var stepDown = scroller.clientHeight * 0.6;
-        var lastScrollTop = -1;
-        for (var d = 0; d < 200; d++) {
-          scroller.scrollTop += stepDown;
-          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-          await new Promise(function(r) { setTimeout(r, 250); });
-          this.collectVisibleItems(items);
-          if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
-          lastScrollTop = scroller.scrollTop;
+      // Claude Code's own app can lazily load older history into its
+      // client-side state once scrollTop actually hits 0 — on a long
+      // conversation that load can take several seconds, on a short one
+      // it's near-instant. Poll scrollHeight and keep collecting as it
+      // grows, only moving on once it's held steady for a bit; capped so a
+      // conversation with nothing left to load doesn't hang. This replaces
+      // a single fixed wait that was too short for long conversations
+      // (observed live: 37 of 90 messages caught with an 800ms wait).
+      var settleHeight = -1;
+      var settleStable = 0;
+      for (var s = 0; s < 24 && settleStable < 4; s++) {
+        await new Promise(function(r) { setTimeout(r, 500); });
+        this.collectVisibleItems(items);
+        if (scroller.scrollHeight === settleHeight) {
+          settleStable++;
+        } else {
+          settleStable = 0;
         }
+        settleHeight = scroller.scrollHeight;
+      }
 
-        if (items.size === lastItemCount) break;
-        lastItemCount = items.size;
+      // Scroll-DOWN sweep back to the bottom, same stepped pattern.
+      var step = scroller.clientHeight * 0.6;
+      var lastScrollTop = -1;
+      for (var i = 0; i < 200; i++) {
+        scroller.scrollTop += step;
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        await new Promise(function(r) { setTimeout(r, 250); });
+        this.collectVisibleItems(items);
+        if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
+        lastScrollTop = scroller.scrollTop;
       }
       scroller.style.overflowAnchor = originalAnchor;
     } else {

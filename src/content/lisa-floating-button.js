@@ -1025,10 +1025,13 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     toast.textContent = message;
     document.body.appendChild(toast);
 
-    if (!message.includes('Saving')) {
-      const ms = duration || (message.length > 80 ? 5000 : 3000);
-      setTimeout(() => toast.remove(), ms);
-    }
+    // Progress toasts ("Exporting as Markdown...", "Extracting LISA-V...")
+    // stay up until the result toast replaces them — a long capture can
+    // outlast a 3s timeout, and a vanished progress toast reads as failure.
+    // Capped so one can never get stuck on screen.
+    const isProgress = message.includes('Saving') || /(\.\.\.|…)$/.test(message.trim());
+    const ms = isProgress ? 180000 : (duration || (message.length > 80 ? 5000 : 3000));
+    setTimeout(() => toast.remove(), ms);
   }
   showUpgradePrompt(reason = 'limit') {
     const existing = document.querySelector('.lisa-upgrade-modal');

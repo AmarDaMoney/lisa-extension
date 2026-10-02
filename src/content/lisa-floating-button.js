@@ -286,15 +286,6 @@ class LISAFloatingButton {
       .lisa-menu-item:hover {
         background: #3b82f6;
       }
-      .lisa-menu-item.lisa-menu-pair {
-        flex: 1;
-        text-align: center;
-        font-size: 12px;
-        border-right: 1px solid #333;
-      }
-      .lisa-menu-item.lisa-menu-pair:last-child {
-        border-right: none;
-      }
       .lisa-menu-section-label {
         padding: 6px 16px 2px;
         font-size: 10px;
@@ -424,15 +415,10 @@ class LISAFloatingButton {
     console.debug('[LISA] Floating button removed');
   }
 
-  // Two switchable layouts for comparison — see _buildMenuLayout1/2 below.
-  // Temporary A/B tool: once one is picked, delete the other, this switcher,
-  // and the acmFabLayout storage key.
-  //
-  // This element persists across a layout switch (innerHTML swap, same
-  // outside-click-close listener throughout) but NOT across Handoff —
-  // picking Handoff opens a genuinely separate panel on top of this one
-  // (see _showHandoffDestinations()) rather than replacing this menu's
-  // content, so it stays visible underneath/beside it.
+  // This element stays open across Handoff — picking Handoff opens a
+  // genuinely separate panel on top of this one (see
+  // _showHandoffDestinations()) rather than replacing this menu's content,
+  // so it stays visible underneath/beside it.
   async showActionMenu() {
     // Remove existing menu if any
     const existing = document.querySelector(".lisa-action-menu");
@@ -461,12 +447,6 @@ class LISAFloatingButton {
 
     // Handle clicks
     menu.addEventListener("click", async (e) => {
-      const layoutPill = e.target.closest('[data-layout]');
-      if (layoutPill) {
-        try { await chrome.storage.sync.set({ acmFabLayout: parseInt(layoutPill.dataset.layout, 10) }); } catch (_) {}
-        await this._renderMainMenuInto(menu);
-        return;
-      }
       const action = e.target.dataset?.action;
       if (action === "handoff") {
         // Opens a separate, independent panel overlapping this one — see
@@ -494,69 +474,25 @@ class LISAFloatingButton {
   async _renderMainMenuInto(menu) {
     const acm = window.__lisaACM;
     const acmStatus = acm ? acm.getStatus() : null;
-
-    let layout = 1;
-    try {
-      const { acmFabLayout } = await chrome.storage.sync.get(['acmFabLayout']);
-      layout = acmFabLayout === 2 ? 2 : 1;
-    } catch (_) {}
-
-    const bodyHtml = layout === 2
-      ? this._buildMenuLayout2(acmStatus)
-      : this._buildMenuLayout1(acmStatus);
-    menu.innerHTML = this._buildMenuHeader(acmStatus, layout) + bodyHtml;
+    menu.innerHTML = this._buildMenuHeader(acmStatus) + this._buildMenuItems(acmStatus);
   }
 
-  // One combined row for both layouts: ACM status (left) + layout switcher
-  // (right) instead of two separate stacked rows — a real row-count cut,
-  // not just padding.
-  _buildMenuHeader(acmStatus, currentLayout) {
+  _buildMenuHeader(acmStatus) {
     const levelColors = { green: '#4ade80', yellow: '#facc15', red: '#f87171', critical: '#ef4444' };
     const dotColor = levelColors[acmStatus?.healthLevel] || '#4ade80';
-    const statusHtml = acmStatus ? `
-      <span style="color:#9ca3af;font-size:11px;display:flex;align-items:center;gap:4px;">
-        <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};display:inline-block;"></span>
-        ${acmStatus.messageCount} msgs · ~${acmStatus.tokenEstimate.toLocaleString()}t
-      </span>
-    ` : '<span></span>';
-
-    const pill = (n) => {
-      const active = currentLayout === n;
-      return `<span data-layout="${n}" style="cursor:pointer;padding:2px 8px;border-radius:10px;font-size:10px;${active ? 'background:#3b82f6;color:#fff;' : 'color:#6b7280;'}">${n}</span>`;
-    };
-
+    if (!acmStatus) return '';
     return `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 16px;border-bottom:1px solid #333;gap:8px;">
-        ${statusHtml}
-        <span style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-          <span style="color:#6b7280;font-size:9px;">Layout</span>
-          ${pill(1)}
-          ${pill(2)}
+      <div style="display:flex;align-items:center;padding:5px 16px;border-bottom:1px solid #333;">
+        <span style="color:#9ca3af;font-size:11px;display:flex;align-items:center;gap:4px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};display:inline-block;"></span>
+          ${acmStatus.messageCount} msgs · ~${acmStatus.tokenEstimate.toLocaleString()}t
         </span>
       </div>
     `;
   }
 
-  // Layout 1 — compact paired rows: Save actions on one row, Context
-  // actions (Checkpoint + Handoff) on another, instead of 4 stacked rows.
-  _buildMenuLayout1(acmStatus) {
-    const gated = acmStatus && acmStatus.conversationId;
-    return `
-      <div style="display:flex;">
-        <div class="lisa-menu-item lisa-menu-pair" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Markdown</div>
-        <div class="lisa-menu-item lisa-menu-pair" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 LISA-V</div>
-      </div>
-      ${gated ? `
-      <div style="display:flex;">
-        <div class="lisa-menu-item lisa-menu-pair" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>
-        <div class="lisa-menu-item lisa-menu-pair" data-action="handoff" title="Pick a destination and hand off your context">🔄 Handoff</div>
-      </div>
-      ` : ''}
-    `;
-  }
-
-  // Layout 2 — grouped into Save / Context sections, same 4 actions.
-  _buildMenuLayout2(acmStatus) {
+  // Grouped into Save / Context sections.
+  _buildMenuItems(acmStatus) {
     const gated = acmStatus && acmStatus.conversationId;
     return `
       <div class="lisa-menu-section-label">Save</div>

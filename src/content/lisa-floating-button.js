@@ -827,9 +827,6 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
       const allMessages = conversation.messages;
       const n = allMessages.length;
-      // Diagnostic for the "handoff only contains 2 messages" report — safe
-      // to remove once the real cause is confirmed from a live console.
-      console.log('[LISA] Handoff captured conversation:', { captureMethod: conversation._captureMethod, totalMessages: n });
 
       const openingCount = Math.min(2, n);
       const closingCount = Math.min(4, n - openingCount);
@@ -925,15 +922,6 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         anchors: anchors.length > 0 ? anchors : undefined,
         session_metadata: sessionMetadata || undefined
       };
-      // Diagnostic for the "handoff only contains 2 messages" report — safe
-      // to remove once the real cause is confirmed from a live console.
-      console.log('[LISA] Handoff payload shape:', {
-        totalMessages: n,
-        openingCount: payload.opening.length,
-        middleBlockCount: payload.middle.length,
-        middleMessageCount: payload.middle.reduce((sum, b) => sum + (b.messages ? b.messages.length : 1), 0),
-        closingCount: payload.closing.length
-      });
 
       const filename = `lisa-handoff-${targetPlatform}-${Date.now()}.json`;
       this.showToast("Opening new tab and transferring context...");

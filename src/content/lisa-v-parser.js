@@ -557,34 +557,6 @@ class LisaVParser {
   async extractClaudeCodeMessages() {
     const items = new Map();
 
-    // 'div, main' — matches every other platform's scroller detection in
-    // this file; 'div' alone would return null (no scroll sweep at all) if
-    // the real conversation container happens to be a <main>. Prefer a
-    // candidate that actually contains conversation entries over "biggest
-    // scrollable element on the page" — a complex /code/ page can have
-    // other large scrollable regions (file/diff viewer, session sidebar)
-    // with a bigger scrollHeight than the conversation list itself.
-    function findScroller() {
-      const candidates = [...document.querySelectorAll('div, main')].filter(el => {
-        const s = getComputedStyle(el);
-        return (s.overflowY === 'auto' || s.overflowY === 'scroll')
-               && el.scrollHeight > el.clientHeight + 200;
-      });
-      const withEntries = candidates.filter(el => el.querySelector('[data-epitaxy-entry]') !== null);
-      const pool = withEntries.length > 0 ? withEntries : candidates;
-      return pool.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
-    }
-
-    // Poll for the scroller — matches every other platform's extractor in
-    // this file. A one-shot lookup can miss it if called slightly before
-    // the page's virtualized list has finished hydrating.
-    let scroller = null;
-    for (let attempt = 0; attempt < 10; attempt++) {
-      scroller = findScroller();
-      if (scroller) break;
-      await new Promise(r => setTimeout(r, 500));
-    }
-
     function collectVisible() {
       const allEls = document.querySelectorAll('[data-epitaxy-entry]');
       for (const el of allEls) {
@@ -593,7 +565,13 @@ class LisaVParser {
         const itemIdx = el.getAttribute('data-epitaxy-item-index');
         if (!entryId) continue;
         const key = entryId + '|' + (itemIdx || '0');
-        if (items.has(key)) continue;
+        if (items.has(key)) {
+          // Refresh position only — indices can shift when Claude Code
+          // prepends older history; the final down-sweep re-sees every
+          // entry with its final index.
+          items.get(key).entryIdx = entryIdx;
+          continue;
+        }
         const role = entryId.startsWith('msg_') ? 'assistant' : 'user';
         const rows = el.querySelectorAll('.group\\/message-row');
         const targets = rows.length > 0 ? [...rows] : [el];
@@ -607,65 +585,11 @@ class LisaVParser {
       }
     }
 
-    if (scroller) {
-      // Scroll anchoring (the browser default) can adjust scrollTop on its
-      // own while the virtualizer mounts/resizes items above the viewport,
-      // fighting the manual decrement below and making the up-sweep think
-      // it reached the top before it actually did. Restored after.
-      const originalAnchor = scroller.style.overflowAnchor;
-      scroller.style.overflowAnchor = 'none';
-
-      // Scroll-UP sweep, in small steps with real 'scroll' events and
-      // waits — same pattern already used for Poe/HuggingChat/Grok's
-      // virtualized lists. A single instant `scrollTop = 0` jump (the old
-      // behavior here) lands past whatever the epitaxy virtualizer has
-      // actually mounted for a long conversation, so it never backfills the
-      // earliest entries and they're silently dropped unless the user had
-      // already scrolled to the top by hand before exporting.
-      collectVisible();
-      const stepUp = scroller.clientHeight * 0.6;
-      for (let u = 0; u < 200 && scroller.scrollTop > 0; u++) {
-        scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
-        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(r => setTimeout(r, 250));
-        collectVisible();
-      }
-      scroller.scrollTop = 0;
-      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-
-      // Claude Code's own app can lazily load older history into its
-      // client-side state once scrollTop actually hits 0 — on a long
-      // conversation that load can take several seconds, on a short one
-      // it's near-instant. Poll scrollHeight and keep collecting as it
-      // grows, only moving on once it's held steady for a bit; capped so a
-      // conversation with nothing left to load doesn't hang. This replaces
-      // a single fixed wait that was too short for long conversations
-      // (observed live: 37 of 90 messages caught with an 800ms wait).
-      let settleHeight = -1;
-      let settleStable = 0;
-      for (let s = 0; s < 24 && settleStable < 4; s++) {
-        await new Promise(r => setTimeout(r, 500));
-        collectVisible();
-        if (scroller.scrollHeight === settleHeight) {
-          settleStable++;
-        } else {
-          settleStable = 0;
-        }
-        settleHeight = scroller.scrollHeight;
-      }
-
-      // Scroll-DOWN sweep back to the bottom, same stepped pattern.
-      const step = scroller.clientHeight * 0.6;
-      let lastScrollTop = -1;
-      for (let i = 0; i < 200; i++) {
-        scroller.scrollTop += step;
-        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(r => setTimeout(r, 250));
-        collectVisible();
-        if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
-        lastScrollTop = scroller.scrollTop;
-      }
-      scroller.style.overflowAnchor = originalAnchor;
+    // Shared sweep lives in claude-code-parser.js (loaded earlier in the
+    // claude.ai/code/* manifest entry) so this path and ClaudeCodeParser
+    // can't drift apart. If it's somehow missing, take what's mounted.
+    if (typeof window.__lisaClaudeCodeSweep === 'function') {
+      await window.__lisaClaudeCodeSweep(collectVisible);
     } else {
       collectVisible();
     }

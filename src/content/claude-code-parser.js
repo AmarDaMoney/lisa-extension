@@ -6,6 +6,130 @@
 if (typeof ClaudeCodeParser !== 'undefined') {
 } else {
 
+// ── Shared Claude Code scroll sweep ──
+// Used by ClaudeCodeParser.extractConversation() below and by
+// LisaVParser.extractClaudeCodeMessages() (lisa-v-parser.js), which is the
+// path both the popup and the floating button actually take. One copy so
+// the two can't drift apart again.
+//
+// Claude Code pages its history: it loads ONE older page each time the
+// list *arrives* at the top (edge-triggered). Sitting at scrollTop 0 and
+// waiting never loads a second page — the trigger has to leave the top
+// zone and re-enter it, which is exactly what a user's manual
+// "scroll up, scroll down, scroll up again" does. So the up-phase keeps
+// re-arming that trigger (nudge down, climb back) until two consecutive
+// arrivals at the top bring in nothing new.
+function lisaClaudeCodeFindScroller() {
+  // 'div, main' — a <main> conversation container would otherwise be
+  // missed. Prefer a candidate that actually contains conversation entries
+  // over "biggest scrollable element" — a /code/ page's file/diff viewer
+  // or session sidebar can have a bigger scrollHeight than the list.
+  var candidates = [...document.querySelectorAll('div, main')].filter(function(el) {
+    var s = getComputedStyle(el);
+    return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+           && el.scrollHeight > el.clientHeight + 200;
+  });
+  var withEntries = candidates.filter(function(el) {
+    return el.querySelector('[data-epitaxy-entry]') !== null;
+  });
+  var pool = withEntries.length > 0 ? withEntries : candidates;
+  return pool.sort(function(a, b) { return b.scrollHeight - a.scrollHeight; })[0] || null;
+}
+
+async function lisaClaudeCodeSweep(collect) {
+  var wait = function(ms) { return new Promise(function(r) { setTimeout(r, ms); }); };
+  var firstEntryId = function() {
+    var el = document.querySelector('[data-epitaxy-entry]');
+    return el ? el.getAttribute('data-epitaxy-entry') : null;
+  };
+
+  // Poll for the scroller — a one-shot lookup can miss it if called
+  // slightly before the virtualized list has finished hydrating.
+  var scroller = null;
+  for (var attempt = 0; attempt < 10; attempt++) {
+    scroller = lisaClaudeCodeFindScroller();
+    if (scroller) break;
+    await wait(500);
+  }
+  if (!scroller) { collect(); return; }
+
+  var scrollTo = function(top) {
+    scroller.scrollTop = top;
+    scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+  };
+
+  // Scroll anchoring would adjust scrollTop on its own while the
+  // virtualizer mounts/resizes items above the viewport. Restored after.
+  var originalAnchor = scroller.style.overflowAnchor;
+  scroller.style.overflowAnchor = 'none';
+  try {
+    collect();
+
+    // ── Up-phase: climb, wait at the top, re-arm, repeat ──
+    var quietTops = 0;
+    var arrivals = 0;
+    while (quietTops < 2 && arrivals < 60) {
+      // Stepped climb (not an instant jump — that lands past whatever the
+      // virtualizer has mounted and never backfills the earliest entries).
+      var stepUp = scroller.clientHeight * 0.6;
+      for (var u = 0; u < 400 && scroller.scrollTop > 0; u++) {
+        scrollTo(Math.max(0, scroller.scrollTop - stepUp));
+        await wait(250);
+        collect();
+      }
+      scrollTo(0);
+      arrivals++;
+
+      // Wait for an older page to arrive: scrollHeight growth OR a new
+      // first entry (the virtualizer may keep its height estimate flat
+      // while swapping content).
+      var h0 = scroller.scrollHeight;
+      var first0 = firstEntryId();
+      var grew = false;
+      for (var t = 0; t < 10; t++) {
+        await wait(250);
+        collect();
+        if (scroller.scrollHeight !== h0 || firstEntryId() !== first0) { grew = true; break; }
+      }
+      if (grew) {
+        // Let the rest of the page finish rendering before moving on.
+        await wait(400);
+        collect();
+        quietTops = 0;
+      } else {
+        quietTops++;
+      }
+      console.debug('[LISA CC] top #' + arrivals + ': grew=' + grew +
+                    ' height ' + h0 + '→' + scroller.scrollHeight +
+                    ' first ' + first0 + '→' + firstEntryId());
+      if (quietTops >= 2) break;
+
+      // Re-arm the load-more trigger: leave the top zone, then the climb
+      // at the top of the loop brings us back into it.
+      var maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      scrollTo(Math.min(scroller.clientHeight * 1.5, maxTop));
+      await wait(300);
+      collect();
+    }
+
+    // ── Down-phase: stepped sweep back to the bottom ──
+    // Runs after all history has loaded, so every entry is seen again
+    // here with its final index (callers refresh entryIdx on re-sighting).
+    var step = scroller.clientHeight * 0.6;
+    var lastScrollTop = -1;
+    for (var i = 0; i < 400; i++) {
+      scrollTo(scroller.scrollTop + step);
+      await wait(250);
+      collect();
+      if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
+      lastScrollTop = scroller.scrollTop;
+    }
+  } finally {
+    scroller.style.overflowAnchor = originalAnchor;
+  }
+}
+window.__lisaClaudeCodeSweep = lisaClaudeCodeSweep;
+
 class ClaudeCodeParser {
   constructor() {
     this.platform = 'Claude Code';
@@ -47,28 +171,6 @@ class ClaudeCodeParser {
     return text.trim();
   }
 
-  findScroller() {
-    // 'div, main' — matches every other platform's scroller detection in
-    // this codebase; 'div' alone would return null (no scroll sweep at
-    // all) if the real conversation container happens to be a <main>.
-    var candidates = [...document.querySelectorAll('div, main')].filter(function(el) {
-      var s = getComputedStyle(el);
-      return (s.overflowY === 'auto' || s.overflowY === 'scroll')
-             && el.scrollHeight > el.clientHeight + 200;
-    });
-    // A complex /code/ page can have other large scrollable regions (a
-    // file/diff viewer, a session sidebar) with a bigger scrollHeight than
-    // the actual conversation list, especially since the list's own
-    // virtualizer may report a modest scrollHeight. Prefer whichever
-    // candidate actually contains conversation entries over "biggest
-    // scrollable element on the page."
-    var withEntries = candidates.filter(function(el) {
-      return el.querySelector('[data-epitaxy-entry]') !== null;
-    });
-    var pool = withEntries.length > 0 ? withEntries : candidates;
-    return pool.sort(function(a, b) { return b.scrollHeight - a.scrollHeight; })[0] || null;
-  }
-
   collectVisibleItems(items) {
     var converter = window.__lisaHtmlToMarkdown;
     var allEls = document.querySelectorAll('[data-epitaxy-entry]');
@@ -80,7 +182,13 @@ class ClaudeCodeParser {
       if (!entryId) continue;
       // Key: entryId + itemIdx (or entryId alone for single-item entries)
       var key = entryId + '|' + (itemIdx || '0');
-      if (items.has(key)) continue;
+      if (items.has(key)) {
+        // Refresh position only — indices can shift when Claude Code
+        // prepends older history, and the final down-sweep (run after all
+        // history has loaded) sees every entry again with its final index.
+        items.get(key).entryIdx = entryIdx;
+        continue;
+      }
 
       var isAssistant = entryId.startsWith('msg_');
       var role = isAssistant ? 'assistant' : 'user';
@@ -118,79 +226,9 @@ class ClaudeCodeParser {
 
   async extractConversation() {
     this.conversationId = this.extractConversationId();
-    // Poll for the scroller — matches every other platform's extractor in
-    // lisa-v-parser.js. A one-shot lookup can miss it if called slightly
-    // before the page's virtualized list has finished hydrating.
-    var scroller = null;
-    for (var attempt = 0; attempt < 10; attempt++) {
-      scroller = this.findScroller();
-      if (scroller) break;
-      await new Promise(function(r) { setTimeout(r, 500); });
-    }
     var items = new Map();
-
-    if (scroller) {
-      // Scroll anchoring (the browser default) can adjust scrollTop on its
-      // own while the virtualizer mounts/resizes items above the viewport,
-      // fighting the manual decrement below and making the up-sweep think
-      // it reached the top before it actually did. Restored after.
-      var originalAnchor = scroller.style.overflowAnchor;
-      scroller.style.overflowAnchor = 'none';
-
-      // Scroll-UP sweep, in small steps with real 'scroll' events and
-      // waits — same pattern already used for Poe/HuggingChat/Grok's
-      // virtualized lists. A single instant `scrollTop = 0` jump (the old
-      // behavior here) lands past whatever the epitaxy virtualizer has
-      // actually mounted for a long conversation, so it never backfills the
-      // earliest entries and they're silently dropped unless the user had
-      // already scrolled to the top by hand before exporting.
-      this.collectVisibleItems(items);
-      var stepUp = scroller.clientHeight * 0.6;
-      for (var u = 0; u < 200 && scroller.scrollTop > 0; u++) {
-        scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
-        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(function(r) { setTimeout(r, 250); });
-        this.collectVisibleItems(items);
-      }
-      scroller.scrollTop = 0;
-      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-
-      // Claude Code's own app can lazily load older history into its
-      // client-side state once scrollTop actually hits 0 — on a long
-      // conversation that load can take several seconds, on a short one
-      // it's near-instant. Poll scrollHeight and keep collecting as it
-      // grows, only moving on once it's held steady for a bit; capped so a
-      // conversation with nothing left to load doesn't hang. This replaces
-      // a single fixed wait that was too short for long conversations
-      // (observed live: 37 of 90 messages caught with an 800ms wait).
-      var settleHeight = -1;
-      var settleStable = 0;
-      for (var s = 0; s < 24 && settleStable < 4; s++) {
-        await new Promise(function(r) { setTimeout(r, 500); });
-        this.collectVisibleItems(items);
-        if (scroller.scrollHeight === settleHeight) {
-          settleStable++;
-        } else {
-          settleStable = 0;
-        }
-        settleHeight = scroller.scrollHeight;
-      }
-
-      // Scroll-DOWN sweep back to the bottom, same stepped pattern.
-      var step = scroller.clientHeight * 0.6;
-      var lastScrollTop = -1;
-      for (var i = 0; i < 200; i++) {
-        scroller.scrollTop += step;
-        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(function(r) { setTimeout(r, 250); });
-        this.collectVisibleItems(items);
-        if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
-        lastScrollTop = scroller.scrollTop;
-      }
-      scroller.style.overflowAnchor = originalAnchor;
-    } else {
-      this.collectVisibleItems(items);
-    }
+    var self = this;
+    await lisaClaudeCodeSweep(function() { self.collectVisibleItems(items); });
 
     // Group items by entryId, sort items within each entry
     var entryGroups = new Map();

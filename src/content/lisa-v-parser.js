@@ -622,18 +622,12 @@ class LisaVParser {
       // actually mounted for a long conversation, so it never backfills the
       // earliest entries and they're silently dropped unless the user had
       // already scrolled to the top by hand before exporting.
-      // Smaller steps with a longer dwell at each one than other platforms
-      // in this file use — Claude Code's own lazy-load trigger (and the
-      // epitaxy virtualizer's own item mount/unmount) needs more than a
-      // quick pass-through to register (observed live: 38 of 98 messages
-      // caught at the old 0.6-viewport/250ms pace, full 98 once the app had
-      // already warmed up on a second attempt).
       collectVisible();
-      const stepUp = scroller.clientHeight * 0.4;
-      for (let u = 0; u < 300 && scroller.scrollTop > 0; u++) {
+      const stepUp = scroller.clientHeight * 0.6;
+      for (let u = 0; u < 200 && scroller.scrollTop > 0; u++) {
         scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
         scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 250));
         collectVisible();
       }
       scroller.scrollTop = 0;
@@ -660,14 +654,13 @@ class LisaVParser {
         settleHeight = scroller.scrollHeight;
       }
 
-      // Scroll-DOWN sweep back to the bottom, same slowed-down stepped
-      // pattern as the up-sweep above.
-      const step = scroller.clientHeight * 0.4;
+      // Scroll-DOWN sweep back to the bottom, same stepped pattern.
+      const step = scroller.clientHeight * 0.6;
       let lastScrollTop = -1;
-      for (let i = 0; i < 300; i++) {
+      for (let i = 0; i < 200; i++) {
         scroller.scrollTop += step;
         scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 250));
         collectVisible();
         if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
         lastScrollTop = scroller.scrollTop;

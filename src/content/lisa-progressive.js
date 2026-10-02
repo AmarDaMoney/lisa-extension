@@ -410,19 +410,6 @@ class LisaProgressiveCapture {
     const files = msg.files || [{ filename: msg.filename, content: msg.content }];
     const mimeType = msg.mimeType || 'text/markdown';
 
-    // Build File objects up front — every strategy below needs them. This
-    // used to be declared much further down with `const fileObjects = ...`,
-    // while the ChatGPT block below referenced `fileObjects` earlier in the
-    // same function body. That's a temporal-dead-zone ReferenceError on
-    // every single call — the try/catch silently swallowed it and fell
-    // through to the clipboard-copy fallback, which is the real reason
-    // ChatGPT auto-inject "always failed" (not React ignoring the
-    // assignment, not a quota limit — those were never actually reached).
-    const fileObjects = files.map(f => {
-      const blob = new Blob([f.content], { type: mimeType });
-      return new File([blob], f.filename, { type: mimeType, lastModified: Date.now() });
-    });
-
     // ChatGPT keeps a real input[type="file"] sitting in the composer's
     // DOM at all times (CSS-hidden inside a wrapping .hidden div) —
     // confirmed via live inspection. It is NOT created on-demand the way
@@ -434,33 +421,6 @@ class LisaProgressiveCapture {
     // click-a-menu dance a previous version tried here.
     const isChatGPTHost = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
     if (isChatGPTHost && msg._autoInject) {
-      // The new ChatGPT tab is opened with `active: true` (service worker's
-      // acmHandoffToNewTab), so it already has focus by the time any of
-      // this runs — the SOURCE tab's own "Handoff copied" toast (shown
-      // later by _executeHandoff in lisa-floating-button.js) renders into a
-      // tab that's now in the background and invisible to the user. That's
-      // the actual reason the Ctrl+V prompt kept going unnoticed no matter
-      // which strategy fired. Show it here instead, directly in the tab the
-      // user is actually looking at.
-      const showPasteToast = () => {
-        const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
-        if (editor) editor.focus();
-        const toast = document.createElement('div');
-        toast.id = 'lisa-paste-prompt';
-        Object.assign(toast.style, {
-          position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
-          zIndex: '100001', background: 'rgba(15,15,20,0.95)', color: '#fbbf24',
-          padding: '14px 24px', borderRadius: '10px',
-          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
-          fontSize: '14px', fontWeight: '500',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-          border: '1px solid rgba(251,191,36,0.3)'
-        });
-        toast.textContent = '\u{1F4CB} Handoff copied — press Ctrl+V (Cmd+V) to paste';
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 8000);
-      };
-
       try {
         const fileInput = document.querySelector('input[type="file"]');
         if (fileInput) {
@@ -469,45 +429,16 @@ class LisaProgressiveCapture {
           fileInput.files = dt.files;
           fileInput.dispatchEvent(new Event('change', { bubbles: true }));
           fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-          console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. React ignoring a non-gesture assignment, or a free-tier upload quota limit, can both silently stop this from visibly working even though the assignment itself raised no error.');
-          showPasteToast();
+          console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. A free-tier upload quota limit, or React ignoring a non-gesture assignment, can both silently stop this from visibly working even though the assignment itself raised no error.');
           return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
         }
         console.warn('[LISA] ChatGPT: no input[type="file"] found in DOM at all — unusual page state.', { url: window.location.href });
       } catch (e) {
-        console.warn('[LISA] ChatGPT direct file-input assignment failed:', e);
+        console.warn('[LISA] ChatGPT direct file-input assignment failed, falling back to clipboard:', e);
       }
+    }
 
-      // Confirmed by hand: a real OS-level file copy + a real Ctrl+V paste
-      // into ChatGPT's composer attaches it as a file, not pasted text. A
-      // paste handler reading clipboardData.files is a much more common,
-      // much less defensively-guarded pattern than a drop handler (drop
-      // events are already known to be dropped here — see noSyntheticDrop
-      // below) — isTrusted checks are mainly there to stop fake drag
-      // sources, not fake paste sources, since legitimate paste can come
-      // from OS accessibility tools and browser extensions already. Try a
-      // synthetic ClipboardEvent carrying the file before giving up and
-      // asking the user to paste manually.
-      try {
-        const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
-        if (editor) {
-          editor.focus();
-          const dt = new DataTransfer();
-          fileObjects.forEach(f => dt.items.add(f));
-          const pasteEvent = new ClipboardEvent('paste', {
-            bubbles: true,
-            cancelable: true,
-            clipboardData: dt
-          });
-          editor.dispatchEvent(pasteEvent);
-          console.log('[LISA] ChatGPT: dispatched synthetic paste event with file — verify it actually attached in the UI.');
-          showPasteToast();
-          return { success: true, method: 'chatgpt-pasteSimulation', count: fileObjects.length };
-        }
-      } catch (e) {
-        console.warn('[LISA] ChatGPT paste-simulation failed, falling back to clipboard:', e);
-      }
-
+    if (isChatGPTHost && msg._autoInject) {
       const textContent = msg.content || (files[0] && files[0].content) || '';
       if (textContent) {
         try {
@@ -527,7 +458,22 @@ class LisaProgressiveCapture {
             ta.remove();
           }
           if (!copied) throw new Error('Clipboard write failed');
-          showPasteToast();
+          const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
+          if (editor) editor.focus();
+          const toast = document.createElement('div');
+          toast.id = 'lisa-paste-prompt';
+          Object.assign(toast.style, {
+            position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: '100001', background: 'rgba(15,15,20,0.95)', color: '#fbbf24',
+            padding: '14px 24px', borderRadius: '10px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: '14px', fontWeight: '500',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            border: '1px solid rgba(251,191,36,0.3)'
+          });
+          toast.textContent = '\u{1F4CB} Handoff copied — press Ctrl+V (Cmd+V) to paste';
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 8000);
           return { success: true, method: 'clipboard', count: 1 };
         } catch (e) {
           console.warn('[LISA] ChatGPT clipboard fallback failed:', e);
@@ -535,8 +481,15 @@ class LisaProgressiveCapture {
       }
     }
 
+    // Create File objects
+    const fileObjects = files.map(f => {
+      const blob = new Blob([f.content], { type: mimeType });
+      return new File([blob], f.filename, { type: mimeType, lastModified: Date.now() });
+    });
+
     // Strategy 1: Find the platform's file input and set files
-    const isChatGPT = isChatGPTHost;
+    // ChatGPT creates input[type=file] on-demand — click the attach button first
+    const isChatGPT = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
     let fileInput = document.querySelector('input[type="file"]');
 
     if (fileInput && !(isChatGPT && msg._autoInject)) {

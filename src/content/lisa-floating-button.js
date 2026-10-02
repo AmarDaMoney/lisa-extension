@@ -936,12 +936,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
       if (injectResult && injectResult.success) {
         await this.incrementFloatingLimit('handoff');
-        // All three ChatGPT methods (fileInput, pasteSimulation, clipboard)
-        // land the same way from the user's side — they end up pressing
-        // Ctrl+V — so they all get the same toast as the plain clipboard
-        // case on other platforms, instead of a method-specific message.
-        const isChatGPTMethod = injectResult.method === 'clipboard' || injectResult.method === 'chatgpt-fileInput' || injectResult.method === 'chatgpt-pasteSimulation';
-        const methodLabel = isChatGPTMethod ? 'copied — paste it (Ctrl+V)' : 'injected';
+        const methodLabel = injectResult.method === 'clipboard' ? 'copied — paste it (Ctrl+V)' : 'injected';
         this.showToast(`Handoff ${methodLabel} into the new tab.`);
       } else {
         this.showToast("Could not auto-transfer — " + (injectResult?.error || "open the new tab and paste manually") , true);

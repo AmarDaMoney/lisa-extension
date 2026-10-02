@@ -936,7 +936,19 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
       if (injectResult && injectResult.success) {
         await this.incrementFloatingLimit('handoff');
-        const methodLabel = injectResult.method === 'clipboard' ? 'copied — paste it (Ctrl+V)' : 'injected';
+        // chatgpt-fileInput and chatgpt-pasteSimulation are both synthetic,
+        // no-gesture attempts that ChatGPT's React app can silently ignore
+        // without raising an error — unlike 'clipboard' (a real toast
+        // already tells the user to paste) or the confirmed-working
+        // fileInput/dragDrop methods on Gemini/Grok, these two can't be
+        // verified as actually having attached in the UI. Say so plainly
+        // instead of claiming a confident "injected" — the handoff text is
+        // also on the real clipboard now as a backup (see injectFiles), so
+        // Ctrl+V is a real, working fallback if nothing shows up.
+        const unverified = injectResult.method === 'chatgpt-fileInput' || injectResult.method === 'chatgpt-pasteSimulation';
+        const methodLabel = injectResult.method === 'clipboard' ? 'copied — paste it (Ctrl+V)'
+          : unverified ? 'sent — check the tab; if it didn\'t attach, press Ctrl+V to paste it'
+          : 'injected';
         this.showToast(`Handoff ${methodLabel} into the new tab.`);
       } else {
         this.showToast("Could not auto-transfer — " + (injectResult?.error || "open the new tab and paste manually") , true);

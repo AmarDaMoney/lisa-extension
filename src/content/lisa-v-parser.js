@@ -624,17 +624,20 @@ class LisaVParser {
       // already scrolled to the top by hand before exporting.
       //
       // Claude Code's own app can lazily load older history into its
-      // client-side state as you approach the top — that load can take
-      // longer than one scroll-to-top pass, and whatever it loads then
-      // prepends above the current position (growing scrollHeight), which
-      // needs another pass to actually reach. Repeat the whole sweep until
-      // both scrollHeight and the collected item count stop changing for
-      // two rounds in a row, instead of assuming one pass is enough.
+      // client-side state as you approach the top, and that load can
+      // straddle more than the moment scrollTop first hits 0 — a height
+      // that looks settled after a short quiet window can still resume
+      // growing moments later (observed live: one run caught only 37 of 90
+      // messages checking scrollHeight alone, then the full 90 on an
+      // immediate retry). So don't trust a single up-sweep's settle check:
+      // run full up+down rounds and only stop once the collected item
+      // count itself stops changing for two rounds in a row — any history
+      // that finishes loading during or after one round's down-sweep gets
+      // picked up when the next round climbs back to the top again.
       collectVisible();
-      let lastScrollHeight = -1;
       let lastItemCount = -1;
       let stableRounds = 0;
-      for (let round = 0; round < 10 && stableRounds < 2; round++) {
+      for (let round = 0; round < 6 && stableRounds < 2; round++) {
         const stepUp = scroller.clientHeight * 0.6;
         for (let u = 0; u < 200 && scroller.scrollTop > 0; u++) {
           scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
@@ -645,12 +648,11 @@ class LisaVParser {
         scroller.scrollTop = 0;
         scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
         // A fixed wait here guesses how long Claude Code's own lazy
-        // history load takes — too short for a big conversation (observed:
-        // 57 of 86 messages on one attempt, full 86 on an immediate retry
-        // once the app had already warmed its own state) and wastes time
-        // on a small one. Poll scrollHeight instead and only move on once
-        // it's stopped growing for a few checks in a row, capped so a
-        // conversation with nothing left to load doesn't stall.
+        // history load takes. Poll scrollHeight instead and only move on
+        // once it's stopped growing for a few checks in a row, capped so a
+        // conversation with nothing left to load doesn't stall. This is
+        // just the first-pass filter per round — the outer item-count
+        // check above is what actually catches a load that resumes later.
         let settleHeight = -1;
         let settleStable = 0;
         for (let s = 0; s < 15 && settleStable < 3; s++) {
@@ -664,24 +666,23 @@ class LisaVParser {
         }
         collectVisible();
 
-        if (scroller.scrollHeight === lastScrollHeight && items.size === lastItemCount) {
+        const stepDown = scroller.clientHeight * 0.6;
+        let lastScrollTop = -1;
+        for (let d = 0; d < 200; d++) {
+          scroller.scrollTop += stepDown;
+          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+          await new Promise(r => setTimeout(r, 250));
+          collectVisible();
+          if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
+          lastScrollTop = scroller.scrollTop;
+        }
+
+        if (items.size === lastItemCount) {
           stableRounds++;
         } else {
           stableRounds = 0;
         }
-        lastScrollHeight = scroller.scrollHeight;
         lastItemCount = items.size;
-      }
-
-      const step = scroller.clientHeight * 0.6;
-      let lastScrollTop = -1;
-      for (let i = 0; i < 200; i++) {
-        scroller.scrollTop += step;
-        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(r => setTimeout(r, 250));
-        collectVisible();
-        if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
-        lastScrollTop = scroller.scrollTop;
       }
       scroller.style.overflowAnchor = originalAnchor;
     } else {

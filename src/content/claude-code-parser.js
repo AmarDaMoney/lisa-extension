@@ -48,11 +48,25 @@ class ClaudeCodeParser {
   }
 
   findScroller() {
-    return [...document.querySelectorAll('div')].filter(function(el) {
+    // 'div, main' — matches every other platform's scroller detection in
+    // this codebase; 'div' alone would return null (no scroll sweep at
+    // all) if the real conversation container happens to be a <main>.
+    var candidates = [...document.querySelectorAll('div, main')].filter(function(el) {
       var s = getComputedStyle(el);
       return (s.overflowY === 'auto' || s.overflowY === 'scroll')
              && el.scrollHeight > el.clientHeight + 200;
-    }).sort(function(a, b) { return b.scrollHeight - a.scrollHeight; })[0] || null;
+    });
+    // A complex /code/ page can have other large scrollable regions (a
+    // file/diff viewer, a session sidebar) with a bigger scrollHeight than
+    // the actual conversation list, especially since the list's own
+    // virtualizer may report a modest scrollHeight. Prefer whichever
+    // candidate actually contains conversation entries over "biggest
+    // scrollable element on the page."
+    var withEntries = candidates.filter(function(el) {
+      return el.querySelector('[data-epitaxy-entry]') !== null;
+    });
+    var pool = withEntries.length > 0 ? withEntries : candidates;
+    return pool.sort(function(a, b) { return b.scrollHeight - a.scrollHeight; })[0] || null;
   }
 
   collectVisibleItems(items) {
@@ -104,10 +118,25 @@ class ClaudeCodeParser {
 
   async extractConversation() {
     this.conversationId = this.extractConversationId();
-    var scroller = this.findScroller();
+    // Poll for the scroller — matches every other platform's extractor in
+    // lisa-v-parser.js. A one-shot lookup can miss it if called slightly
+    // before the page's virtualized list has finished hydrating.
+    var scroller = null;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      scroller = this.findScroller();
+      if (scroller) break;
+      await new Promise(function(r) { setTimeout(r, 500); });
+    }
     var items = new Map();
 
     if (scroller) {
+      // Scroll anchoring (the browser default) can adjust scrollTop on its
+      // own while the virtualizer mounts/resizes items above the viewport,
+      // fighting the manual decrement below and making the up-sweep think
+      // it reached the top before it actually did. Restored after.
+      var originalAnchor = scroller.style.overflowAnchor;
+      scroller.style.overflowAnchor = 'none';
+
       // Scroll-UP sweep first, in small steps with real 'scroll' events and
       // waits — same pattern already used for Poe/HuggingChat/Grok's
       // virtualized lists. A single instant `scrollTop = 0` jump (the old
@@ -138,6 +167,7 @@ class ClaudeCodeParser {
         if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
         lastScrollTop = scroller.scrollTop;
       }
+      scroller.style.overflowAnchor = originalAnchor;
     } else {
       this.collectVisibleItems(items);
     }

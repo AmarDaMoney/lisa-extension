@@ -556,13 +556,34 @@ class LisaVParser {
   // Claude Code-specific extraction
   async extractClaudeCodeMessages() {
     const items = new Map();
-    const scrollable = [...document.querySelectorAll('div')].filter(el => {
-      const s = getComputedStyle(el);
-      return (s.overflowY === 'auto' || s.overflowY === 'scroll')
-             && el.scrollHeight > el.clientHeight + 200;
-    }).sort((a, b) => b.scrollHeight - a.scrollHeight);
-    const scroller = scrollable[0];
-    const self = this;
+
+    // 'div, main' — matches every other platform's scroller detection in
+    // this file; 'div' alone would return null (no scroll sweep at all) if
+    // the real conversation container happens to be a <main>. Prefer a
+    // candidate that actually contains conversation entries over "biggest
+    // scrollable element on the page" — a complex /code/ page can have
+    // other large scrollable regions (file/diff viewer, session sidebar)
+    // with a bigger scrollHeight than the conversation list itself.
+    function findScroller() {
+      const candidates = [...document.querySelectorAll('div, main')].filter(el => {
+        const s = getComputedStyle(el);
+        return (s.overflowY === 'auto' || s.overflowY === 'scroll')
+               && el.scrollHeight > el.clientHeight + 200;
+      });
+      const withEntries = candidates.filter(el => el.querySelector('[data-epitaxy-entry]') !== null);
+      const pool = withEntries.length > 0 ? withEntries : candidates;
+      return pool.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || null;
+    }
+
+    // Poll for the scroller — matches every other platform's extractor in
+    // this file. A one-shot lookup can miss it if called slightly before
+    // the page's virtualized list has finished hydrating.
+    let scroller = null;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      scroller = findScroller();
+      if (scroller) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
 
     function collectVisible() {
       const allEls = document.querySelectorAll('[data-epitaxy-entry]');
@@ -587,6 +608,13 @@ class LisaVParser {
     }
 
     if (scroller) {
+      // Scroll anchoring (the browser default) can adjust scrollTop on its
+      // own while the virtualizer mounts/resizes items above the viewport,
+      // fighting the manual decrement below and making the up-sweep think
+      // it reached the top before it actually did. Restored after.
+      const originalAnchor = scroller.style.overflowAnchor;
+      scroller.style.overflowAnchor = 'none';
+
       // Scroll-UP sweep first, in small steps with real 'scroll' events and
       // waits — same pattern already used for Poe/HuggingChat/Grok's
       // virtualized lists. A single instant `scrollTop = 0` jump (the old
@@ -616,6 +644,7 @@ class LisaVParser {
         if (Math.abs(scroller.scrollTop - lastScrollTop) < 2) break;
         lastScrollTop = scroller.scrollTop;
       }
+      scroller.style.overflowAnchor = originalAnchor;
     } else {
       collectVisible();
     }

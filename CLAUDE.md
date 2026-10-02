@@ -172,7 +172,7 @@ with the user's platform preferences (set in popup Settings, stored as
 attempts real file injection via the existing `injectFileAttachment`
 path in `lisa-progressive.js` (the same one the library's manual inject
 already used) — not just a clipboard copy. Confirmed working Claude→
-Gemini and Claude→Grok. **ChatGPT** (`_injectChatGPT` in
+Gemini, Claude→Grok and Claude→ChatGPT (file attach, see below). **ChatGPT** (`_injectChatGPT` in
 `lisa-progressive.js`): the old "falls back to clipboard" behaviour was
 mostly a bug — the ChatGPT block referenced `fileObjects` before its
 `const` declaration (TDZ ReferenceError swallowed by try/catch), so the
@@ -183,8 +183,9 @@ a one-shot capture-phase paste intercept that swaps the user's real
 Ctrl+V for a file paste when the page accepts one, else lets the text
 through. A web page/extension cannot put a real *file* on the OS
 clipboard (Chrome allows text/HTML/PNG only) — the intercept is the
-substitute. Which step worked is logged as `[LISA] ChatGPT: …`. Live
-verification pending.
+substitute. Which step worked is logged as `[LISA] ChatGPT: …`.
+Confirmed live (2026-10-02): step 1 (synthetic file paste) attaches the
+file automatically on real ChatGPT; steps 2–3 remain as fallbacks.
 
 ### Claude Code capture (claude.ai/code/*)
 API-first via `window.__LISA_CLAUDE_CODE_API_CAPTURE` in
@@ -207,8 +208,8 @@ the claude.ai/* entry) treats `/code/` as platform `claudecode`, an API
 platform fed by the same capture module, and Handoff uses it as a
 source. Conversation id is `claudecode-session_…` (lisa-progressive.js
 and shared/conversation-id.js) — stable across reloads, so checkpoints
-persist. Claude Code as a handoff *source* is untested live beyond the
-first rounds; treat its HANDOFF_COMPAT row as a best guess.
+persist. Claude Code confirmed live as a handoff source (→ Claude, →
+fresh Claude Code session; other targets reported working).
 
 **Known pre-existing dead ends** (not from ACM work, found during a code
 audit): `preCacheConversation` (sent from `lisa-floating-button.js` on

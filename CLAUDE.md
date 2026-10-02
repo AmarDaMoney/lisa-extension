@@ -95,7 +95,8 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 ## Ways of working
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
-- **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features.
+- **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.7 → stay on 0.52.8 until that ships).
+- **Keep `main` and `feature/acm` in sync:** after every push to `feature/acm`, fast-forward `main` to it (`git merge --ff-only`) and push `main`. Never force-push either.
 - **Commits:** Descriptive messages. Reference the platform name if the change is platform-specific.
 - **Testing:** Load unpacked in Chrome, test on the target AI platform. No automated test suite currently.
 

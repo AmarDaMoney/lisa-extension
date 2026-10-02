@@ -99,7 +99,7 @@ async function lisaClaudeCodeSweep(collect) {
       } else {
         quietTops++;
       }
-      console.debug('[LISA CC] top #' + arrivals + ': grew=' + grew +
+      console.log('[LISA CC] top #' + arrivals + ': grew=' + grew +
                     ' height ' + h0 + '→' + scroller.scrollHeight +
                     ' first ' + first0 + '→' + firstEntryId());
       if (quietTops >= 2) break;

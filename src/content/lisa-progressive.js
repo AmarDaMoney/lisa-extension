@@ -410,6 +410,19 @@ class LisaProgressiveCapture {
     const files = msg.files || [{ filename: msg.filename, content: msg.content }];
     const mimeType = msg.mimeType || 'text/markdown';
 
+    // Build File objects up front — every strategy below needs them. This
+    // used to be declared much further down with `const fileObjects = ...`,
+    // while the ChatGPT block below referenced `fileObjects` earlier in the
+    // same function body. That's a temporal-dead-zone ReferenceError on
+    // every single call — the try/catch silently swallowed it and fell
+    // through to the clipboard-copy fallback, which is the real reason
+    // ChatGPT auto-inject "always failed" (not React ignoring the
+    // assignment, not a quota limit — those were never actually reached).
+    const fileObjects = files.map(f => {
+      const blob = new Blob([f.content], { type: mimeType });
+      return new File([blob], f.filename, { type: mimeType, lastModified: Date.now() });
+    });
+
     // ChatGPT keeps a real input[type="file"] sitting in the composer's
     // DOM at all times (CSS-hidden inside a wrapping .hidden div) —
     // confirmed via live inspection. It is NOT created on-demand the way
@@ -429,12 +442,41 @@ class LisaProgressiveCapture {
           fileInput.files = dt.files;
           fileInput.dispatchEvent(new Event('change', { bubbles: true }));
           fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-          console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. A free-tier upload quota limit, or React ignoring a non-gesture assignment, can both silently stop this from visibly working even though the assignment itself raised no error.');
+          console.log('[LISA] ChatGPT: file assigned to composer input — verify it actually attached in the UI. React ignoring a non-gesture assignment, or a free-tier upload quota limit, can both silently stop this from visibly working even though the assignment itself raised no error.');
           return { success: true, method: 'chatgpt-fileInput', count: fileObjects.length };
         }
         console.warn('[LISA] ChatGPT: no input[type="file"] found in DOM at all — unusual page state.', { url: window.location.href });
       } catch (e) {
-        console.warn('[LISA] ChatGPT direct file-input assignment failed, falling back to clipboard:', e);
+        console.warn('[LISA] ChatGPT direct file-input assignment failed:', e);
+      }
+
+      // Confirmed by hand: a real OS-level file copy + a real Ctrl+V paste
+      // into ChatGPT's composer attaches it as a file, not pasted text. A
+      // paste handler reading clipboardData.files is a much more common,
+      // much less defensively-guarded pattern than a drop handler (drop
+      // events are already known to be dropped here — see noSyntheticDrop
+      // below) — isTrusted checks are mainly there to stop fake drag
+      // sources, not fake paste sources, since legitimate paste can come
+      // from OS accessibility tools and browser extensions already. Try a
+      // synthetic ClipboardEvent carrying the file before giving up and
+      // asking the user to paste manually.
+      try {
+        const editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
+        if (editor) {
+          editor.focus();
+          const dt = new DataTransfer();
+          fileObjects.forEach(f => dt.items.add(f));
+          const pasteEvent = new ClipboardEvent('paste', {
+            bubbles: true,
+            cancelable: true,
+            clipboardData: dt
+          });
+          editor.dispatchEvent(pasteEvent);
+          console.log('[LISA] ChatGPT: dispatched synthetic paste event with file — verify it actually attached in the UI.');
+          return { success: true, method: 'chatgpt-pasteSimulation', count: fileObjects.length };
+        }
+      } catch (e) {
+        console.warn('[LISA] ChatGPT paste-simulation failed, falling back to clipboard:', e);
       }
     }
 
@@ -481,15 +523,8 @@ class LisaProgressiveCapture {
       }
     }
 
-    // Create File objects
-    const fileObjects = files.map(f => {
-      const blob = new Blob([f.content], { type: mimeType });
-      return new File([blob], f.filename, { type: mimeType, lastModified: Date.now() });
-    });
-
     // Strategy 1: Find the platform's file input and set files
-    // ChatGPT creates input[type=file] on-demand — click the attach button first
-    const isChatGPT = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
+    const isChatGPT = isChatGPTHost;
     let fileInput = document.querySelector('input[type="file"]');
 
     if (fileInput && !(isChatGPT && msg._autoInject)) {

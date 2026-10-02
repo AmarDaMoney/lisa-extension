@@ -644,7 +644,24 @@ class LisaVParser {
         }
         scroller.scrollTop = 0;
         scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(r => setTimeout(r, 800));
+        // A fixed wait here guesses how long Claude Code's own lazy
+        // history load takes — too short for a big conversation (observed:
+        // 57 of 86 messages on one attempt, full 86 on an immediate retry
+        // once the app had already warmed its own state) and wastes time
+        // on a small one. Poll scrollHeight instead and only move on once
+        // it's stopped growing for a few checks in a row, capped so a
+        // conversation with nothing left to load doesn't stall.
+        let settleHeight = -1;
+        let settleStable = 0;
+        for (let s = 0; s < 15 && settleStable < 3; s++) {
+          await new Promise(r => setTimeout(r, 400));
+          if (scroller.scrollHeight === settleHeight) {
+            settleStable++;
+          } else {
+            settleStable = 0;
+          }
+          settleHeight = scroller.scrollHeight;
+        }
         collectVisible();
 
         if (scroller.scrollHeight === lastScrollHeight && items.size === lastItemCount) {

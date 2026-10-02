@@ -137,25 +137,46 @@ class ClaudeCodeParser {
       var originalAnchor = scroller.style.overflowAnchor;
       scroller.style.overflowAnchor = 'none';
 
-      // Scroll-UP sweep first, in small steps with real 'scroll' events and
+      // Scroll-UP sweep, in small steps with real 'scroll' events and
       // waits — same pattern already used for Poe/HuggingChat/Grok's
       // virtualized lists. A single instant `scrollTop = 0` jump (the old
       // behavior here) lands past whatever the epitaxy virtualizer has
       // actually mounted for a long conversation, so it never backfills the
       // earliest entries and they're silently dropped unless the user had
       // already scrolled to the top by hand before exporting.
+      //
+      // Claude Code's own app can lazily load older history into its
+      // client-side state as you approach the top — that load can take
+      // longer than one scroll-to-top pass, and whatever it loads then
+      // prepends above the current position (growing scrollHeight), which
+      // needs another pass to actually reach. Repeat the whole sweep until
+      // both scrollHeight and the collected item count stop changing for
+      // two rounds in a row, instead of assuming one pass is enough.
       this.collectVisibleItems(items);
-      var stepUp = scroller.clientHeight * 0.6;
-      for (var u = 0; u < 200 && scroller.scrollTop > 0; u++) {
-        scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
+      var lastScrollHeight = -1;
+      var lastItemCount = -1;
+      var stableRounds = 0;
+      for (var round = 0; round < 10 && stableRounds < 2; round++) {
+        var stepUp = scroller.clientHeight * 0.6;
+        for (var u = 0; u < 200 && scroller.scrollTop > 0; u++) {
+          scroller.scrollTop = Math.max(0, scroller.scrollTop - stepUp);
+          scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+          await new Promise(function(r) { setTimeout(r, 250); });
+          this.collectVisibleItems(items);
+        }
+        scroller.scrollTop = 0;
         scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-        await new Promise(function(r) { setTimeout(r, 250); });
+        await new Promise(function(r) { setTimeout(r, 800); });
         this.collectVisibleItems(items);
+
+        if (scroller.scrollHeight === lastScrollHeight && items.size === lastItemCount) {
+          stableRounds++;
+        } else {
+          stableRounds = 0;
+        }
+        lastScrollHeight = scroller.scrollHeight;
+        lastItemCount = items.size;
       }
-      scroller.scrollTop = 0;
-      scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
-      await new Promise(function(r) { setTimeout(r, 500); });
-      this.collectVisibleItems(items);
 
       var step = scroller.clientHeight * 0.6;
       var lastScrollTop = -1;

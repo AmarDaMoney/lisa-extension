@@ -181,6 +181,20 @@ being masked by hitting the free-tier upload quota — unresolved, revisit
 with a fresh-quota test and the `[LISA] ChatGPT:` console diagnostics
 already in place before trying another fix.
 
+### Claude Code capture (claude.ai/code/*)
+API-first via `window.__LISA_CLAUDE_CODE_API_CAPTURE` in
+`src/content/claude-code-parser.js`: pages through
+`/v1/code/sessions/<session_id>/events` (header `anthropic-version:
+2023-06-01`, 50 events/page, newest first, `?cursor=<next_cursor>`).
+Only `user` events with typed text and the text blocks of `assistant`
+events become messages (tool calls/results, progress, control and
+sub-agent events are skipped; one assistant message per turn). Falls
+back to the shared scroll sweep `window.__lisaClaudeCodeSweep` (same
+file), which re-arms Claude Code's load-more-at-top paging until two
+arrivals at the top bring nothing. Both `LisaVParser` (popup + FAB) and
+`ClaudeCodeParser` use these — don't re-duplicate them. Console lines
+`[LISA CC] …` show which path ran.
+
 **Known pre-existing dead ends** (not from ACM work, found during a code
 audit): `preCacheConversation` (sent from `lisa-floating-button.js` on
 tab-hide) and `refreshUserTier` (sent from `success.html` post-checkout)

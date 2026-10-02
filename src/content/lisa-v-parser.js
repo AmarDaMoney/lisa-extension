@@ -361,7 +361,20 @@ class LisaVParser {
     // Platform-specific message extraction
     let messages = [];
     
-    if (platform === 'Claude Code') {
+    if (platform === 'Claude Code' && window.__LISA_CLAUDE_CODE_API_CAPTURE) {
+      // ---- API-FIRST CAPTURE (complete, no scroll sweep) ----
+      const apiResult = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_CODE_API_CAPTURE, false);
+      if (apiResult) {
+        this.apiMessageCount = apiResult.messageCount;
+        console.log('[LISA] LISA-V using Claude Code API capture:', apiResult.messageCount, 'messages');
+        for (const msg of apiResult.messages) {
+          this.blocks.push(...(await this._apiMessageToBlocks(msg)));
+        }
+        return this.blocks;
+      }
+      console.warn('[LISA] Claude Code API capture failed after retry, falling back to scroll sweep');
+      messages = await this.extractClaudeCodeMessages();
+    } else if (platform === 'Claude Code') {
       messages = await this.extractClaudeCodeMessages();
     } else if (platform === 'Claude' && window.__LISA_CLAUDE_API_CAPTURE) {
       // ---- API-FIRST CAPTURE (instant, complete, no scroll sweep) ----

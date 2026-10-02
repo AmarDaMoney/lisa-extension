@@ -6,6 +6,146 @@
 if (typeof ClaudeCodeParser !== 'undefined') {
 } else {
 
+// ── API-first capture for Claude Code ──
+// The /code/ page loads its history from
+//   /v1/code/sessions/<session_id>/events   (anthropic-version header required)
+// 50 events per page, newest first, paged with ?cursor=<next_cursor>.
+// Confirmed live: ~5.6k events / 112 pages for a long session. Events
+// include tool calls, tool results, progress and control traffic; only
+// two kinds carry the conversation:
+//   - 'user' events whose message.content is typed text (string or text
+//     blocks) — tool results come back as 'user' events too, but as
+//     tool_result blocks, so they're skipped here
+//   - 'assistant' events — one per content block, so a single reply is
+//     spread over many events; every text block between two user messages
+//     is joined into one assistant message
+// Tool calls/results are left out on purpose, matching what the DOM
+// sweep keeps (it strips tool widgets), and keeping exports readable.
+// Sub-agent traffic (parent_tool_use_id set) is skipped for the same reason.
+var LISA_CC_API_VERSION = '2023-06-01';
+
+async function lisaClaudeCodeFetchAllEvents(sessionId) {
+  var base = '/v1/code/sessions/' + encodeURIComponent(sessionId) + '/events';
+  var events = [];
+  var cursor = null;
+  var pages = 0;
+  do {
+    var resp = await fetch(base + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''), {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Accept': 'application/json', 'anthropic-version': LISA_CC_API_VERSION }
+    });
+    if (!resp.ok) throw new Error('events ' + resp.status);
+    var json = await resp.json();
+    var data = Array.isArray(json.data) ? json.data : [];
+    for (var i = 0; i < data.length; i++) events.push(data[i]);
+    pages++;
+    // A cursor that doesn't advance would loop forever — stop instead.
+    if (json.next_cursor && json.next_cursor === cursor) break;
+    cursor = json.next_cursor || null;
+  } while (cursor && pages < 1000);
+  return { events: events, pages: pages };
+}
+
+function lisaClaudeCodeTextOf(message) {
+  var c = message && message.content;
+  if (typeof c === 'string') return c;
+  if (!Array.isArray(c)) return '';
+  var parts = [];
+  for (var i = 0; i < c.length; i++) {
+    var b = c[i];
+    if (b && b.type === 'text' && typeof b.text === 'string' && b.text.trim()) parts.push(b.text);
+  }
+  return parts.join('\n');
+}
+
+function lisaClaudeCodeEventsToMessages(events) {
+  // Oldest first. The API pages newest-first; reverse, then stable-sort
+  // by created_at in case page boundaries ever interleave.
+  var seen = new Set();
+  var ordered = [];
+  for (var i = events.length - 1; i >= 0; i--) {
+    var e = events[i];
+    if (!e) continue;
+    if (e.event_id) {
+      if (seen.has(e.event_id)) continue;
+      seen.add(e.event_id);
+    }
+    ordered.push({ e: e, k: ordered.length, t: Date.parse(e.created_at) || 0 });
+  }
+  ordered.sort(function(a, b) { return (a.t - b.t) || (a.k - b.k); });
+
+  var messages = [];
+  var turn = null; // current assistant reply being assembled
+  var flush = function() {
+    if (turn && turn.parts.length) {
+      messages.push({
+        role: 'assistant',
+        content: turn.parts.join('\n\n'),
+        index: messages.length,
+        timestamp: turn.timestamp,
+        messageId: turn.messageId,
+        model: turn.model || undefined
+      });
+    }
+    turn = null;
+  };
+
+  for (var j = 0; j < ordered.length; j++) {
+    var ev = ordered[j].e;
+    var payload = ev.payload || {};
+    if (payload.parent_tool_use_id) continue; // sub-agent traffic
+    var msg = payload.message || {};
+    if (ev.event_type === 'user') {
+      var userText = lisaClaudeCodeTextOf(msg).trim();
+      if (!userText) continue; // tool_result-only event
+      flush();
+      messages.push({
+        role: 'user',
+        content: userText,
+        index: messages.length,
+        timestamp: ev.created_at || '',
+        messageId: payload.uuid || ev.event_id || null
+      });
+    } else if (ev.event_type === 'assistant') {
+      var text = lisaClaudeCodeTextOf(msg).trim();
+      if (!turn) turn = { parts: [], timestamp: ev.created_at || '', messageId: msg.id || null, model: msg.model || null };
+      // Guard against the same block arriving twice in one reply.
+      if (text && turn.parts[turn.parts.length - 1] !== text) turn.parts.push(text);
+    }
+  }
+  flush();
+  return messages;
+}
+
+async function lisaClaudeCodeExtractViaAPI() {
+  var m = window.location.pathname.match(/\/code\/(session_[a-zA-Z0-9]+)/);
+  if (!m) return null;
+  var sessionId = m[1];
+  var fetched = await lisaClaudeCodeFetchAllEvents(sessionId);
+  var messages = lisaClaudeCodeEventsToMessages(fetched.events);
+  console.log('[LISA CC] API capture: ' + messages.length + ' messages from ' +
+              fetched.events.length + ' events / ' + fetched.pages + ' pages');
+  if (messages.length === 0) return null;
+  return {
+    platform: 'Claude Code',
+    conversationId: sessionId,
+    url: window.location.href,
+    title: null, // caller fills from the page title bar
+    extractedAt: new Date().toISOString(),
+    messageCount: messages.length,
+    messages: messages,
+    _captureMethod: 'api-code-events',
+    _totalEvents: fetched.events.length
+  };
+}
+// Same shape as __LISA_CLAUDE_API_CAPTURE so LisaVParser's existing
+// _captureViaApiWithRetry() can drive it.
+window.__LISA_CLAUDE_CODE_API_CAPTURE = {
+  extractViaAPI: lisaClaudeCodeExtractViaAPI,
+  extractSharedViaAPI: function() { return Promise.resolve(null); }
+};
+
 // ── Shared Claude Code scroll sweep ──
 // Used by ClaudeCodeParser.extractConversation() below and by
 // LisaVParser.extractClaudeCodeMessages() (lisa-v-parser.js), which is the
@@ -226,6 +366,22 @@ class ClaudeCodeParser {
 
   async extractConversation() {
     this.conversationId = this.extractConversationId();
+
+    // API first (complete, no scrolling); scroll sweep only as fallback.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        var apiResult = await lisaClaudeCodeExtractViaAPI();
+        if (apiResult) {
+          apiResult.title = this.extractTitle();
+          return apiResult;
+        }
+      } catch (err) {
+        console.warn('[LISA CC] API capture attempt ' + (attempt + 1) + ' failed:', err && err.message);
+      }
+      if (attempt === 0) await new Promise(function(r) { setTimeout(r, 500); });
+    }
+    console.warn('[LISA CC] API capture unavailable, falling back to scroll sweep');
+
     var items = new Map();
     var self = this;
     await lisaClaudeCodeSweep(function() { self.collectVisibleItems(items); });

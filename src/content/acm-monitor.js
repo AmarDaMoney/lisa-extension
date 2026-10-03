@@ -47,8 +47,7 @@ const ACMMonitor = {
   // pickable but are labelled in the picker.
   HANDOFF_RECEIVERS: {
     claude: 'ok', chatgpt: 'ok', gemini: 'ok', grok: 'ok', deepseek: 'ok',
-    huggingchat: 'ok', poe: 'ok', claudecode: 'ok', mistral: 'ok',
-    metaai: 'failing',
+    huggingchat: 'ok', poe: 'ok', claudecode: 'ok', mistral: 'ok', metaai: 'ok',
     copilot: 'untested', perplexity: 'untested',
   },
 

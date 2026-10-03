@@ -547,6 +547,27 @@ class LisaProgressiveCapture {
     }
     log(editor ? 'composer found (' + editor.tagName.toLowerCase() + ')' : 'no composer found');
 
+    // Second success signal: most sites show an attachment chip with the
+    // file name ("lisa-handoff-…"). Some accept a pasted/dropped file
+    // without calling preventDefault (seen on Meta AI), so without this
+    // check the next method ran too and the handoff arrived twice.
+    const countMarks = () => {
+      try { return (document.body.innerText.match(/lisa-hand/gi) || []).length; } catch (_) { return 0; }
+    };
+    const baseline = countMarks();
+    const appeared = async (ms = 2000) => {
+      for (let t = 0; t < ms; t += 200) {
+        if (countMarks() > baseline) return true;
+        await new Promise(r => setTimeout(r, 200));
+      }
+      return countMarks() > baseline;
+    };
+    const attached = (how, method) => {
+      log('file attached via ' + how);
+      this._showPageToast('\u{1F4CE} Handoff attached as a file');
+      return { success: true, method, count: fileObjects.length };
+    };
+
     // ── Stage 1: inject the file ──
     let inputMethod = null;
     if (FILE_INPUT_FIRST.test(host)) {
@@ -554,23 +575,20 @@ class LisaProgressiveCapture {
       if (inputMethod) log('file assigned via ' + inputMethod + ' (proven method on this platform)');
     }
     if (!inputMethod && editor) {
-      if (this._pasteFilesInto(editor, fileObjects)) {
-        log('file attached via paste (accepted by the page)');
-        this._showPageToast('\u{1F4CE} Handoff attached as a file');
-        return { success: true, method: 'pasteFile', count: fileObjects.length };
-      }
+      if (this._pasteFilesInto(editor, fileObjects)) return attached('paste (accepted by the page)', 'pasteFile');
+      if (await appeared()) return attached('paste (attachment appeared on the page)', 'pasteFile');
       log('page did not accept a file paste');
-      if (!NO_SYNTHETIC_DROP.test(host) && this._dropFilesOnto(editor, fileObjects)) {
-        log('file attached via drop (accepted by the page)');
-        this._showPageToast('\u{1F4CE} Handoff attached as a file');
-        return { success: true, method: 'dragDrop', count: fileObjects.length };
+      if (!NO_SYNTHETIC_DROP.test(host)) {
+        if (this._dropFilesOnto(editor, fileObjects)) return attached('drop (accepted by the page)', 'dragDrop');
+        if (await appeared()) return attached('drop (attachment appeared on the page)', 'dragDrop');
+        log('page did not accept a file drop');
       }
-      if (!NO_SYNTHETIC_DROP.test(host)) log('page did not accept a file drop');
     }
     if (!inputMethod && !FILE_INPUT_FIRST.test(host)) {
       inputMethod = await this._injectViaFileInput(fileObjects);
       if (inputMethod) log('file assigned via ' + inputMethod + ' (unverified)');
     }
+    if (inputMethod && await appeared(2500)) return attached(inputMethod + ' (attachment appeared on the page)', inputMethod);
 
     // ── Stages 2 + 3: Ctrl+V as a file, else as text ──
     const textContent = msg.content || (files[0] && files[0].content) || '';

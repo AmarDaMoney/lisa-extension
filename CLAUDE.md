@@ -169,8 +169,8 @@ page capture Markdown export uses. Destinations come from
 `ACMMonitor.HANDOFF_RECEIVERS` — a per-*target* status map (the payload is
 the same JSON whatever the source, so receiving is a property of the
 target alone): ok = claude, chatgpt, gemini, grok, deepseek, huggingchat,
-poe, claudecode, mistral (confirmed after the three-stage injection);
-failing = metaai (unconfirmed since the meta.ai URL fix); untested = copilot,
+poe, claudecode, mistral, metaai (confirmed after the three-stage
+injection + meta.ai URL fix); untested = copilot,
 perplexity (non-ok ones are labelled in the picker) — intersected
 with the user's platform preferences (set in popup Settings, stored as
 `acmPlatforms`). Picking a target opens a new tab next to the source tab
@@ -190,7 +190,11 @@ intercept turns the user's real Ctrl+V into a file paste; (3) the handoff
 text is on the clipboard, so a Ctrl+V the page won't take as a file
 pastes text. A page/extension can't put a real *file* on the OS
 clipboard (Chrome allows text/HTML/PNG only) — stage 2 is the substitute.
-Every step logs `[LISA] Handoff: …` in the new tab. History: ChatGPT's
+Besides `preventDefault`, a step also counts as accepted when an
+attachment chip with the file name ("lisa-handoff-…") appears on the page
+within ~2s — Meta AI accepts a pasted file without calling
+`preventDefault`, which made the next method run too (handoff arrived
+twice). Every step logs `[LISA] Handoff: …` in the new tab. History: ChatGPT's
 file path never ran before (TDZ bug, fixed); synthetic paste is confirmed
 live on ChatGPT. Meta AI handoffs opened www.meta.ai, where LISA's content
 scripts don't run (they match meta.ai) — NEW_CHAT_URLS now opens meta.ai.

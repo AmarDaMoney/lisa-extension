@@ -1858,7 +1858,8 @@ async function handleCopyAsLisa(info, tab) {
     // Detect source platform
     const sourceUrl = info.pageUrl || '';
     let sourcePlatform = 'unknown';
-    if (/claude\.ai/.test(sourceUrl)) sourcePlatform = 'Claude';
+    if (/claude\.ai\/code/.test(sourceUrl)) sourcePlatform = 'Claude Code';
+    else if (/claude\.ai/.test(sourceUrl)) sourcePlatform = 'Claude';
     else if (/chatgpt\.com|chat\.openai\.com/.test(sourceUrl)) sourcePlatform = 'ChatGPT';
     else if (/gemini\.google/.test(sourceUrl)) sourcePlatform = 'Gemini';
     else if (/mistral\.ai/.test(sourceUrl)) sourcePlatform = 'Mistral';
@@ -1866,6 +1867,10 @@ async function handleCopyAsLisa(info, tab) {
     else if (/copilot\.(microsoft\.)?com/.test(sourceUrl)) sourcePlatform = 'Copilot';
     else if (/perplexity\.ai/.test(sourceUrl)) sourcePlatform = 'Perplexity';
     else if (/x\.ai|grok\.com/.test(sourceUrl)) sourcePlatform = 'Grok';
+    else if (/huggingface\.co\/chat/.test(sourceUrl)) sourcePlatform = 'HuggingChat';
+    else if (/meta\.ai/.test(sourceUrl)) sourcePlatform = 'Meta AI';
+    else if (/poe\.com/.test(sourceUrl)) sourcePlatform = 'Poe';
+    else if (sourceUrl) { try { sourcePlatform = new URL(sourceUrl).hostname.replace(/^www\./, ''); } catch (e) {} }
 
     const version = chrome.runtime.getManifest().version;
     const timestamp = new Date().toISOString();
@@ -1879,29 +1884,35 @@ async function handleCopyAsLisa(info, tab) {
     md += '---\n';
     md += '*LISA v' + version + ' • ' + timestamp + '*\n';
 
-    // Copy to clipboard via offscreen or content script
-    await chrome.tabs.sendMessage(tab.id, {
-      action: 'copyToClipboard',
-      text: md
-    });
+    // Copy via LISA's content script (AI platforms); on any other page,
+    // inject a one-off copier — the menu click grants activeTab.
+    try {
+      await chrome.tabs.sendMessage(tab.id, { action: 'copyToClipboard', text: md });
+    } catch (e) {
+      const [res] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, frameIds: info.frameId ? [info.frameId] : [0] },
+        func: (text) => {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand('copy');
+          ta.remove();
+          if (ok) return true;
+          return navigator.clipboard.writeText(text).then(() => true, () => false);
+        },
+        args: [md]
+      });
+      if (!res || !res.result) throw new Error('clipboard write refused');
+    }
 
     showNotification('LISA', '✅ Copied! ' + selectedText.length + ' chars from ' + sourcePlatform + ' — paste into any AI chat.');
 
   } catch (error) {
-    // Fallback: try writing to clipboard via offscreen document
-    try {
-      const selectedText = info.selectionText || '';
-      await chrome.offscreen.createDocument({
-        url: 'offscreen.html',
-        reasons: ['CLIPBOARD'],
-        justification: 'Copy LISA context to clipboard'
-      });
-      await chrome.runtime.sendMessage({ action: 'clipboard-write', text: selectedText });
-      showNotification('LISA', '✅ Selection copied! Paste into any AI chat.');
-    } catch (e2) {
-      console.error('[LISA] Copy failed:', e2);
-      showNotification('LISA', '❌ Copy failed — try selecting text and using Ctrl+C');
-    }
+    console.error('[LISA] Copy failed:', error);
+    showNotification('LISA', '❌ Copy failed — try selecting text and using Ctrl+C');
   }
 }
 

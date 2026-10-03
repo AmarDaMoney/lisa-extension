@@ -169,7 +169,8 @@ page capture Markdown export uses. Destinations come from
 `ACMMonitor.HANDOFF_RECEIVERS` — a per-*target* status map (the payload is
 the same JSON whatever the source, so receiving is a property of the
 target alone): ok = claude, chatgpt, gemini, grok, deepseek, huggingchat,
-poe, claudecode; failing = mistral, metaai; untested = copilot,
+poe, claudecode, mistral (confirmed after the three-stage injection);
+failing = metaai (unconfirmed since the meta.ai URL fix); untested = copilot,
 perplexity (non-ok ones are labelled in the picker) — intersected
 with the user's platform preferences (set in popup Settings, stored as
 `acmPlatforms`). Picking a target opens a new tab next to the source tab

@@ -2014,7 +2014,7 @@ class LISAPopup {
 
         this.showLicenseStatus('valid', '✅', t.isPayg
           ? (t.userTier === 'premium'
-              ? 'PAYG license valid — Premium while credits last, 1 credit per action'
+              ? 'PAYG license valid — Premium while credits last: 1 credit per extension action (Compress, Markdown, LISA-V, Handoff), 5 per AI Compress'
               : 'PAYG license valid — no credits left (Free tier until you top up)')
           : `License valid! Tier: ${data.tier || 'Pro'}`);
         this.trackEvent('license_validated', { tier: data.tier });

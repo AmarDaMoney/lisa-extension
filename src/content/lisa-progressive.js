@@ -426,105 +426,16 @@ class LisaProgressiveCapture {
       return new File([blob], f.filename, { type: mimeType, lastModified: Date.now() });
     });
 
-    if (/chatgpt\.com|chat\.openai\.com/.test(window.location.hostname) && msg._autoInject) {
-      return this._injectChatGPT(msg, files, fileObjects);
+    // Automatic handoff (new tab, no user gesture): the three-stage chain
+    // in _autoInjectHandoff(). The manual library inject below keeps its
+    // original behaviour.
+    if (msg._autoInject) {
+      return this._autoInjectHandoff(msg, files, fileObjects);
     }
 
-    // Strategy 1: Find the platform's file input and set files
-    // ChatGPT creates input[type=file] on-demand — click the attach button first
-    const isChatGPT = /chatgpt\.com|chat\.openai\.com/.test(window.location.hostname);
-    let fileInput = document.querySelector('input[type="file"]');
-
-    if (fileInput && !(isChatGPT && msg._autoInject)) {
-      // fileInput.files assignment works on most platforms but NOT ChatGPT
-      // (React ignores synthetic .files changes — silently fails)
-      const dt = new DataTransfer();
-      fileObjects.forEach(f => dt.items.add(f));
-      fileInput.files = dt.files;
-      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-      fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-      return { success: true, method: 'fileInput', count: fileObjects.length };
-    }
-
-    // Strategy 1.5: Gemini file-input materialization
-    // Gemini hides input[type=file] until the upload button is clicked,
-    // possibly inside shadow DOM. We (a) deep-search shadow roots,
-    // (b) click the upload button while intercepting the native dialog,
-    // then use the standard DataTransfer injection from Strategy 1.
-    const isGemini = /gemini\.google/.test(window.location.hostname);
-    let interceptedInput = null;
-    if (isGemini && !fileInput) {
-      // (a) Deep search including shadow DOM
-      const deepFind = (root) => {
-        const inp = root.querySelector('input[type="file"]');
-        if (inp) return inp;
-        for (const el of root.querySelectorAll('*')) {
-          if (el.shadowRoot) {
-            const found = deepFind(el.shadowRoot);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-      fileInput = deepFind(document);
-
-      // (b) Two-step menu: click "+" button → click attach_file in menu
-      // Selectors are icon-based (language-independent) since Gemini
-      // localizes aria-labels (e.g. "Importation et outils" in French).
-      if (!fileInput) {
-        // Step 1: Click the "+" tools button (mat-icon "plus")
-        const plusIcon = document.querySelector('mat-icon[data-mat-icon-name="plus"]');
-        const plusBtn = plusIcon && plusIcon.closest('button');
-        if (plusBtn) {
-          plusBtn.click();
-          await new Promise(r => setTimeout(r, 400));
-
-          // Step 2: Click the attach/file option in the opened menu
-          // Look for mat-icon "attach_file" or "upload_file" in the menu
-          const attachIcon = document.querySelector(
-            'mat-icon[data-mat-icon-name="attach_file"], ' +
-            'mat-icon[data-mat-icon-name="upload_file"], ' +
-            'mat-icon[data-mat-icon-name="upload"]'
-          );
-          const attachBtn = attachIcon && (attachIcon.closest('button') || attachIcon.closest('[role="menuitem"]') || attachIcon.parentElement);
-          if (attachBtn) {
-            // Intercept HTMLInputElement.click to suppress native file dialog
-            const origClick = HTMLInputElement.prototype.click;
-            interceptedInput = null;
-            HTMLInputElement.prototype.click = function () {
-              if (this.type === 'file') { interceptedInput = this; return; }
-              return origClick.call(this);
-            };
-
-            attachBtn.click();
-            await new Promise(r => setTimeout(r, 400));
-
-            HTMLInputElement.prototype.click = origClick;
-
-            fileInput = interceptedInput
-              || document.querySelector('input[type="file"]')
-              || deepFind(document);
-          }
-
-          // Close the menu if we didn't find a file input
-          if (!fileInput) {
-            document.body.click();
-            await new Promise(r => setTimeout(r, 100));
-          }
-        }
-      }
-
-      if (fileInput) {
-        const dt = new DataTransfer();
-        fileObjects.forEach(f => dt.items.add(f));
-        fileInput.files = dt.files;
-        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-        fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-        console.log('[LISA] Gemini file injection succeeded via', interceptedInput ? 'intercepted-click' : 'deep-search');
-        return { success: true, method: 'gemini-fileInput', count: fileObjects.length };
-      }
-      console.log('[LISA] Gemini: no file input found, falling through to clipboard');
-    }
+    // Strategy 1 / 1.5: the platform's file input (incl. Gemini's hidden one)
+    const inputMethod = await this._injectViaFileInput(fileObjects);
+    if (inputMethod) return { success: true, method: inputMethod, count: fileObjects.length };
 
     // Strategy 2: Simulate drag-and-drop on the chat input area
     // Skip on platforms that drop synthetic events (isTrusted guard)
@@ -607,48 +518,61 @@ class LisaProgressiveCapture {
     return { success: false, error: 'No file input, drop target, or composer found on this platform' };
   }
 
-  // ── ChatGPT handoff injection ──
-  // A browser can't put a real *file* on the OS clipboard (only text,
-  // HTML, PNG), so "Ctrl+V pastes a file" is done here instead: each step
-  // checks whether ChatGPT actually took the file, and the last one turns
-  // the user's own Ctrl+V into a file attachment.
-  //   1. Synthetic paste carrying the file on the composer — ChatGPT's
-  //      paste handler calls preventDefault when it accepts files, which
-  //      is a synchronous, reliable "it worked" signal.
-  //   2. Hidden input[type=file] assignment (no success signal available).
-  //   3. Text on the clipboard + a one-shot paste intercept: the user's
-  //      real (trusted) Ctrl+V is swapped for a file paste if ChatGPT
-  //      accepts one; otherwise it passes through untouched as text.
-  async _injectChatGPT(msg, files, fileObjects) {
+  // ── Automatic handoff injection (all platforms) ──
+  // Three stages, each falling through to the next:
+  //   1. Inject the file. Verified methods first where a platform isn't
+  //      already proven with its file input: a synthetic paste or drop
+  //      carrying the File — the page calling preventDefault is a
+  //      synchronous "accepted" signal. The hidden input[type=file]
+  //      assignment has no such signal, so it's trusted only where live
+  //      tests proved it (FILE_INPUT_FIRST), else tried after the paste.
+  //   2. Copy-paste as a file: unless stage 1 was verified, the user's own
+  //      (trusted) Ctrl+V is swapped for a file paste if the page takes one.
+  //   3. Copy-paste as text: the handoff text is on the clipboard, so a
+  //      Ctrl+V the page won't take as a file still pastes the text.
+  // A browser can't put a real *file* on the OS clipboard (only text, HTML,
+  // PNG) — stage 2 is the substitute. Each step logs "[LISA] Handoff: …".
+  async _autoInjectHandoff(msg, files, fileObjects) {
+    const host = window.location.hostname;
+    // Receivers whose file-input injection is confirmed live.
+    const FILE_INPUT_FIRST = /claude\.ai|gemini\.google|grok\.com|chat\.deepseek\.com|huggingface\.co|poe\.com/;
+    // Frontends known to drop synthetic drag events (isTrusted guard).
+    const NO_SYNTHETIC_DROP = /gemini\.google|chatgpt\.com|chat\.openai\.com/;
+    const log = (m) => console.log('[LISA] Handoff: ' + m);
+
     let editor = null;
     for (let i = 0; i < 20 && !editor; i++) {
-      editor = document.querySelector('#prompt-textarea, div[contenteditable="true"]');
+      editor = document.querySelector('#prompt-textarea, div[contenteditable="true"], textarea');
       if (!editor) await new Promise(r => setTimeout(r, 500));
     }
+    log(editor ? 'composer found (' + editor.tagName.toLowerCase() + ')' : 'no composer found');
 
-    if (editor && this._pasteFilesInto(editor, fileObjects)) {
-      console.log('[LISA] ChatGPT: handoff attached via file paste');
-      this._showPageToast('\u{1F4CE} Handoff attached as a file');
-      return { success: true, method: 'chatgpt-pasteFile', count: fileObjects.length };
+    // ── Stage 1: inject the file ──
+    let inputMethod = null;
+    if (FILE_INPUT_FIRST.test(host)) {
+      inputMethod = await this._injectViaFileInput(fileObjects);
+      if (inputMethod) log('file assigned via ' + inputMethod + ' (proven method on this platform)');
     }
-    console.log('[LISA] ChatGPT: synthetic file paste not accepted' + (editor ? '' : ' (no composer found)'));
-
-    let inputTried = false;
-    try {
-      const fileInput = document.querySelector('input[type="file"]');
-      if (fileInput) {
-        const dt = new DataTransfer();
-        fileObjects.forEach(f => dt.items.add(f));
-        fileInput.files = dt.files;
-        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-        fileInput.dispatchEvent(new Event('input', { bubbles: true }));
-        inputTried = true;
-        console.log('[LISA] ChatGPT: file assigned to composer input — check the composer for a file chip');
+    if (!inputMethod && editor) {
+      if (this._pasteFilesInto(editor, fileObjects)) {
+        log('file attached via paste (accepted by the page)');
+        this._showPageToast('\u{1F4CE} Handoff attached as a file');
+        return { success: true, method: 'pasteFile', count: fileObjects.length };
       }
-    } catch (e) {
-      console.warn('[LISA] ChatGPT file-input assignment failed:', e);
+      log('page did not accept a file paste');
+      if (!NO_SYNTHETIC_DROP.test(host) && this._dropFilesOnto(editor, fileObjects)) {
+        log('file attached via drop (accepted by the page)');
+        this._showPageToast('\u{1F4CE} Handoff attached as a file');
+        return { success: true, method: 'dragDrop', count: fileObjects.length };
+      }
+      if (!NO_SYNTHETIC_DROP.test(host)) log('page did not accept a file drop');
+    }
+    if (!inputMethod && !FILE_INPUT_FIRST.test(host)) {
+      inputMethod = await this._injectViaFileInput(fileObjects);
+      if (inputMethod) log('file assigned via ' + inputMethod + ' (unverified)');
     }
 
+    // ── Stages 2 + 3: Ctrl+V as a file, else as text ──
     const textContent = msg.content || (files[0] && files[0].content) || '';
     let copied = false;
     if (textContent) {
@@ -668,12 +592,102 @@ class LisaProgressiveCapture {
         } catch (_) {}
       }
     }
+    log('Ctrl+V fallback armed (file paste, else text' + (copied ? '' : ' — clipboard write failed') + ')');
     this._armPasteIntercept(fileObjects);
     if (editor) editor.focus();
-    this._showPageToast(inputTried
-      ? '\u{1F4CB} Handoff ready — if no file appears in the message box, press Ctrl+V (Cmd+V)'
+    this._showPageToast(inputMethod
+      ? '\u{1F4CE} Handoff sent as a file — if it doesn’t appear in the message box, press Ctrl+V (Cmd+V)'
       : '\u{1F4CB} Handoff ready — press Ctrl+V (Cmd+V) in the message box');
-    return { success: true, method: copied ? 'clipboard' : 'chatgpt-pasteIntercept', count: 1 };
+    if (inputMethod) return { success: true, method: inputMethod, count: fileObjects.length };
+    return { success: true, method: copied ? 'clipboard' : 'pasteIntercept', count: 1 };
+  }
+
+  // The platform's file input: a visible/hidden input[type=file], or on
+  // Gemini one found in shadow DOM or materialized via its "+" → attach
+  // menu (native file dialog suppressed). Returns the method name or null.
+  // No success signal exists for this path — callers decide how far to
+  // trust it.
+  async _injectViaFileInput(fileObjects) {
+    const assign = (input) => {
+      const dt = new DataTransfer();
+      fileObjects.forEach(f => dt.items.add(f));
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const plain = document.querySelector('input[type="file"]');
+    if (plain) { assign(plain); return 'fileInput'; }
+    if (!/gemini\.google/.test(window.location.hostname)) return null;
+
+    const deepFind = (root) => {
+      const inp = root.querySelector('input[type="file"]');
+      if (inp) return inp;
+      for (const el of root.querySelectorAll('*')) {
+        if (el.shadowRoot) {
+          const found = deepFind(el.shadowRoot);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    let fileInput = deepFind(document);
+    let interceptedInput = null;
+    // Two-step menu: "+" tools button → attach_file. Icon-based selectors
+    // (language-independent) since Gemini localizes aria-labels.
+    if (!fileInput) {
+      const plusIcon = document.querySelector('mat-icon[data-mat-icon-name="plus"]');
+      const plusBtn = plusIcon && plusIcon.closest('button');
+      if (plusBtn) {
+        plusBtn.click();
+        await new Promise(r => setTimeout(r, 400));
+        const attachIcon = document.querySelector(
+          'mat-icon[data-mat-icon-name="attach_file"], ' +
+          'mat-icon[data-mat-icon-name="upload_file"], ' +
+          'mat-icon[data-mat-icon-name="upload"]'
+        );
+        const attachBtn = attachIcon && (attachIcon.closest('button') || attachIcon.closest('[role="menuitem"]') || attachIcon.parentElement);
+        if (attachBtn) {
+          // Intercept HTMLInputElement.click to suppress the native file dialog
+          const origClick = HTMLInputElement.prototype.click;
+          HTMLInputElement.prototype.click = function () {
+            if (this.type === 'file') { interceptedInput = this; return; }
+            return origClick.call(this);
+          };
+          attachBtn.click();
+          await new Promise(r => setTimeout(r, 400));
+          HTMLInputElement.prototype.click = origClick;
+          fileInput = interceptedInput || document.querySelector('input[type="file"]') || deepFind(document);
+        }
+        if (!fileInput) {
+          document.body.click(); // close the menu
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+    }
+    if (!fileInput) {
+      console.log('[LISA] Gemini: no file input found');
+      return null;
+    }
+    assign(fileInput);
+    console.log('[LISA] Gemini file injection via', interceptedInput ? 'intercepted-click' : 'deep-search');
+    return 'gemini-fileInput';
+  }
+
+  // Dispatches dragover+drop carrying files; true if the page accepted the
+  // drop (called preventDefault on it).
+  _dropFilesOnto(target, fileObjects) {
+    try {
+      const dt = new DataTransfer();
+      fileObjects.forEach(f => dt.items.add(f));
+      target.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      target.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const drop = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt });
+      target.dispatchEvent(drop);
+      return drop.defaultPrevented;
+    } catch (e) {
+      console.warn('[LISA] file drop dispatch failed:', e);
+      return false;
+    }
   }
 
   // Dispatches a paste carrying files; returns true if the page's paste
@@ -711,10 +725,10 @@ class LisaProgressiveCapture {
       if (this._pasteFilesInto(target, pending.files)) {
         e.preventDefault();
         e.stopImmediatePropagation();
-        console.log('[LISA] ChatGPT: Ctrl+V converted into a file attachment');
+        console.log('[LISA] Handoff: Ctrl+V converted into a file attachment');
         this._showPageToast('\u{1F4CE} Handoff attached as a file');
       } else {
-        console.log('[LISA] ChatGPT: page did not accept a file paste — pasting as text');
+        console.log('[LISA] Handoff: page did not accept a file paste — pasting as text');
       }
     }, true);
   }

@@ -63,7 +63,7 @@ const ACMMonitor = {
     copilot:     'https://copilot.microsoft.com/',
     perplexity:  'https://www.perplexity.ai/',
     huggingchat: 'https://huggingface.co/chat/',
-    metaai:      'https://www.meta.ai/',
+    metaai:      'https://meta.ai/', // LISA's content scripts match meta.ai only — www.meta.ai never got them
     poe:         'https://poe.com/',
     claudecode:  'https://claude.ai/code/',
   },

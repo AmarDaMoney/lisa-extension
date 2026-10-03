@@ -177,20 +177,24 @@ with the user's platform preferences (set in popup Settings, stored as
 attempts real file injection via the existing `injectFileAttachment`
 path in `lisa-progressive.js` (the same one the library's manual inject
 already used) — not just a clipboard copy. Confirmed working Claude→
-Gemini, Claude→Grok and Claude→ChatGPT (file attach, see below). **ChatGPT** (`_injectChatGPT` in
-`lisa-progressive.js`): the old "falls back to clipboard" behaviour was
-mostly a bug — the ChatGPT block referenced `fileObjects` before its
-`const` declaration (TDZ ReferenceError swallowed by try/catch), so the
-file path never ran. Now: (1) synthetic `paste` carrying the File on
-`#prompt-textarea` — success = the page called `preventDefault`;
-(2) hidden `input[type=file]` assignment; (3) text on the clipboard plus
-a one-shot capture-phase paste intercept that swaps the user's real
-Ctrl+V for a file paste when the page accepts one, else lets the text
-through. A web page/extension cannot put a real *file* on the OS
-clipboard (Chrome allows text/HTML/PNG only) — the intercept is the
-substitute. Which step worked is logged as `[LISA] ChatGPT: …`.
-Confirmed live (2026-10-02): step 1 (synthetic file paste) attaches the
-file automatically on real ChatGPT; steps 2–3 remain as fallbacks.
+Gemini, Claude→Grok and Claude→ChatGPT. **Injection into the new tab**
+(`_autoInjectHandoff` in `lisa-progressive.js`, all platforms) runs three
+stages: (1) inject the file — the platform's file input first where live
+tests proved it (`FILE_INPUT_FIRST`: claude, gemini, grok, deepseek,
+huggingchat, poe; Gemini's hidden input via `_injectViaFileInput`), else a
+synthetic `paste` then `drop` carrying the File, each *verified* by the
+page calling `preventDefault`, then the file input as an unverified last
+try; (2) unless stage 1 was verified, a one-shot capture-phase paste
+intercept turns the user's real Ctrl+V into a file paste; (3) the handoff
+text is on the clipboard, so a Ctrl+V the page won't take as a file
+pastes text. A page/extension can't put a real *file* on the OS
+clipboard (Chrome allows text/HTML/PNG only) — stage 2 is the substitute.
+Every step logs `[LISA] Handoff: …` in the new tab. History: ChatGPT's
+file path never ran before (TDZ bug, fixed); synthetic paste is confirmed
+live on ChatGPT. Meta AI handoffs opened www.meta.ai, where LISA's content
+scripts don't run (they match meta.ai) — NEW_CHAT_URLS now opens meta.ai.
+The manual library inject (`injectFiles` without `_autoInject`) keeps its
+original file input → drop → clipboard order.
 
 ### Claude Code capture (claude.ai/code/*)
 API-first via `window.__LISA_CLAUDE_CODE_API_CAPTURE` in

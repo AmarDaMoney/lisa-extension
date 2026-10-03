@@ -973,7 +973,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
       if (injectResult && injectResult.success) {
         if (!limitCheck.credits) await this.incrementFloatingLimit('handoff'); // paid with a credit → don't also use a free save
-        const waitsForPaste = injectResult.method === 'clipboard' || injectResult.method === 'chatgpt-pasteIntercept';
+        const waitsForPaste = injectResult.method === 'clipboard' || injectResult.method === 'pasteIntercept';
         const methodLabel = waitsForPaste ? 'ready — press Ctrl+V' : 'injected';
         this.showToast(`Handoff ${methodLabel} into the new tab.`);
       } else {

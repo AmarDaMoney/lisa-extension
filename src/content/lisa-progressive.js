@@ -548,11 +548,13 @@ class LisaProgressiveCapture {
     log(editor ? 'composer found (' + editor.tagName.toLowerCase() + ')' : 'no composer found');
 
     // Second success signal: most sites show an attachment chip with the
-    // file name ("lisa-handoff-…"). Some accept a pasted/dropped file
-    // without calling preventDefault (seen on Meta AI), so without this
-    // check the next method ran too and the handoff arrived twice.
+    // file name. Some accept a pasted/dropped file without calling
+    // preventDefault (seen on Meta AI), so without this check the next
+    // method ran too and the handoff arrived twice. Matches the name's
+    // first 12 characters — chips often truncate the rest.
+    const mark = ((fileObjects[0] && fileObjects[0].name) || 'lisa-handoff').slice(0, 12).toLowerCase();
     const countMarks = () => {
-      try { return (document.body.innerText.match(/lisa-hand/gi) || []).length; } catch (_) { return 0; }
+      try { return document.body.innerText.toLowerCase().split(mark).length - 1; } catch (_) { return 0; }
     };
     const baseline = countMarks();
     const appeared = async (ms = 2000) => {

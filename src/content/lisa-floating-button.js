@@ -960,7 +960,14 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         session_metadata: sessionMetadata || undefined
       };
 
-      const filename = `lisa-handoff-${targetPlatform}-${Date.now()}.json`;
+      // Same pattern as files saved from the library: <Title>-lisa-<platform>
+      // (source conversation's title and platform). Unlike the library's
+      // sanitizer, letters with accents are kept (\p{L}), so a French or
+      // Spanish title stays readable.
+      const safeTitle = (conversation.title || document.title || 'handoff')
+        .replace(/[^\p{L}\p{N} -]/gu, '').trim().substring(0, 50).replace(/\s+/g, '_') || 'handoff';
+      const safePlatform = String(conversation.platform || acm._detectPlatform()).replace(/[^\p{L}\p{N}]+/gu, '_');
+      const filename = `${safeTitle}-lisa-${safePlatform}.json`;
       this.showToast("Opening new tab and transferring context...");
 
       const injectResult = await chrome.runtime.sendMessage({

@@ -191,14 +191,15 @@ text is on the clipboard, so a Ctrl+V the page won't take as a file
 pastes text. A page/extension can't put a real *file* on the OS
 clipboard (Chrome allows text/HTML/PNG only) — stage 2 is the substitute.
 Besides `preventDefault`, a step also counts as accepted when an
-attachment chip with the file name ("lisa-handoff-…") appears on the page
+attachment chip showing the file name (its first 12 chars) appears on the page
 within ~2s — Meta AI accepts a pasted file without calling
 `preventDefault`, which made the next method run too (handoff arrived
 twice). Every step logs `[LISA] Handoff: …` in the new tab. History: ChatGPT's
 file path never ran before (TDZ bug, fixed); synthetic paste is confirmed
 live on ChatGPT. Meta AI handoffs opened www.meta.ai, where LISA's content
 scripts don't run (they match meta.ai) — NEW_CHAT_URLS now opens meta.ai.
-The manual library inject (`injectFiles` without `_autoInject`) keeps its
+The handoff file is named like a library save, `<Title>-lisa-<SourcePlatform>.json`
+(accented letters kept). The manual library inject (`injectFiles` without `_autoInject`) keeps its
 original file input → drop → clipboard order.
 
 ### Claude Code capture (claude.ai/code/*)

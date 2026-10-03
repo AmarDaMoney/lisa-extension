@@ -1,6 +1,39 @@
 // Microsoft Copilot Conversation Parser
 // Extracts conversation data from copilot.com (formerly copilot.microsoft.com)
 
+// ── Shared Copilot turn finder ──
+// Used by CopilotParser below and LisaVParser.extractCopilotMessages() so
+// the two can't drift. copilot.com (2026 redesign) marks turns with
+// data-testid="chatQuestion" (user) / "chatOutput" (assistant), text in
+// .fai-UserMessage__message / .fai-CopilotMessage__content — confirmed
+// live. The old copilot.microsoft.com classes (user-message / ai-message)
+// stay as a fallback. Returns [{ role, el }] in page order, where el is a
+// cleaned CLONE of just the message text (screen-reader "You said" /
+// "Copilot said" headings, buttons, avatar, name, disclaimer removed).
+function lisaCopilotTurns() {
+  const NEW = '[data-testid="chatQuestion"], [data-testid="chatOutput"]';
+  const OLD = '[class*="user-message"], [class*="ai-message"]';
+  let nodes = [...document.querySelectorAll(NEW)];
+  const isNew = nodes.length > 0;
+  if (!isNew) nodes = [...document.querySelectorAll(OLD)];
+  // Keep outermost matches only — a turn can contain a nested match.
+  nodes = nodes.filter(n => !nodes.some(o => o !== n && o.contains(n)));
+  return nodes.map(n => {
+    const role = isNew
+      ? (n.getAttribute('data-testid') === 'chatQuestion' ? 'user' : 'assistant')
+      : (String(n.className).includes('user-message') ? 'user' : 'assistant');
+    const body = isNew
+      ? (n.querySelector(role === 'user' ? '[class*="UserMessage__message"]' : '[class*="CopilotMessage__content"]') || n)
+      : n;
+    const el = body.cloneNode(true);
+    el.querySelectorAll('h5, h6, [class*="accessibleHeading"], [class*="actionBar"], [class*="__actions"], [role="toolbar"], ' +
+      '[class*="disclaimer"], [class*="__avatar"], [class*="__name"], [class*="FeedbackButtons"], button, svg, [role="button"]')
+      .forEach(x => x.remove());
+    return { role, el };
+  });
+}
+window.__lisaCopilotTurns = lisaCopilotTurns;
+
 class CopilotParser {
   constructor() {
     this.platform = 'Microsoft Copilot';
@@ -16,21 +49,13 @@ class CopilotParser {
   extractMessages() {
     const messages = [];
     
-    // Query both roles together — querySelectorAll returns DOM order, no sort needed
-    const allElements = document.querySelectorAll('[class*="user-message"], [class*="ai-message"]');
-    const allMessages = [];
-    allElements.forEach(el => {
-      const role = el.className.includes('user-message') ? 'user' : 'assistant';
-      const textContent = this.extractTextContent(el);
-      if (textContent && textContent.trim().length > 0) {
-        allMessages.push({ el, role });
-      }
-    });
+    const allMessages = lisaCopilotTurns();
 
-    // Deduplicate — nested elements may match multiple times
+    // Deduplicate identical consecutive content
     const seen = new Set();
     for (const msg of allMessages) {
-      const text = this.extractTextContent(msg.el).trim();
+      const text = (msg.el.textContent || '').trim();
+      if (!text) continue;
       const key = text.substring(0, 100);
       if (seen.has(key)) continue;
       seen.add(key);

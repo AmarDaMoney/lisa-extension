@@ -818,17 +818,9 @@ class LisaVParser {
   // Generic fallback extraction
   async extractCopilotMessages() {
     const messages = [];
-    const userMessages = document.querySelectorAll('[class*="user-message"]');
-    const aiMessages = document.querySelectorAll('[class*="ai-message"]');
-
-    const allMessages = [];
-    for (const el of userMessages) {
-      allMessages.push({ el, role: 'user', pos: el.getBoundingClientRect().top });
-    }
-    for (const el of aiMessages) {
-      allMessages.push({ el, role: 'assistant', pos: el.getBoundingClientRect().top });
-    }
-    allMessages.sort((a, b) => a.pos - b.pos);
+    // Shared turn finder in copilot-parser.js (loaded first on Copilot pages):
+    // copilot.com's data-testid markup, old class names as fallback.
+    const allMessages = typeof window.__lisaCopilotTurns === 'function' ? window.__lisaCopilotTurns() : [];
 
     const seen = new Set();
     for (const msg of allMessages) {

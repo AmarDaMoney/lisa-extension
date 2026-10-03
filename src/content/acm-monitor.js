@@ -208,6 +208,7 @@ const ACMMonitor = {
     if (host.includes('claude.ai')) return true; // chat API, or Claude Code session events
     if (host.includes('chatgpt.com')) return true;
     if (host.includes('perplexity.ai')) return true;
+    if (host.includes('grok.com')) return true;
     return false;
   },
 
@@ -219,6 +220,7 @@ const ACMMonitor = {
     // Same { messageCount, messages: [{role, content}] } contract as Claude/
     // ChatGPT's capture modules — perplexity-api-main.js already produces it.
     if (host.includes('perplexity.ai')) return window.__LISA_PERPLEXITY_API_CAPTURE || null;
+    if (host.includes('grok.com')) return window.__LISA_GROK_API_CAPTURE || null;
     return null;
   },
 

@@ -164,7 +164,7 @@ existed before being consolidated to call the one shared function.
 
 Handoff works from every source platform: `_executeHandoff()` uses the
 platform's API capture where one exists (`ACMMonitor._getApiCapture()` —
-Claude, Claude Code, ChatGPT, Perplexity), else the same `LisaVParser`
+Claude, Claude Code, ChatGPT, Perplexity, Grok), else the same `LisaVParser`
 page capture Markdown export uses. Destinations come from
 `ACMMonitor.HANDOFF_RECEIVERS` — a per-*target* status map (the payload is
 the same JSON whatever the source, so receiving is a property of the
@@ -251,6 +251,22 @@ by node. No REST history endpoint is visible to the page (only
 dump one turn's outline (tags, data-testid, fai-* classes) from the page
 console, or run `__lisaCopilotCollectAll()` + `LisaVParser` from the
 LISA console context and compare COLLECTED vs EXPORTED.
+
+### Grok capture (grok.com)
+API-first via `window.__LISA_GROK_API_CAPTURE` in `src/content/grok-parser.js`
+(found live via DevTools; no extra headers needed): `GET
+/rest/app-chat/conversations/<id>/response-node?includeThreads=true` →
+`responseNodes [{responseId, sender, parentResponseId?}]`, then `POST
+…/load-responses {responseIds}` (batches of 50) → `responses [{message,
+sender: 'human'|…, createTime, partial, isControl}]`. The page keeps only
+the latest messages mounted (live: 7 of 112 captured by DOM), so the API
+is the complete path. Edits/regenerations make a tree: the live branch is
+followed from the newest leaf back to the root — an uncached (in-flight,
+partial) response counts as newest. Finished responses are cached per
+conversation, so ACM re-checks cost 1 request. `isControl` and partial
+responses are skipped. Used by `GrokParser`, `LisaVParser`, ACM and
+Handoff (`_getApiCapture`); DOM capture remains the fallback. Console:
+`[LISA] Grok API capture: N messages (…)`. Conversation URLs: `/c/<id>`.
 
 **Known pre-existing dead ends** (not from ACM work, found during a code
 audit): `preCacheConversation` (sent from `lisa-floating-button.js` on

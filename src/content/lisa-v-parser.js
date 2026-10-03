@@ -435,6 +435,20 @@ class LisaVParser {
       messages = await this.extractHuggingChatMessages();
     } else if (platform === 'Meta AI') {
       messages = await this.extractMetaAIMessages();
+    } else if (platform === 'Grok' && window.__LISA_GROK_API_CAPTURE) {
+      // ---- API-FIRST CAPTURE (complete; the page keeps only the latest messages) ----
+      const apiResult = await this._captureViaApiWithRetry(window.__LISA_GROK_API_CAPTURE, false);
+      if (apiResult) {
+        this.apiMessageCount = apiResult.messageCount;
+        console.log('[LISA] LISA-V using Grok API capture:', apiResult.messageCount, 'messages');
+        for (const msg of apiResult.messages) {
+          this.blocks.push(...(await this._apiMessageToBlocks(msg)));
+        }
+        return this.blocks;
+      }
+      console.warn('[LISA] Grok API capture failed after retry, falling back to page capture');
+      this.usedFallbackCapture = true;
+      messages = await this.extractGrokMessages();
     } else if (platform === 'Grok') {
       messages = await this.extractGrokMessages();
     } else {

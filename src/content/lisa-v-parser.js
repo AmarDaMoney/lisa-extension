@@ -820,7 +820,9 @@ class LisaVParser {
     const messages = [];
     // Shared turn finder in copilot-parser.js (loaded first on Copilot pages):
     // copilot.com's data-testid markup, old class names as fallback.
-    const allMessages = typeof window.__lisaCopilotTurns === 'function' ? window.__lisaCopilotTurns() : [];
+    const allMessages = typeof window.__lisaCopilotCollectAll === 'function'
+      ? await window.__lisaCopilotCollectAll()
+      : (typeof window.__lisaCopilotTurns === 'function' ? window.__lisaCopilotTurns() : []);
 
     const seen = new Set();
     for (const msg of allMessages) {

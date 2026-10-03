@@ -6,6 +6,7 @@ class LISAPopup {
     this.currentConversation = null;
     this.compressedData = null;
     this.userTier = 'free';
+    this.isPayg = false;
     this.usageStats = {
       exportsToday: 0,
       importsToday: 0,
@@ -177,8 +178,51 @@ class LISAPopup {
     await chrome.storage.sync.set({ usageStats: this.usageStats });
   }
 
+  // What a /api/validate-license answer means. Single source of truth for
+  // validateLicenseKey() and loadUserTier(): a valid key is Premium unless
+  // the server says its tier is 'free' (a free license, or a PAYG key with
+  // no credits left); PAYG keys are flagged so actions get metered.
+  _tierFromLicenseResponse(data) {
+    const valid = !!data && data.valid === true;
+    return {
+      userTier: valid && data.tier !== 'free' ? 'premium' : 'free',
+      isPayg: valid && data.payg === true
+    };
+  }
+
+  // Charges 1 PAYG credit to the stored license key. The key (not a Google
+  // identity) is the right identifier: the server resolves it to the email
+  // its credits are stored under. True only if the server confirms it.
+  async _chargePaygCredit() {
+    try {
+      const { licenseKey } = await chrome.storage.sync.get(['licenseKey']);
+      if (!licenseKey) return false;
+      const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-License-Key': licenseKey },
+        body: JSON.stringify({ source: 'extension' })
+      });
+      if (!resp.ok) return false;
+      const data = await resp.json();
+      return data.success === true;
+    } catch (e) {
+      console.debug('[LISA] PAYG credit charge failed:', e);
+      return false;
+    }
+  }
+
   async checkUsageLimits(type) {
-    if (this.userTier === 'premium') {
+    // PAYG key: Premium features while credits last, but every metered
+    // action costs 1 credit — so this runs before the premium shortcut
+    // (which used to let PAYG keys through for free, uncharged). Out of
+    // credits (or server unreachable) → the normal free rules below.
+    if (this.isPayg) {
+      if (type === 'export' && this.userTier === 'premium') return { allowed: true };
+      if (type !== 'export' && await this._chargePaygCredit()) {
+        this.loadCreditBalance();
+        return { allowed: true, credits: true };
+      }
+    } else if (this.userTier === 'premium') {
       return { allowed: true };
     }
 
@@ -195,7 +239,7 @@ class LISAPopup {
     // not) when Compress ran, so neither spends a second credit here. Only
     // 'compress' (Compress to LISA JSON, which does the real work) is
     // PAYG-eligible, same as md/lisav/handoff.
-    if (type !== 'export') {
+    if (type !== 'export' && !this.isPayg) { // PAYG keys were already charged (or found empty) above
       try {
         let identifier = '';
         const headers = { 'Content-Type': 'application/json' };
@@ -221,12 +265,16 @@ class LISAPopup {
           if (balResp.ok) {
             const balData = await balResp.json();
             if (balData.balance > 0) {
-              await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+              const dedResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ source: 'extension' })
               });
-              return { allowed: true, credits: true };
+              const ded = dedResp.ok ? await dedResp.json() : null;
+              if (ded && ded.success === true) {
+                this.loadCreditBalance();
+                return { allowed: true, credits: true };
+              }
             }
           }
         }
@@ -254,7 +302,7 @@ class LISAPopup {
 
   async loadUserTier() {
     try {
-      const storage = await chrome.storage.sync.get(['userTier', 'licenseKey']);
+      const storage = await chrome.storage.sync.get(['userTier', 'licenseKey', 'isPayg']);
       // Server-side verification (H-2 fix)
       if (storage.licenseKey) {
         try {
@@ -264,17 +312,26 @@ class LISAPopup {
             body: JSON.stringify({ key: storage.licenseKey })
           });
           if (resp.ok) {
-            const data = await resp.json();
-            this.userTier = (data.valid === true) ? 'premium' : 'free';
-            await chrome.storage.sync.set({ userTier: this.userTier });
+            const t = this._tierFromLicenseResponse(await resp.json());
+            this.userTier = t.userTier;
+            this.isPayg = t.isPayg;
+            await chrome.storage.sync.set({ userTier: this.userTier, isPayg: this.isPayg });
+          } else if (resp.status === 401 || resp.status === 403) {
+            // Key no longer valid — don't keep a stale Premium status.
+            this.userTier = 'free';
+            this.isPayg = false;
+            await chrome.storage.sync.set({ userTier: 'free', isPayg: false });
           } else {
             this.userTier = storage.userTier || 'free';
+            this.isPayg = storage.isPayg === true;
           }
         } catch (e) {
           this.userTier = storage.userTier || 'free';
+          this.isPayg = storage.isPayg === true;
         }
       } else {
         this.userTier = 'free';
+        this.isPayg = false;
       }
       
       const tierBadge = document.getElementById('userTier');
@@ -1111,7 +1168,11 @@ class LISAPopup {
           // Measure what the user actually downloads (lean export), not the full compressedData
           const checkpointHistory = await this._getCheckpointHistory();
           const _lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory });
-          const enrichedTokenEstimate = Math.round((JSON.stringify(_lean.messages).length + JSON.stringify(_lean.anchor).length + JSON.stringify(_lean.semantic_anchors).length + JSON.stringify(_lean.session_metadata).length) / 4);
+          // ?? '' — a short conversation gets buildLeanExport's verbatim payload,
+          // which has no anchor/semantic_anchors; JSON.stringify(undefined) is
+          // undefined, and .length on it crashed the whole compress.
+          const _len = v => JSON.stringify(v ?? '').length;
+          const enrichedTokenEstimate = Math.round((_len(_lean.messages) + _len(_lean.anchor) + _len(_lean.semantic_anchors) + _len(_lean.session_metadata)) / 4);
           // Inference reduction = pre-resolved signals (entities + concepts + relationships)
           // Each signal replaces ~3 tokens of AI inference work (entity resolution, disambiguation, etc.)
           // Clamped to 5-95% to stay honest
@@ -1645,8 +1706,15 @@ class LISAPopup {
       let identifier = '';
       let headers = { 'Content-Type': 'application/json' };
 
+      // A PAYG key's credits are what it spends (see _chargePaygCredit), so
+      // show that balance — not a Google identity's, which may differ.
+      if (this.isPayg) {
+        const { licenseKey } = await chrome.storage.sync.get(['licenseKey']);
+        if (licenseKey) identifier = licenseKey;
+      }
+
       try {
-        const token = await new Promise((resolve) => {
+        const token = identifier ? null : await new Promise((resolve) => {
           chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
         });
         if (token) {
@@ -1918,18 +1986,27 @@ class LISAPopup {
           return;
         }
         
-        // Store the validated license
-        await chrome.storage.sync.set({ 
+        // Store the validated license — tier from what the server says, not
+        // "premium" for any valid key (that made PAYG keys unlimited/free).
+        const t = this._tierFromLicenseResponse(data);
+        await chrome.storage.sync.set({
           licenseKey: licenseKey,
-          userTier: 'premium',
+          userTier: t.userTier,
+          isPayg: t.isPayg,
           licenseValidatedAt: new Date().toISOString()
         });
-        
-        this.userTier = 'premium';
+
+        this.userTier = t.userTier;
+        this.isPayg = t.isPayg;
         this.updateTierDisplay();
         this.updateTierBadge();
-        
-        this.showLicenseStatus('valid', '✅', `License valid! Tier: ${data.tier || 'Pro'}`);
+        this.loadCreditBalance();
+
+        this.showLicenseStatus('valid', '✅', t.isPayg
+          ? (t.userTier === 'premium'
+              ? 'PAYG license valid — Premium while credits last, 1 credit per action'
+              : 'PAYG license valid — no credits left (Free tier until you top up)')
+          : `License valid! Tier: ${data.tier || 'Pro'}`);
         this.trackEvent('license_validated', { tier: data.tier });
         
       } else if (response.status === 401 || response.status === 403) {
@@ -2009,6 +2086,7 @@ class LISAPopup {
       await chrome.storage.local.clear();
       
       this.userTier = 'free';
+      this.isPayg = false;
       this.usageStats = { exportsToday: 0, importsToday: 0, compressToday: 0 };
       
       // Reset UI

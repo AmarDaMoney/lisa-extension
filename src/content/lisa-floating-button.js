@@ -45,8 +45,31 @@ class LISAFloatingButton {
   }
   
   async checkFloatingLimit(type) {
-    // Premium users have no limits
-    if (this.isPremium) return { allowed: true };
+    // Read fresh: the popup may have validated/changed the license since
+    // this page loaded.
+    let tierInfo = {};
+    try { tierInfo = await chrome.storage.sync.get(['userTier', 'isPayg', 'licenseKey']); } catch (_) {}
+    this.isPremium = tierInfo.userTier === 'premium';
+
+    // PAYG key: Premium features while credits last, 1 credit per action —
+    // checked before the premium shortcut, which used to let PAYG keys
+    // through uncharged. Out of credits → normal free rules below.
+    if (tierInfo.isPayg === true && tierInfo.licenseKey) {
+      try {
+        const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-License-Key': tierInfo.licenseKey },
+          body: JSON.stringify({ source: 'extension' })
+        });
+        const data = resp.ok ? await resp.json() : null;
+        if (data && data.success === true) return { allowed: true, credits: true };
+      } catch (e) {
+        console.debug('[LISA] PAYG credit charge failed:', e);
+      }
+    } else if (this.isPremium) {
+      // Premium users have no limits
+      return { allowed: true };
+    }
     // Welcome pool: 100 free operations before daily limits kick in
     try {
       const poolResult = await chrome.storage.sync.get(['usageStats']);
@@ -65,7 +88,8 @@ class LISAFloatingButton {
     // user whose credits are tied to a license key, not Google, would never
     // have them checked here at all and would always just hit the free
     // daily-5 cap instead.
-    try {
+    // PAYG keys were already charged (or found empty) above.
+    if (tierInfo.isPayg !== true) try {
       let identifier = '';
       const headers = { 'Content-Type': 'application/json' };
 
@@ -93,13 +117,14 @@ class LISAFloatingButton {
         if (balResp.ok) {
           const balData = await balResp.json();
           if (balData.balance > 0) {
-            // Deduct 1 credit and allow
-            await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+            // Deduct 1 credit — allow only if the server confirms it
+            const dedResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
               method: 'POST',
               headers,
               body: JSON.stringify({ source: 'extension' })
             });
-            return { allowed: true, credits: true };
+            const ded = dedResp.ok ? await dedResp.json() : null;
+            if (ded && ded.success === true) return { allowed: true, credits: true };
           }
         }
       }

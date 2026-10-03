@@ -248,7 +248,7 @@ class UniversalParser {
         const text = document.body?.innerText?.substring(0, 1000) || '';
         sendResponse({ text });
       }
-      return true;
+      return false; // not ours — let other listeners answer, or the sender fail fast
     });
   }
 }

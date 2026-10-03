@@ -135,7 +135,7 @@ class ClaudeParser {
           });
         return true;
       }
-      return true; // Keep channel open for async response
+      return false; // not ours — let other listeners answer, or the sender fail fast
     });
   }
 }

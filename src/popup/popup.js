@@ -426,7 +426,10 @@ class LISAPopup {
   
   async detectLanguageFromPage(tabId) {
     try {
-      const response = await this.sendMessageToTab(tabId, { action: 'samplePageText' });
+      // Optional feature, and only universal-parser.js answers it — one quick
+      // try, no retries (retries re-inject content scripts and used to stack
+      // up three 10s timeouts on supported platforms like Claude).
+      const response = await this.sendMessageToTab(tabId, { action: 'samplePageText' }, 2000, 0);
       if (response && response.text) {
         const lang = this.detectLanguage(response.text);
         this.showLanguageIndicator(lang);

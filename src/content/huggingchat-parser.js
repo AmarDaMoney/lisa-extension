@@ -99,7 +99,7 @@ class HuggingChatParser {
           });
         return true;
       }
-      return true;
+      return false; // not ours — let other listeners answer, or the sender fail fast
     });
   }
 }

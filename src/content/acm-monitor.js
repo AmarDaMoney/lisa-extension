@@ -287,7 +287,7 @@ const ACMMonitor = {
     if (host.includes('huggingface.co'))        return '[data-message-type], [data-message-role]';
     if (host.includes('meta.ai'))               return '[data-message-type], [data-testid="assistant-message"]';
     if (host.includes('mistral.ai'))            return '[class*="message"]';
-    if (/copilot\.(microsoft\.)?com/.test(host)) return '[data-testid="chatQuestion"], [data-testid="chatOutput"], [class*="user-message"], [class*="ai-message"]';
+    if (/copilot\.(microsoft\.)?com/.test(host)) return '[data-testid="chatQuestion"], [data-testid="copilot-message-div"], [class*="user-message"], [class*="ai-message"]';
     return '[data-message-author-role]';
   },
 

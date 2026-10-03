@@ -107,7 +107,7 @@ class LisaProgressiveCapture {
     if (host.includes('huggingface.co'))         return '[data-message-type], [data-message-role]';
     if (host.includes('meta.ai'))                return '[data-message-type], [data-testid="assistant-message"]';
     if (host.includes('mistral.ai'))            return '[class*="message"]';
-    if (/copilot\.(microsoft\.)?com/.test(host)) return '[data-testid="chatQuestion"], [data-testid="chatOutput"], [class*="user-message"], [class*="ai-message"]';
+    if (/copilot\.(microsoft\.)?com/.test(host)) return '[data-testid="chatQuestion"], [data-testid="copilot-message-div"], [class*="user-message"], [class*="ai-message"]';
     return '[data-message-author-role]';
   }
 
@@ -116,7 +116,7 @@ class LisaProgressiveCapture {
     if (el.hasAttribute('data-user-message-bubble')) return 'user';
     if (el.classList.contains('user')) return 'user';
     if (el.getAttribute('data-testid') === 'chatQuestion') return 'user'; // Copilot
-    if (el.getAttribute('data-testid') === 'chatOutput') return 'assistant';
+    if (el.getAttribute('data-testid') === 'copilot-message-div') return 'assistant'; // ('chatOutput' is the user's own text)
     if (String(el.className).includes('user-message')) return 'user';
     return 'assistant';
   }

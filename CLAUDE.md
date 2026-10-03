@@ -274,3 +274,23 @@ tab-hide) and `refreshUserTier` (sent from `success.html` post-checkout)
 both have no handler anywhere — harmless no-ops, not regressions, just
 unimplemented. `acm_getStatus` in `service-worker.js` has a handler but
 no caller. Leave as-is unless picking them up deliberately.
+
+## Roadmap / parked ideas
+
+- **MCP Memory Server** (`lisa-web-backend/lisa_mcp.py`, guide in
+  `MCP_SETUP.md` there) — early access. Next: public package (`uvx lisa-mcp`),
+  `GET /api/snapshots/{id}` so tools stop downloading the whole library,
+  per-request auth before any multi-user hosting. Semantic search works since
+  backend 8b27d03 (snapshots embedded on save; old ones backfilled on search).
+- **Ambiguity categories** — 10 targeted (Referential, Temporal, Priority,
+  Completion, Social noise, Reasoning, Role, Dependency, State, Relevance).
+  Live today: social noise (T1), referential (T1 NER only — compromise coref
+  rewrite is disabled; T1.5 GLiNER + fastcoref), relevance (T2 salience).
+  Plan: annotate, don't rewrite. Cheap T1 rules next (Role, Priority,
+  Completion, Temporal), then have the paid AI Compress prompt emit
+  category-tagged fields to cover all 10 in T2.
+- **Second extension (Amar's idea, parked)** — LISA-format extraction /
+  summarizing of *any* web page text for AI consumption (saving tokens on AI
+  reading), the backend's original purpose before LISA focused on AI
+  platforms. Free tier local like this extension, AI tier via the backend.
+  Seed: the right-click "Copy as LISA Context", which now works on any page.

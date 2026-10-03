@@ -5,7 +5,7 @@
  * and the eval harness (Node.js require).
  *
  * Browser: functions are globals.
- * Node:    module.exports = { buildLeanExport, buildMarkdownExport }
+ * Node:    module.exports = { buildLeanExport, buildMarkdownExport, lisaSafeTitle }
  */
 
 // checkpoint-detect.js is loaded as a global before this file in every
@@ -20,6 +20,18 @@ const checkpointDetect = (typeof module !== 'undefined' && module.exports)
  * Build the lean JSON export payload from compressed data.
  * Returns the full download-ready object including compression gate.
  */
+// Filename-safe conversation title, for library saves, downloads and
+// handoff files. Keeps letters, combining marks and digits from every
+// script — accented French/Spanish, Arabic, CJK, Cyrillic, Hindi (whose
+// vowel signs are combining marks, \p{M}) — and drops only punctuation,
+// symbols and emoji. Cuts at whole characters, never mid-character.
+// (lisa-floating-button.js runs in content scripts without this file and
+// carries the same rule inline — keep the two in step.)
+function lisaSafeTitle(text, maxChars = 50, sep = '_') {
+  const cleaned = String(text || '').normalize('NFC').replace(/[^\p{L}\p{M}\p{N} -]/gu, '').trim();
+  return Array.from(cleaned).slice(0, maxChars).join('').trim().replace(/\s+/g, sep);
+}
+
 function buildLeanExport(compressed, rawMessages, options = {}) {
   const tokens = compressed.semanticTokens || compressed.messages || compressed.compressed || [];
   const messages = tokens.map(t => ({
@@ -210,5 +222,5 @@ function buildMarkdownExport(compressed, rawMessages) {
 
 // Dual-mode: global in browser, module.exports in Node
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildLeanExport, buildMarkdownExport };
+  module.exports = { buildLeanExport, buildMarkdownExport, lisaSafeTitle };
 }

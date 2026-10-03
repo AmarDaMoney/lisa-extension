@@ -198,8 +198,11 @@ twice). Every step logs `[LISA] Handoff: …` in the new tab. History: ChatGPT's
 file path never ran before (TDZ bug, fixed); synthetic paste is confirmed
 live on ChatGPT. Meta AI handoffs opened www.meta.ai, where LISA's content
 scripts don't run (they match meta.ai) — NEW_CHAT_URLS now opens meta.ai.
-The handoff file is named like a library save, `<Title>-lisa-<SourcePlatform>.json`
-(accented letters kept). The manual library inject (`injectFiles` without `_autoInject`) keeps its
+The handoff file is named like a library save, `<Title>-lisa-<SourcePlatform>.json`.
+Titles in all filenames go through `lisaSafeTitle()` (`src/shared/export-builders.js`;
+the FAB, a content script, carries the same rule inline): letters, combining marks and
+digits from every script are kept (French accents, Arabic, CJK, Cyrillic, Hindi vowel signs),
+only punctuation/symbols/emoji dropped, cut at whole characters. The manual library inject (`injectFiles` without `_autoInject`) keeps its
 original file input → drop → clipboard order.
 
 ### Claude Code capture (claude.ai/code/*)

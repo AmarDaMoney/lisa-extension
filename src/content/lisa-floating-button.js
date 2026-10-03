@@ -965,9 +965,13 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       // sanitizer, letters with accents are kept (\p{L}), so a French or
       // Spanish title stays readable.
       const safeTitle = (conversation.title || document.title || 'handoff')
-        .replace(/[^\p{L}\p{N} -]/gu, '').trim().substring(0, 50).replace(/\s+/g, '_') || 'handoff';
-      const safePlatform = String(conversation.platform || acm._detectPlatform()).replace(/[^\p{L}\p{N}]+/gu, '_');
-      const filename = `${safeTitle}-lisa-${safePlatform}.json`;
+        .normalize('NFC').replace(/[^\p{L}\p{M}\p{N} -]/gu, '').trim();
+      // Same rule as lisaSafeTitle() in shared/export-builders.js (not loaded
+      // in content scripts): every script's letters + combining marks, cut at
+      // whole characters.
+      const safeTitleCut = Array.from(safeTitle).slice(0, 50).join('').trim().replace(/\s+/g, '_') || 'handoff';
+      const safePlatform = String(conversation.platform || acm._detectPlatform()).replace(/[^\p{L}\p{M}\p{N}]+/gu, '_');
+      const filename = `${safeTitleCut}-lisa-${safePlatform}.json`;
       this.showToast("Opening new tab and transferring context...");
 
       const injectResult = await chrome.runtime.sendMessage({

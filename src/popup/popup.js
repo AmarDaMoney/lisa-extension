@@ -1518,7 +1518,7 @@ class LISAPopup {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const platform = (this.compressedData.metadata.platform || 'unknown').replace(/[.\s()]/g, '-');
-    const title = (this.compressedData.metadata?.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
+    const title = lisaSafeTitle(this.compressedData.metadata?.title || '');
     const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
     const lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory: await this._getCheckpointHistory() });
@@ -2268,7 +2268,7 @@ class LISAPopup {
         }
         const isJson = typeof content === 'string' && content.trimStart().startsWith('{');
         const ext = isJson ? '.json' : '.md';
-        const title = (snap.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
+        const title = lisaSafeTitle(snap.title || 'handoff');
         return { filename: title + '-lisa-' + (snap.platform || 'unknown') + ext, content, mimeType: isJson ? 'application/json' : 'text/markdown' };
       });
 
@@ -2365,7 +2365,7 @@ class LISAPopup {
       
       const a = document.createElement('a');
       a.href = url;
-      const snapshotTitle = (snapshot.title || '').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
+      const snapshotTitle = lisaSafeTitle(snapshot.title || '');
       a.download = snapshotTitle ? `${snapshotTitle}-lisa-${snapshot.platform}-${snapshot.id}.${extension}` : `lisa-${snapshot.platform}-${snapshot.id}.${extension}`;
       a.click();
       
@@ -2550,7 +2550,7 @@ class LISAPopup {
         // All other formats: wrap with structured header for AI consumption
         injectContent = this.wrapRawContentAsMarkdown(snapshot, snapCheckpointHistory) || this.convertSnapshotToMarkdown(snapshot);
       }
-      const snapshotTitle = (snapshot.title || 'handoff').replace(/[^a-zA-Z0-9 -]/g, '').trim().substring(0, 50).replace(/\s+/g, '_');
+      const snapshotTitle = lisaSafeTitle(snapshot.title || 'handoff');
       // Platforms dedupe attachments by filename within a conversation: a
       // repeated name silently re-attaches the first file. Two snapshots of
       // one conversation share title and platform, and a null format used to

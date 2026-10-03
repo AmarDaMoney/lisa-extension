@@ -1,5 +1,5 @@
 // Microsoft Copilot Conversation Parser
-// Extracts conversation data from copilot.microsoft.com
+// Extracts conversation data from copilot.com (formerly copilot.microsoft.com)
 
 class CopilotParser {
   constructor() {
@@ -9,7 +9,7 @@ class CopilotParser {
 
   extractConversationId() {
     // Copilot may use session or conversation IDs
-    const match = window.location.pathname.match(/\/chat\/([a-zA-Z0-9-]+)/);
+    const match = window.location.pathname.match(/\/chat\/(?:conversation\/)?([a-zA-Z0-9-]+)/);
     return match ? match[1] : 'copilot-session';
   }
 

@@ -22,6 +22,8 @@
     "https://chat.mistral.ai/*",
     "https://chat.deepseek.com/*",
     "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*",
     "https://*.perplexity.ai/*",
     "https://lisa-web-backend-production.up.railway.app/*"
   ],
@@ -150,7 +152,9 @@
     },
     {
       "matches": [
-        "https://copilot.microsoft.com/*"
+        "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*"
       ],
       "js": [
         "src/content/copilot-parser.js",
@@ -261,6 +265,8 @@
         "https://chat.mistral.ai/*",
         "https://chat.deepseek.com/*",
         "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*",
         "https://*.perplexity.ai/*"
       ]
     }

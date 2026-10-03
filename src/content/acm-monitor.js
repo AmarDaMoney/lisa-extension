@@ -59,7 +59,7 @@ const ACMMonitor = {
     grok:        'https://grok.com/',
     deepseek:    'https://chat.deepseek.com/',
     mistral:     'https://chat.mistral.ai/chat',
-    copilot:     'https://copilot.microsoft.com/',
+    copilot:     'https://copilot.com/',
     perplexity:  'https://www.perplexity.ai/',
     huggingchat: 'https://huggingface.co/chat/',
     metaai:      'https://meta.ai/', // LISA's content scripts match meta.ai only — www.meta.ai never got them
@@ -92,7 +92,7 @@ const ACMMonitor = {
     if (host.includes('grok.com')) return 'grok';
     if (host.includes('deepseek.com')) return 'deepseek';
     if (host.includes('mistral.ai')) return 'mistral';
-    if (host.includes('copilot.microsoft')) return 'copilot';
+    if (/copilot\.(microsoft\.)?com/.test(host)) return 'copilot';
     if (host.includes('perplexity.ai')) return 'perplexity';
     if (host.includes('huggingface.co')) return 'huggingchat';
     if (host.includes('meta.ai')) return 'metaai';
@@ -287,7 +287,7 @@ const ACMMonitor = {
     if (host.includes('huggingface.co'))        return '[data-message-type], [data-message-role]';
     if (host.includes('meta.ai'))               return '[data-message-type], [data-testid="assistant-message"]';
     if (host.includes('mistral.ai'))            return '[class*="message"]';
-    if (host.includes('copilot.microsoft.com')) return '[class*="user-message"], [class*="ai-message"]';
+    if (/copilot\.(microsoft\.)?com/.test(host)) return '[class*="user-message"], [class*="ai-message"]';
     return '[data-message-author-role]';
   },
 

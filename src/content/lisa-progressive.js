@@ -82,7 +82,7 @@ class LisaProgressiveCapture {
       [/poe\.com/,                 /\/chat\/([a-zA-Z0-9]+)/],
       [/huggingface\.co/,           /\/chat\/conversation\/([a-f0-9]+)/],
       [/meta\.ai/,                  /\/prompt\/([a-f0-9-]+)/],
-      [/copilot\.microsoft\.com/,  /\/chat\/([a-zA-Z0-9-]+)/],
+      [/copilot\.(microsoft\.)?com/, /\/chat\/(?:conversation\/)?([a-zA-Z0-9-]+)/],
     ];
     for (const [hostRe, pathRe] of patterns) {
       if (hostRe.test(host)) {
@@ -107,7 +107,7 @@ class LisaProgressiveCapture {
     if (host.includes('huggingface.co'))         return '[data-message-type], [data-message-role]';
     if (host.includes('meta.ai'))                return '[data-message-type], [data-testid="assistant-message"]';
     if (host.includes('mistral.ai'))            return '[class*="message"]';
-    if (host.includes('copilot.microsoft.com')) return '[class*="user-message"], [class*="ai-message"]';
+    if (/copilot\.(microsoft\.)?com/.test(host)) return '[class*="user-message"], [class*="ai-message"]';
     return '[data-message-author-role]';
   }
 

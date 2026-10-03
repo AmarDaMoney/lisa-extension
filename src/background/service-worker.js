@@ -1268,7 +1268,7 @@ class SnapshotManager {
     if (url.includes('grok.com')) return 'Grok';
     if (url.includes('chat.mistral.ai')) return 'Mistral AI';
     if (url.includes('chat.deepseek.com')) return 'DeepSeek';
-    if (url.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
+    if (/copilot\.(microsoft\.)?com/.test(url)) return 'Microsoft Copilot';
     if (url.includes('perplexity.ai')) return 'Perplexity';
     if (url.includes('poe.com')) return 'Poe';
     if (url.includes('huggingface.co')) return 'HuggingChat';
@@ -1863,7 +1863,7 @@ async function handleCopyAsLisa(info, tab) {
     else if (/gemini\.google/.test(sourceUrl)) sourcePlatform = 'Gemini';
     else if (/mistral\.ai/.test(sourceUrl)) sourcePlatform = 'Mistral';
     else if (/deepseek\.com/.test(sourceUrl)) sourcePlatform = 'DeepSeek';
-    else if (/copilot\.microsoft/.test(sourceUrl)) sourcePlatform = 'Copilot';
+    else if (/copilot\.(microsoft\.)?com/.test(sourceUrl)) sourcePlatform = 'Copilot';
     else if (/perplexity\.ai/.test(sourceUrl)) sourcePlatform = 'Perplexity';
     else if (/x\.ai|grok\.com/.test(sourceUrl)) sourcePlatform = 'Grok';
 
@@ -1936,7 +1936,7 @@ async function ensureContentScriptLoaded(tab) {
     else if (url.includes('grok.com')) scriptFile = 'src/content/grok-parser.js';
     else if (url.includes('chat.mistral.ai')) scriptFile = 'src/content/mistral-parser.js';
     else if (url.includes('chat.deepseek.com')) scriptFile = 'src/content/deepseek-parser.js';
-    else if (url.includes('copilot.microsoft.com')) scriptFile = 'src/content/copilot-parser.js';
+    else if (/copilot\.(microsoft\.)?com/.test(url)) scriptFile = 'src/content/copilot-parser.js';
     else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
     else if (url.includes('poe.com')) scriptFile = 'src/content/poe-parser.js';
     else if (url.includes('huggingface.co')) scriptFile = 'src/content/huggingchat-parser.js';
@@ -2058,6 +2058,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       'chat.mistral.ai',
       'chat.deepseek.com',
       'copilot.microsoft.com',
+      'copilot.com',
       'perplexity.ai'
     ];
     

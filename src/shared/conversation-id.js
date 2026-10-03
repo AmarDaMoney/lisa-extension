@@ -43,7 +43,8 @@ function getConversationIdFromUrl(urlString) {
     [/poe\.com/,                /\/chat\/([a-zA-Z0-9]+)/],
     [/huggingface\.co/,         /\/chat\/conversation\/([a-f0-9]+)/],
     [/meta\.ai/,                /\/prompt\/([a-f0-9-]+)/],
-    [/copilot\.microsoft\.com/, /\/chat\/([a-zA-Z0-9-]+)/],
+    // copilot.com (new) and copilot.microsoft.com; new URLs are /chat/conversation/<id>
+    [/copilot\.(microsoft\.)?com/, /\/chat\/(?:conversation\/)?([a-zA-Z0-9-]+)/],
   ];
   for (const [hostRe, pathRe] of patterns) {
     if (hostRe.test(host)) {

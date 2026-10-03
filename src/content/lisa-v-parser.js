@@ -53,7 +53,7 @@ class LisaVParser {
     if (host.includes('grok.com')) return 'Grok';
     if (host.includes('chat.mistral.ai')) return 'Mistral AI';
     if (host.includes('chat.deepseek.com')) return 'DeepSeek';
-    if (host.includes('copilot.microsoft.com')) return 'Microsoft Copilot';
+    if (/copilot\.(microsoft\.)?com/.test(host)) return 'Microsoft Copilot';
     if (host.includes('perplexity.ai')) return 'Perplexity';
     if (host.includes('poe.com')) return 'Poe';
     if (host.includes('huggingface.co')) return 'HuggingChat';

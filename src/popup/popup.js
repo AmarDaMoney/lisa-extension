@@ -427,7 +427,7 @@ class LISAPopup {
         platform = 'Mistral AI';
       } else if (url.includes('chat.deepseek.com')) {
         platform = 'DeepSeek';
-      } else if (url.includes('copilot.microsoft.com')) {
+      } else if (/copilot\.(microsoft\.)?com/.test(url)) {
         platform = 'Microsoft Copilot';
       } else if (url.includes('perplexity.ai')) {
         platform = 'Perplexity';
@@ -956,7 +956,7 @@ class LISAPopup {
       else if (url.includes('x.com')) scriptFile = 'src/content/grok-parser.js';
       else if (url.includes('chat.mistral.ai')) scriptFile = 'src/content/mistral-parser.js';
       else if (url.includes('chat.deepseek.com')) scriptFile = 'src/content/deepseek-parser.js';
-      else if (url.includes('copilot.microsoft.com')) scriptFile = 'src/content/copilot-parser.js';
+      else if (/copilot\.(microsoft\.)?com/.test(url)) scriptFile = 'src/content/copilot-parser.js';
       else if (url.includes('perplexity.ai')) scriptFile = 'src/content/perplexity-parser.js';
       else if (url.includes('poe.com')) scriptFile = 'src/content/poe-parser.js';
       else if (url.includes('huggingface.co')) scriptFile = 'src/content/huggingchat-parser.js';

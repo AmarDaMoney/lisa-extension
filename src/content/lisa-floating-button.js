@@ -638,7 +638,7 @@ class LISAFloatingButton {
         this.showToast('❌ ' + (response?.error || 'Save failed'), true);
         return;
       }
-      const remaining = await this.incrementFloatingLimit('md');
+      const remaining = limitCheck.credits ? undefined : await this.incrementFloatingLimit('md'); // paid with a credit → don't also use a free save
       if (remaining !== undefined && remaining <= 5) {
         const label = remaining > 2 ? `${remaining} welcome credits remaining` : `${remaining} saves remaining today`;
         setTimeout(() => this.showToast(label), 2000);
@@ -686,7 +686,7 @@ class LISAFloatingButton {
         if (parser.usedFallbackCapture) {
           setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
         }
-        const remaining = await this.incrementFloatingLimit('lisav');
+        const remaining = limitCheck.credits ? undefined : await this.incrementFloatingLimit('lisav'); // paid with a credit → don't also use a free save
           if (remaining !== undefined && remaining <= 5) {
             const label = remaining > 2 ? `${remaining} welcome credits remaining` : `${remaining} saves remaining today`;
             setTimeout(() => this.showToast(label), 2000);
@@ -963,7 +963,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       });
 
       if (injectResult && injectResult.success) {
-        await this.incrementFloatingLimit('handoff');
+        if (!limitCheck.credits) await this.incrementFloatingLimit('handoff'); // paid with a credit → don't also use a free save
         const waitsForPaste = injectResult.method === 'clipboard' || injectResult.method === 'chatgpt-pasteIntercept';
         const methodLabel = waitsForPaste ? 'ready — press Ctrl+V' : 'injected';
         this.showToast(`Handoff ${methodLabel} into the new tab.`);

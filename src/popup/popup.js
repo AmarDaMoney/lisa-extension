@@ -164,7 +164,11 @@ class LISAPopup {
     return daysSinceReset >= 1;
   }
 
-  async updateUsageStats(type) {
+  async updateUsageStats(type, limitCheck) {
+    // Free allowances only count free use: Premium (incl. PAYG with
+    // credits) is uncapped, and an action already paid for with a credit
+    // must not also eat the welcome pool / daily count.
+    if (this.userTier === 'premium' || (limitCheck && limitCheck.credits)) return;
     // Decrement welcome pool first, then count daily
     if (this.usageStats.lifetimeFreePool > 0) {
       this.usageStats.lifetimeFreePool--;
@@ -1197,7 +1201,7 @@ class LISAPopup {
         // Show language indicator
         this.showLanguageIndicator(this.compressedData.session_metadata?.language);
 
-        await this.updateUsageStats('compress');
+        await this.updateUsageStats('compress', limitCheck);
         this.setupUI(); // Refresh button texts with new count
 
         if (this.userTier === 'free') {
@@ -1316,6 +1320,11 @@ class LISAPopup {
         const err = await response.json().catch(() => ({}));
         if (err.detail?.error_code === 'LICENSE_REQUIRED') {
           this.showError('Valid license key required for AI Compress.');
+        } else if (err.detail?.error_code === 'INSUFFICIENT_CREDITS') {
+          clearInterval(progressInterval);
+          document.getElementById('loadingProgress').style.display = 'none';
+          this.showError(err.detail.message || 'Not enough credits for AI Compress. Top up to continue.');
+          this.loadCreditBalance();
         } else if (err.detail?.error_code === 'DAILY_LIMIT_EXCEEDED') {
           clearInterval(progressInterval);
           document.getElementById('loadingProgress').style.display = 'none';
@@ -1343,6 +1352,7 @@ class LISAPopup {
         aiToken.semanticTokens = aiToken.semanticTokens || [];
         this.compressedData = aiToken;
         this.compressedData._aiCompressed = true;
+        this.loadCreditBalance(); // PAYG: the server just charged for this
 
         // Merge popup enrichment into AI compressed output
         const convEnrich = this.currentConversation || {};
@@ -1544,7 +1554,7 @@ class LISAPopup {
       }
       
       if (downloadId) {
-        this.updateUsageStats('export');
+        this.updateUsageStats('export', limitCheck);
         this.setupUI(); // Refresh button texts with new count
         
         this.trackEvent('download', { 
@@ -1603,7 +1613,7 @@ class LISAPopup {
       this.hideLoading();
 
       if (response && response.success) {
-        await this.updateUsageStats('export');
+        await this.updateUsageStats('export', limitCheck);
         this.setupUI(); // Refresh button texts with new count
 
         this.updatePlatformStatus('✅ Saved to library!', true);

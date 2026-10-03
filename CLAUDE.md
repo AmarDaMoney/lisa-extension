@@ -229,6 +229,29 @@ and shared/conversation-id.js) — stable across reloads, so checkpoints
 persist. Claude Code confirmed live as a handoff source (→ Claude, →
 fresh Claude Code session; other targets reported working).
 
+### Copilot capture (copilot.com)
+Copilot moved from copilot.microsoft.com to **copilot.com** (+ www); both
+are matched everywhere (manifest, `/copilot\.(microsoft\.)?com/` checks).
+Adding the new host is a new permission — CWS users get an approval
+prompt on update. Conversation URLs are `/chat/conversation/<id>` (the id
+regex skips the literal "conversation").
+
+Markup, confirmed by live DOM inspection — note the misleading name:
+- user turn: `[data-testid="chatQuestion"]`, text in `.fai-UserMessage__message`,
+  which wraps **`[data-testid="chatOutput"]` = the user's own text, NOT the reply**
+- assistant turn: `[data-testid="copilot-message-div"]` / `.fai-CopilotMessage`,
+  text in `.fai-CopilotMessage__content`
+The list is virtualized and **recycles a few DOM nodes** for different
+messages while scrolling, so `lisaCopilotCollectAll()` (in
+`copilot-parser.js`, shared by `CopilotParser` and `LisaVParser`) climbs to
+the top, then sweeps down in small steps deduping by role + text — never
+by node. No REST history endpoint is visible to the page (only
+`client_health_ping` + telemetry), so DOM capture is the path. Console:
+`[LISA] Copilot history: …` / `Copilot capture: N messages`. To debug,
+dump one turn's outline (tags, data-testid, fai-* classes) from the page
+console, or run `__lisaCopilotCollectAll()` + `LisaVParser` from the
+LISA console context and compare COLLECTED vs EXPORTED.
+
 **Known pre-existing dead ends** (not from ACM work, found during a code
 audit): `preCacheConversation` (sent from `lisa-floating-button.js` on
 tab-hide) and `refreshUserTier` (sent from `success.html` post-checkout)

@@ -38,27 +38,18 @@ const ACMMonitor = {
     red: 120,    // yellow to red: recommend refresh; red+: critical
   },
 
-  // Platform compatibility matrix for handoff — which targets receive well
-  // from which source. Built from testing; will grow as we verify more pairs.
-  // true = tested and works, false = tested and problematic, absent = untested
-  // Untested entries (anything beyond claude<->chatgpt/gemini/grok) are
-  // best-guess, same as the pre-existing deepseek/mistral/copilot/perplexity
-  // rows — verify with real file auto-inject before trusting, see CLAUDE.md.
-  HANDOFF_COMPAT: {
-    claude:    { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true, huggingchat: true, metaai: true, poe: true, claudecode: true },
-    chatgpt:   { claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true, huggingchat: true, metaai: true, poe: true, claudecode: true },
-    gemini:    { claude: true, chatgpt: true, gemini: true },
-    grok:      { claude: true, chatgpt: true, grok: true },
-    deepseek:  { claude: true, chatgpt: true, deepseek: true },
-    mistral:   { claude: true, chatgpt: true, mistral: true },
-    copilot:   { claude: true, chatgpt: true },
-    perplexity:{ claude: true, chatgpt: true },
-    huggingchat:{ claude: true, chatgpt: true },
-    metaai:    { claude: true, chatgpt: true },
-    poe:       { claude: true, chatgpt: true },
-    // Claude Code as a source: same receivers as Claude chat (untested
-    // beyond what Claude's own row already reflects).
-    claudecode:{ claude: true, chatgpt: true, gemini: true, grok: true, deepseek: true, mistral: true, huggingchat: true, metaai: true, poe: true },
+  // Handoff destinations, by how well each one *receives* a handoff. The
+  // payload is the same JSON whatever the source platform, so this is a
+  // property of the target only — every source gets the same list (it was
+  // a per-source matrix before, which left most sources with 2-3 targets).
+  // Status from live tests: 'ok' = file arrives; 'failing' = known not to
+  // arrive yet; 'untested' = not tried live. Non-'ok' entries stay
+  // pickable but are labelled in the picker.
+  HANDOFF_RECEIVERS: {
+    claude: 'ok', chatgpt: 'ok', gemini: 'ok', grok: 'ok', deepseek: 'ok',
+    huggingchat: 'ok', poe: 'ok', claudecode: 'ok',
+    mistral: 'failing', metaai: 'failing',
+    copilot: 'untested', perplexity: 'untested',
   },
 
   // New chat URLs per platform
@@ -79,7 +70,6 @@ const ACMMonitor = {
 
   async getHandoffTargets() {
     const currentPlatform = this._detectPlatform();
-    const compat = this.HANDOFF_COMPAT[currentPlatform] || {};
 
     try {
       const result = await chrome.storage.sync.get(['acmPlatforms']);
@@ -87,8 +77,8 @@ const ACMMonitor = {
       if (userPrefs.length === 0) return [];
 
       return userPrefs
-        .filter(p => p !== currentPlatform && compat[p] === true)
-        .map(p => ({ platform: p, url: this.NEW_CHAT_URLS[p] }));
+        .filter(p => p !== currentPlatform && this.HANDOFF_RECEIVERS[p] && this.NEW_CHAT_URLS[p])
+        .map(p => ({ platform: p, url: this.NEW_CHAT_URLS[p], status: this.HANDOFF_RECEIVERS[p] }));
     } catch (_) {
       return [];
     }

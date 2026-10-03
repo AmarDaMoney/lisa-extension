@@ -763,7 +763,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 
     const allTargets = [
       { platform: currentPlatform, url: acm.NEW_CHAT_URLS[currentPlatform], label: `${platformNames[currentPlatform] || currentPlatform} (fresh session)` },
-      ...targets.map(t => ({ ...t, label: platformNames[t.platform] || t.platform }))
+      ...targets.map(t => ({ ...t, label: (platformNames[t.platform] || t.platform) +
+        (t.status === 'untested' ? ' (untested)' : t.status === 'failing' ? ' (known issue)' : '') }))
     ];
 
     const destPanel = document.createElement('div');
@@ -835,18 +836,26 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       const acm = window.__lisaACM;
       const checkpointHistory = await acm.getCheckpointHistory(); // full chain, oldest first — [] if none exist
 
-      // Extract the live conversation the same way Compress & Copy does
+      // Extract the live conversation: the platform's own API where LISA has
+      // one (Claude, Claude Code, ChatGPT, Perplexity — acm._getApiCapture()
+      // maps them), else the same LisaVParser capture Markdown export uses.
+      // Without that fallback every other source platform (Gemini, Grok,
+      // DeepSeek, Mistral, …) got "No messages to hand off".
       let conversation = null;
-      if (window.__LISA_CLAUDE_CODE_API_CAPTURE && window.location.pathname.startsWith('/code/')) {
-        conversation = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_CODE_API_CAPTURE, false);
-      }
-      if (!conversation && window.__LISA_CLAUDE_API_CAPTURE) {
+      const apiCapture = typeof acm._getApiCapture === 'function' ? acm._getApiCapture() : null;
+      if (apiCapture) {
         const isShared = window.location.pathname.startsWith('/share/');
-        conversation = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
+        conversation = await this._captureViaApiWithRetry(apiCapture, isShared);
       }
-      if (!conversation && window.__LISA_CHATGPT_API_CAPTURE) {
-        const isShared = window.location.pathname.startsWith('/share/');
-        conversation = await this._captureViaApiWithRetry(window.__LISA_CHATGPT_API_CAPTURE, isShared);
+      if (!conversation || !conversation.messages || conversation.messages.length === 0) {
+        try {
+          const parser = new LisaVParser();
+          await parser.extractConversation();
+          await parser.finalize();
+          conversation = parser.toMessages();
+        } catch (e) {
+          console.warn('[LISA] Handoff: page capture failed:', e);
+        }
       }
       if (!conversation || !conversation.messages || conversation.messages.length === 0) {
         this.showToast("No messages to hand off", true);

@@ -1689,7 +1689,7 @@ class LISAPopup {
       const badge = document.getElementById('creditBalance');
       const count = document.getElementById('creditCount');
       if (badge && count) {
-        count.textContent = "$" + (balance * 0.01).toFixed(2);
+        count.textContent = balance.toLocaleString(); // template already says "credits"
         badge.style.display = balance > 0 ? 'inline-block' : 'none';
       }
     } catch (e) {

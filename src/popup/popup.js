@@ -1888,13 +1888,22 @@ class LISAPopup {
 
     try {
       // Call the app API to validate the license (key sent in body, not URL)
-      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/validate-license', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ key: licenseKey })
-      });
+      let response;
+      try {
+        response = await fetch('https://lisa-web-backend-production.up.railway.app/api/validate-license', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ key: licenseKey })
+        });
+      } catch (networkError) {
+        // Only a failed request (offline, DNS, server unreachable) lands
+        // here — everything else below has a real HTTP status to report.
+        console.error('[LISA] License validation: server unreachable:', networkError);
+        this.showLicenseStatus('invalid', '❌', "Couldn't reach the LISA server. Check your connection and try again.");
+        return;
+      }
 
       if (response.ok) {
         const data = await response.json();
@@ -1923,12 +1932,21 @@ class LISAPopup {
       } else if (response.status === 401 || response.status === 403) {
         this.showLicenseStatus('invalid', '❌', 'Invalid license key');
       } else {
-        throw new Error('Validation failed');
+        // Previously every non-401/403 status was reported as "check your
+        // internet connection", hiding server errors behind a network message.
+        let body = '';
+        try { body = (await response.text()).slice(0, 300); } catch (_) {}
+        console.error('[LISA] License validation: HTTP ' + response.status, body);
+        this.showLicenseStatus('invalid', '❌', response.status >= 500
+          ? `LISA server error (HTTP ${response.status}). Please try again shortly.`
+          : `Unexpected server response (HTTP ${response.status}). Please contact support.`);
       }
-      
+
     } catch (error) {
+      // Reaching here means the server answered but something after that
+      // failed (unreadable response, storage error) — not a connection issue.
       console.error('[LISA] License validation error:', error);
-      this.showLicenseStatus('invalid', '❌', 'Could not validate license. Check your internet connection and try again.');
+      this.showLicenseStatus('invalid', '❌', 'Something went wrong while validating the license. Please try again.');
     } finally {
       validateBtn.disabled = false;
       validateBtn.textContent = 'Validate';

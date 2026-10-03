@@ -48,7 +48,7 @@ const ACMMonitor = {
   HANDOFF_RECEIVERS: {
     claude: 'ok', chatgpt: 'ok', gemini: 'ok', grok: 'ok', deepseek: 'ok',
     huggingchat: 'ok', poe: 'ok', claudecode: 'ok', mistral: 'ok', metaai: 'ok',
-    copilot: 'untested', perplexity: 'untested',
+    copilot: 'ok', perplexity: 'ok',
   },
 
   // New chat URLs per platform

@@ -6,6 +6,24 @@ class LISAFloatingButton {
     this.button = null;
     this.isPremium = false;
     this.init();
+    // Toggle from the popup — registered once here: init() re-runs on every
+    // tier/settings change, and a listener added there stacked up, so one
+    // toggle ran several times (hide, then show again) and could save
+    // hideFloatingButton the wrong way round.
+    try {
+      chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.action !== 'toggleFloatingButton') return false;
+        if (this.button) {
+          this.removeButton();
+          chrome.storage.sync.set({ hideFloatingButton: true });
+        } else {
+          this.createButton();
+          chrome.storage.sync.set({ hideFloatingButton: false });
+        }
+        sendResponse({ success: true, visible: !!this.button });
+        return false;
+      });
+    } catch (_) { /* extension context gone */ }
     // Listen for storage changes to re-init after popup sets premium
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === "sync" && (changes.userTier || changes.askOnChatSwitch)) {
@@ -24,21 +42,6 @@ class LISAFloatingButton {
         this.createButton();
       }
 
-      // Listen for toggle messages from popup
-      chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        if (request.action === 'toggleFloatingButton') {
-          if (this.button) {
-            this.removeButton();
-            chrome.storage.sync.set({ hideFloatingButton: true });
-          } else {
-            this.createButton();
-            chrome.storage.sync.set({ hideFloatingButton: false });
-          }
-          sendResponse({ success: true, visible: !!this.button });
-          return true;
-        }
-      });
-      
     } catch (error) {
       console.debug('[LISA] Could not check premium status');
     }

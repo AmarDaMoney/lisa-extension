@@ -229,6 +229,24 @@ and shared/conversation-id.js) — stable across reloads, so checkpoints
 persist. Claude Code confirmed live as a handoff source (→ Claude, →
 fresh Claude Code session; other targets reported working).
 
+### Claude in Chrome conversations (claude.ai/chat/<v8 uuid>)
+Conversations made with the Claude in Chrome extension open on claude.ai
+but 404 on the REST `/chat_conversations/<id>` endpoints (ids are v8
+UUIDs, `xxxxxxxx-xxxx-8xxx-…`), and their page DOM has no
+`[data-test-render-count]` wrappers, so the DOM fallback finds ~1 message.
+`extractViaAPI()` in `claude-api-capture.js` falls back on a REST 404 to
+`extractViaRPC()`: Connect RPC with protobuf bodies (found live via
+DevTools), `anthropic.bard.api.v1alpha.ConversationService/`:
+`StreamTimeline` (server stream, `application/connect+proto`; its first
+data frame = newest ~40 messages + a signed `csh1.…` cursor; aborted
+after that frame), then `ReadConversationHistory` `{1 id, 2 cursor,
+3 {6:1,22:1}}` (`application/proto`), one older page per call, each with
+the next cursor, until none. Field map is in the code comment. Cursors are
+server-signed — never construct them. Per-conversation cache: repeat calls
+(ACM) cost the stream + 1 page. Message count is real turns (live: 107 —
+user 53 / assistant 54) while the cursor's `c` counts ~1884 entries
+including tool steps. Console: `[LISA] Claude RPC capture: N messages`.
+
 ### Copilot capture (copilot.com)
 Copilot moved from copilot.microsoft.com to **copilot.com** (+ www); both
 are matched everywhere (manifest, `/copilot\.(microsoft\.)?com/` checks).

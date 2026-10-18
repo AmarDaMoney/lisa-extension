@@ -467,7 +467,71 @@ class LisaVParser {
     }
   }
 
+  // Newer claude.ai transcript layout (live: Claude in Chrome conversations):
+  // no [data-test-render-count]; each turn is a virtualized
+  // [data-testid="transcript-row"] with a stable data-index and
+  // data-perf-row="human"|"assistant". Rows mount/unmount while scrolling,
+  // so sweep top → bottom collecting by data-index.
+  async extractClaudeTranscriptRows() {
+    const rows = new Map(); // data-index -> {role, el blocks}
+    const collect = async () => {
+      for (const row of document.querySelectorAll('[data-testid="transcript-row"][data-index]')) {
+        const idx = parseInt(row.getAttribute('data-index'), 10);
+        if (Number.isNaN(idx)) continue;
+        const kind = row.getAttribute('data-perf-row');
+        const role = kind === 'human' ? 'user' : 'assistant';
+        const el = row.querySelector(role === 'user' ? '[data-testid="user-message"]' : '[data-testid="assistant-message"]');
+        if (!el) continue;
+        const prev = rows.get(idx);
+        // Keep the longest version seen (a row can mount half-rendered).
+        const len = el.textContent.length;
+        if (prev && prev.len >= len) continue;
+        const blocks = (await this.parseMessageContent(el, role)).filter(bl => bl.v && bl.v.trim());
+        if (blocks.length && typeof blocks[0].v === 'string') {
+          blocks[0].v = blocks[0].v.replace(/^(You said|Vous avez dit|Claude replied|Claude a répondu)\s*:?\s*/i, '');
+        }
+        if (blocks.length) rows.set(idx, { len, blocks });
+      }
+    };
+    const first = document.querySelector('[data-testid="transcript-row"]');
+    let scroller = first && first.parentElement;
+    while (scroller && scroller !== document.body) {
+      const s = getComputedStyle(scroller);
+      if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && scroller.scrollHeight > scroller.clientHeight + 50) break;
+      scroller = scroller.parentElement;
+    }
+    if (!scroller || scroller === document.body) scroller = document.scrollingElement;
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const startTop = scroller.scrollTop;
+    // Climb until the top stops growing (older rows load in as we arrive).
+    let lastHeight = -1, stable = 0;
+    for (let i = 0; i < 200 && stable < 3; i++) {
+      scroller.scrollTop = 0;
+      await wait(500);
+      await collect();
+      if (scroller.scrollHeight === lastHeight) stable++; else { stable = 0; lastHeight = scroller.scrollHeight; }
+    }
+    // Sweep down in overlapping steps.
+    const step = Math.max(Math.floor(scroller.clientHeight * 0.5), 200);
+    for (let top = 0, i = 0; i < 2000; i++) {
+      await collect();
+      if (top >= scroller.scrollHeight - scroller.clientHeight) break;
+      top += step;
+      scroller.scrollTop = top;
+      await wait(250);
+    }
+    await collect();
+    scroller.scrollTop = startTop;
+    const out = [...rows.entries()].sort((a, b) => a[0] - b[0]).map(e => e[1].blocks);
+    console.log('[LISA] Claude transcript-row capture: ' + out.length + ' messages');
+    return out;
+  }
+
   async extractClaudeMessages() {
+    if (!document.querySelector('[data-test-render-count]') &&
+        document.querySelector('[data-testid="transcript-row"][data-index]')) {
+      return this.extractClaudeTranscriptRows();
+    }
     // Scroll sweep for virtualised Claude conversations
     const progressive = window.lisaProgressive;
     const domCount = document.querySelectorAll('[data-test-render-count]').length;

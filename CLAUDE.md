@@ -246,6 +246,12 @@ server-signed — never construct them. Per-conversation cache: repeat calls
 (ACM) cost the stream + 1 page. Message count is real turns (live: 107 —
 user 53 / assistant 54) while the cursor's `c` counts ~1884 entries
 including tool steps. Console: `[LISA] Claude RPC capture: N messages`.
+DOM fallback for that layout: `LisaVParser.extractClaudeTranscriptRows()` —
+rows are `[data-testid="transcript-row"][data-index]` with
+`data-perf-row="human"|"assistant"`, text in `[data-testid="user-message"]` /
+`[data-testid="assistant-message"]`; virtualized, so it climbs to the top
+then sweeps down collecting by `data-index`. Used only when the page has no
+`[data-test-render-count]`. Console: `[LISA] Claude transcript-row capture`.
 
 ### Copilot capture (copilot.com)
 Copilot moved from copilot.microsoft.com to **copilot.com** (+ www); both

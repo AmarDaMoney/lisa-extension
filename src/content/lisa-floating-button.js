@@ -481,6 +481,7 @@ class LISAFloatingButton {
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
       else if (action === "checkpoint") await this.contextCheckpoint();
+      else if (action === "inference-shield") await this.checkWithInferenceShield();
     });
 
     // Close on outside click
@@ -526,6 +527,8 @@ class LISAFloatingButton {
       <div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>
       <div class="lisa-menu-item" data-action="handoff" title="Pick a destination and hand off your context">🔄 Handoff</div>
       ` : ''}
+      <div class="lisa-menu-section-label">Protect</div>
+      <div class="lisa-menu-item" data-action="inference-shield" title="Open this conversation in Inference Shield to see what it reveals about your technology before you share it">🛡 Inference Shield</div>
     `;
   }
 
@@ -543,6 +546,87 @@ class LISAFloatingButton {
       if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 500));
     }
     return null;
+  }
+
+  // Markdown for a captured conversation; shared by Save as Markdown and
+  // Inference Shield so both show the same text.
+  _conversationToMarkdown(messages) {
+    const title = messages.title || document.title || 'Conversation';
+    const platform = messages.platform || 'AI';
+    const date = new Date().toISOString().split('T')[0];
+    let md = `# ${title}\n`;
+    md += `> ${platform} conversation — exported ${date}\n\n---\n\n`;
+
+    for (const msg of messages.messages) {
+      const role = msg.role === 'user' ? 'User' : 'Assistant';
+      let text = typeof msg.content === 'string' ? msg.content : (msg.content ? JSON.stringify(msg.content) : '');
+      // Tool calls/results live in msg.artifacts, not msg.content (see
+      // claude-api-capture.js's processContentBlocks) — without this, a
+      // message that's purely a tool call renders as an empty section
+      // with its actual content silently lost.
+      if (Array.isArray(msg.artifacts) && msg.artifacts.length > 0) {
+        const artifactText = msg.artifacts.map(a => {
+          if (a.type === 'tool_use') return `Tool call: ${a.name}\nInput: ${JSON.stringify(a.input)}`;
+          if (a.type === 'tool_result') {
+            const resultText = typeof a.content === 'string' ? a.content : JSON.stringify(a.content);
+            return `Tool result:\n${resultText}`;
+          }
+          return null;
+        }).filter(Boolean).join('\n\n');
+        text = text ? `${text}\n\n${artifactText}` : artifactText;
+      }
+      md += `### ${role}\n\n${text}\n\n`;
+    }
+    return md;
+  }
+
+  // The live conversation: the platform's own API where LISA has one (via
+  // ACM's map, else Claude/ChatGPT capture modules), then the LisaVParser
+  // page capture. Same chain Handoff uses.
+  async _captureConversation() {
+    let conversation = null;
+    const acm = window.__lisaACM;
+    const apiCapture = acm && typeof acm._getApiCapture === 'function'
+      ? acm._getApiCapture()
+      : (window.__LISA_CLAUDE_API_CAPTURE || window.__LISA_CHATGPT_API_CAPTURE || null);
+    if (apiCapture) {
+      const isShared = window.location.pathname.startsWith('/share/');
+      conversation = await this._captureViaApiWithRetry(apiCapture, isShared);
+    }
+    if (!conversation || !conversation.messages || conversation.messages.length === 0) {
+      try {
+        const parser = new LisaVParser();
+        await parser.extractConversation();
+        await parser.finalize();
+        conversation = parser.toMessages();
+      } catch (e) {
+        console.warn('[LISA] Page capture failed:', e);
+      }
+    }
+    return conversation && conversation.messages && conversation.messages.length ? conversation : null;
+  }
+
+  // Open the conversation in Inference Shield (a new tab next to this one).
+  // Free: it's only a hand-off; Shield charges when the user presses Run.
+  async checkWithInferenceShield() {
+    try {
+      this.showToast("Opening Inference Shield...");
+      const conversation = await this._captureConversation();
+      if (!conversation) {
+        this.showToast("❌ No messages found", true);
+        return;
+      }
+      const title = conversation.title || document.title || 'Conversation';
+      const response = await chrome.runtime.sendMessage({
+        action: 'openInferenceShield',
+        text: this._conversationToMarkdown(conversation),
+        source: `${conversation.platform || 'AI'} conversation "${title}"`.slice(0, 80),
+      });
+      if (!response || !response.ok) this.showToast("❌ Couldn't open Inference Shield", true);
+    } catch (e) {
+      console.warn('[LISA] Inference Shield hand-off failed:', e);
+      this.showToast("❌ Couldn't open Inference Shield", true);
+    }
   }
 
   async saveAsMarkdown() {
@@ -585,30 +669,7 @@ class LISAFloatingButton {
       // Build clean markdown
       const title = messages.title || document.title || 'Conversation';
       const platform = messages.platform || 'AI';
-      const date = new Date().toISOString().split('T')[0];
-      let md = `# ${title}\n`;
-      md += `> ${platform} conversation — exported ${date}\n\n---\n\n`;
-
-      for (const msg of messages.messages) {
-        const role = msg.role === 'user' ? 'User' : 'Assistant';
-        let text = typeof msg.content === 'string' ? msg.content : (msg.content ? JSON.stringify(msg.content) : '');
-        // Tool calls/results live in msg.artifacts, not msg.content (see
-        // claude-api-capture.js's processContentBlocks) — without this, a
-        // message that's purely a tool call renders as an empty section
-        // with its actual content silently lost.
-        if (Array.isArray(msg.artifacts) && msg.artifacts.length > 0) {
-          const artifactText = msg.artifacts.map(a => {
-            if (a.type === 'tool_use') return `Tool call: ${a.name}\nInput: ${JSON.stringify(a.input)}`;
-            if (a.type === 'tool_result') {
-              const resultText = typeof a.content === 'string' ? a.content : JSON.stringify(a.content);
-              return `Tool result:\n${resultText}`;
-            }
-            return null;
-          }).filter(Boolean).join('\n\n');
-          text = text ? `${text}\n\n${artifactText}` : artifactText;
-        }
-        md += `### ${role}\n\n${text}\n\n`;
-      }
+      const md = this._conversationToMarkdown(messages);
 
       // Save formatted markdown to library
       const response = await chrome.runtime.sendMessage({

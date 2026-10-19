@@ -22,10 +22,11 @@
     "https://chat.mistral.ai/*",
     "https://chat.deepseek.com/*",
     "https://copilot.microsoft.com/*",
-        "https://copilot.com/*",
-        "https://www.copilot.com/*",
+    "https://copilot.com/*",
+    "https://www.copilot.com/*",
     "https://*.perplexity.ai/*",
-    "https://lisa-web-backend-production.up.railway.app/*"
+    "https://lisa-web-backend-production.up.railway.app/*",
+    "https://shield.sat-chain.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js"
@@ -240,6 +241,15 @@
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
         "src/content/lisa-floating-button.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://shield.sat-chain.com/app*"
+      ],
+      "js": [
+        "src/content/shield-bridge.js"
       ],
       "run_at": "document_idle"
     }

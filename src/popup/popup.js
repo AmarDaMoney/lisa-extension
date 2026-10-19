@@ -2119,6 +2119,7 @@ class LISAPopup {
           <button class="snapshot-btn download" data-id="${eId}" title="Download JSON">\ud83d\udcbe</button>
             <button class="snapshot-btn inject" data-id="${eId}" title="Inject context to active AI tab">\ud83d\udcce</button>
           <button class="snapshot-btn send" data-id="${eId}" title="Send to App">\ud83d\udce4</button>
+          <button class="snapshot-btn shield" data-id="${eId}" title="Check with Inference Shield: see what it reveals before you share it">\ud83d\udee1\ufe0f</button>
           <button class="snapshot-btn delete" data-id="${eId}" title="Delete">\ud83d\uddd1\ufe0f</button>
         </div>
       </div>
@@ -2140,6 +2141,10 @@ class LISAPopup {
 
     container.querySelectorAll('.snapshot-btn.send').forEach(btn => {
       btn.addEventListener('click', (e) => this.sendSnapshotToApp(e.target.dataset.id));
+    });
+
+    container.querySelectorAll('.snapshot-btn.shield').forEach(btn => {
+      btn.addEventListener('click', (e) => this.checkSnapshotWithShield(e.currentTarget.dataset.id));
     });
 
     container.querySelectorAll('.snapshot-btn.delete').forEach(btn => {
@@ -2660,6 +2665,29 @@ class LISAPopup {
     } catch (error) {
       console.error('[LISA] Failed to send snapshot:', error);
       alert('Failed to send to App: ' + error.message);
+    }
+  }
+
+  // Open a library item in Inference Shield as readable text. Free: Shield
+  // charges only when the user presses Run there.
+  async checkSnapshotWithShield(id) {
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'getFullSnapshot', id });
+      const snapshot = response && response.snapshot;
+      if (!snapshot) {
+        alert('Snapshot not found');
+        return;
+      }
+      const text = snapshot.derived?.markdown || this.convertSnapshotToMarkdown(snapshot);
+      const result = await chrome.runtime.sendMessage({
+        action: 'openInferenceShield',
+        text,
+        source: `Library: ${snapshot.title || snapshot.platform || 'snapshot'}`.slice(0, 80)
+      });
+      if (!result || !result.ok) alert("Couldn't open Inference Shield");
+    } catch (error) {
+      console.error('[LISA] Inference Shield hand-off failed:', error);
+      alert("Couldn't open Inference Shield: " + error.message);
     }
   }
 

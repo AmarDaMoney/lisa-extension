@@ -1345,6 +1345,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // async response
   }
 
+  // Inference Shield: open the app with text from the floating button or the
+  // library (see INFERENCE SHIELD HAND-OFF), and hand it to the bridge.
+  if (request.action === 'openInferenceShield') {
+    if (sender.id !== chrome.runtime.id) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    openInferenceShield(request.text, request.source, sender.tab)
+      .then(sendResponse)
+      .catch((e) => sendResponse({ ok: false, error: e?.message }));
+    return true;
+  }
+  if (request.action === 'shieldHandoffTake') {
+    takeShieldHandoff(sender)
+      .then((payload) => sendResponse({ payload }))
+      .catch(() => sendResponse({ payload: null }));
+    return true;
+  }
+
   // ACM handoff — open a fresh tab on the target platform and inject the
   // handoff payload as a file, reusing the same injectFileAttachment path
   // the library's manual inject already uses. A new tab has two race
@@ -1762,6 +1781,17 @@ function createContextMenus() {
       }
     });
     
+    // Open the selection in Inference Shield (see INFERENCE SHIELD HAND-OFF)
+    chrome.contextMenus.create({
+      id: 'check-with-shield',
+      title: '🛡 Check with Inference Shield',
+      contexts: ['selection']
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[LISA] Failed to create check-with-shield menu:', chrome.runtime.lastError);
+      }
+    });
+
     console.debug('[LISA] Context menus created');
   });
 }
@@ -1831,6 +1861,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'copy-as-lisa') {
     await handleCopyAsLisa(info, tab);
   }
+  if (info.menuItemId === 'check-with-shield') {
+    await handleCheckWithShield(info, tab);
+  }
 });
 
 async function handleExportSelection(info, tab) {
@@ -1872,6 +1905,100 @@ async function handleExportSelection(info, tab) {
   }
 }
 
+// Name of the AI platform (or site) a URL belongs to, for labels.
+function detectSourcePlatform(sourceUrl) {
+  let sourcePlatform = 'unknown';
+  if (/claude\.ai\/code/.test(sourceUrl)) sourcePlatform = 'Claude Code';
+  else if (/claude\.ai/.test(sourceUrl)) sourcePlatform = 'Claude';
+  else if (/chatgpt\.com|chat\.openai\.com/.test(sourceUrl)) sourcePlatform = 'ChatGPT';
+  else if (/gemini\.google/.test(sourceUrl)) sourcePlatform = 'Gemini';
+  else if (/mistral\.ai/.test(sourceUrl)) sourcePlatform = 'Mistral';
+  else if (/deepseek\.com/.test(sourceUrl)) sourcePlatform = 'DeepSeek';
+  else if (/copilot\.(microsoft\.)?com/.test(sourceUrl)) sourcePlatform = 'Copilot';
+  else if (/perplexity\.ai/.test(sourceUrl)) sourcePlatform = 'Perplexity';
+  else if (/x\.ai|grok\.com/.test(sourceUrl)) sourcePlatform = 'Grok';
+  else if (/huggingface\.co\/chat/.test(sourceUrl)) sourcePlatform = 'HuggingChat';
+  else if (/meta\.ai/.test(sourceUrl)) sourcePlatform = 'Meta AI';
+  else if (/poe\.com/.test(sourceUrl)) sourcePlatform = 'Poe';
+  else if (sourceUrl) { try { sourcePlatform = new URL(sourceUrl).hostname.replace(/^www\./, ''); } catch (e) {} }
+  return sourcePlatform;
+}
+
+// ============================================
+// INFERENCE SHIELD HAND-OFF
+// ============================================
+// "Check with Inference Shield" (right-click, floating button, library) opens
+// the Shield app in a new tab next to the current one. The text and the
+// user's sign-in never go in the URL: they wait here in session storage,
+// keyed by the new tab's id, for at most 2 minutes, and are handed over once
+// to src/content/shield-bridge.js, which runs only on the Shield origin.
+const SHIELD_ORIGIN = 'https://shield.sat-chain.com';
+const SHIELD_APP_URL = SHIELD_ORIGIN + '/app';
+const SHIELD_HANDOFF_TTL_MS = 2 * 60 * 1000;
+
+async function openInferenceShield(text, source, fromTab) {
+  if (!text || !text.trim()) return { ok: false, error: 'Nothing to check' };
+  const createOpts = { url: SHIELD_APP_URL, active: true };
+  if (fromTab && typeof fromTab.index === 'number') {
+    createOpts.index = fromTab.index + 1;
+    createOpts.windowId = fromTab.windowId;
+  }
+  const tab = await chrome.tabs.create(createOpts);
+  await chrome.storage.session.set({
+    ['shieldHandoff:' + tab.id]: { text, source: String(source || 'LISA').slice(0, 80), at: Date.now() }
+  });
+  return { ok: true };
+}
+
+// The user's LISA sign-in for Shield: their license key, else a Google token
+// (non-interactive; LISA verifies it server-side).
+async function shieldCredential() {
+  const { licenseKey } = await chrome.storage.sync.get(['licenseKey']);
+  if (licenseKey) return { licenseKey };
+  const googleToken = await new Promise((resolve) => {
+    try {
+      chrome.identity.getAuthToken({ interactive: false }, (token) => {
+        resolve(chrome.runtime.lastError ? null : (token || null));
+      });
+    } catch (_) {
+      resolve(null);
+    }
+  });
+  return googleToken ? { googleToken } : {};
+}
+
+async function takeShieldHandoff(sender) {
+  // Only our own bridge script, running in a top-level Shield tab, may collect.
+  if (sender.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0) return null;
+  if (sender.origin !== SHIELD_ORIGIN) return null;
+  const storageKey = 'shieldHandoff:' + sender.tab.id;
+  const stored = (await chrome.storage.session.get([storageKey]))[storageKey];
+  await chrome.storage.session.remove(storageKey);
+  if (!stored || Date.now() - stored.at > SHIELD_HANDOFF_TTL_MS) return null;
+  return { text: stored.text, source: stored.source, ...(await shieldCredential()) };
+}
+
+async function handleCheckWithShield(info, tab) {
+  // Read the selection from the page so line breaks survive (selectionText
+  // collapses whitespace); fall back to selectionText if the page refuses.
+  let text = '';
+  try {
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, frameIds: [info.frameId || 0] },
+      func: () => window.getSelection().toString()
+    });
+    text = (result && result.result) || '';
+  } catch (_) { /* restricted page */ }
+  if (!text.trim()) text = info.selectionText || '';
+  if (!text.trim()) {
+    showNotification('LISA', '❌ No text selected');
+    return;
+  }
+  const source = `Selection from ${detectSourcePlatform(info.pageUrl || '')}`;
+  const result = await openInferenceShield(text, source, tab);
+  if (!result.ok) showNotification('LISA', "❌ Couldn't open Inference Shield");
+}
+
 async function handleCopyAsLisa(info, tab) {
   try {
     const selectedText = info.selectionText;
@@ -1882,20 +2009,7 @@ async function handleCopyAsLisa(info, tab) {
 
     // Detect source platform
     const sourceUrl = info.pageUrl || '';
-    let sourcePlatform = 'unknown';
-    if (/claude\.ai\/code/.test(sourceUrl)) sourcePlatform = 'Claude Code';
-    else if (/claude\.ai/.test(sourceUrl)) sourcePlatform = 'Claude';
-    else if (/chatgpt\.com|chat\.openai\.com/.test(sourceUrl)) sourcePlatform = 'ChatGPT';
-    else if (/gemini\.google/.test(sourceUrl)) sourcePlatform = 'Gemini';
-    else if (/mistral\.ai/.test(sourceUrl)) sourcePlatform = 'Mistral';
-    else if (/deepseek\.com/.test(sourceUrl)) sourcePlatform = 'DeepSeek';
-    else if (/copilot\.(microsoft\.)?com/.test(sourceUrl)) sourcePlatform = 'Copilot';
-    else if (/perplexity\.ai/.test(sourceUrl)) sourcePlatform = 'Perplexity';
-    else if (/x\.ai|grok\.com/.test(sourceUrl)) sourcePlatform = 'Grok';
-    else if (/huggingface\.co\/chat/.test(sourceUrl)) sourcePlatform = 'HuggingChat';
-    else if (/meta\.ai/.test(sourceUrl)) sourcePlatform = 'Meta AI';
-    else if (/poe\.com/.test(sourceUrl)) sourcePlatform = 'Poe';
-    else if (sourceUrl) { try { sourcePlatform = new URL(sourceUrl).hostname.replace(/^www\./, ''); } catch (e) {} }
+    const sourcePlatform = detectSourcePlatform(sourceUrl);
 
     const version = chrome.runtime.getManifest().version;
     const timestamp = new Date().toISOString();

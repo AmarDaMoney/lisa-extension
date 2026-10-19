@@ -292,6 +292,22 @@ responses are skipped. Used by `GrokParser`, `LisaVParser`, ACM and
 Handoff (`_getApiCapture`); DOM capture remains the fallback. Console:
 `[LISA] Grok API capture: N messages (…)`. Conversation URLs: `/c/<id>`.
 
+### Inference Shield hand-off (shield.sat-chain.com)
+"Check with Inference Shield" opens the Shield app (a SAT-CHAIN product on the
+same LISA key and credits) in a new tab next to the current one, from three
+places: right-click on a selection (`check-with-shield` context menu; text via
+`executeScript` + `getSelection()`, fallback `selectionText`), the floating
+button ("🛡 Inference Shield": `_captureConversation()` +
+`_conversationToMarkdown()`, the same helpers Handoff/Markdown use) and the
+popup library (🛡 button, `checkSnapshotWithShield`). Text and sign-in never go
+in the URL: the service worker keeps `{text, source}` in
+`chrome.storage.session` under `shieldHandoff:<tabId>` (2 min, one-time) and
+gives it, plus the license key or a non-interactive Google token, only to
+`src/content/shield-bridge.js` running top-frame on `SHIELD_ORIGIN`, which
+`postMessage`s it to the page (same origin). Opening Shield is free; Shield
+charges on Run. Changing the Shield domain needs a manifest change (host
+permission + content script match) and a CWS update.
+
 **Known pre-existing dead ends** (not from ACM work, found during a code
 audit): `preCacheConversation` (sent from `lisa-floating-button.js` on
 tab-hide) and `refreshUserTier` (sent from `success.html` post-checkout)

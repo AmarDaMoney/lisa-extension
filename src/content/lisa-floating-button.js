@@ -900,23 +900,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       // maps them), else the same LisaVParser capture Markdown export uses.
       // Without that fallback every other source platform (Gemini, Grok,
       // DeepSeek, Mistral, …) got "No messages to hand off".
-      let conversation = null;
-      const apiCapture = typeof acm._getApiCapture === 'function' ? acm._getApiCapture() : null;
-      if (apiCapture) {
-        const isShared = window.location.pathname.startsWith('/share/');
-        conversation = await this._captureViaApiWithRetry(apiCapture, isShared);
-      }
-      if (!conversation || !conversation.messages || conversation.messages.length === 0) {
-        try {
-          const parser = new LisaVParser();
-          await parser.extractConversation();
-          await parser.finalize();
-          conversation = parser.toMessages();
-        } catch (e) {
-          console.warn('[LISA] Handoff: page capture failed:', e);
-        }
-      }
-      if (!conversation || !conversation.messages || conversation.messages.length === 0) {
+      const conversation = await this._captureConversation();
+      if (!conversation) {
         this.showToast("No messages to hand off", true);
         return;
       }

@@ -194,6 +194,36 @@ class LISAPopup {
     };
   }
 
+  // Credentials the backend accepts for credits: the Google access token
+  // itself (the server verifies it with Google and checks it was issued to
+  // this extension) or a license key. Self-declared ids (X-Google-Id /
+  // X-Identifier) are rejected, since anyone could claim anyone's id.
+  // preferLicense: a PAYG key's credits are what it spends, so use the key.
+  async _creditAuthHeaders({ preferLicense = false } = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    const { licenseKey } = await chrome.storage.sync.get(['licenseKey']);
+    if (preferLicense && licenseKey) {
+      headers['X-License-Key'] = licenseKey;
+      return headers;
+    }
+    const token = await new Promise((resolve) => {
+      try {
+        chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+      } catch (_) {
+        resolve(null);
+      }
+    });
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      return headers;
+    }
+    if (licenseKey) {
+      headers['X-License-Key'] = licenseKey;
+      return headers;
+    }
+    return null;
+  }
+
   // Charges 1 PAYG credit to the stored license key. The key (not a Google
   // identity) is the right identifier: the server resolves it to the email
   // its credits are stored under. True only if the server confirms it.
@@ -245,41 +275,18 @@ class LISAPopup {
     // PAYG-eligible, same as md/lisav/handoff.
     if (type !== 'export' && !this.isPayg) { // PAYG keys were already charged (or found empty) above
       try {
-        let identifier = '';
-        const headers = { 'Content-Type': 'application/json' };
-        const token = await new Promise((resolve) => {
-          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
-        });
-        if (token) {
-          const idResp = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
-          if (idResp.ok) {
-            const idData = await idResp.json();
-            if (idData.sub) identifier = `goog_${idData.sub}`;
-          }
-        }
-        if (!identifier) {
-          const stored = await chrome.storage.sync.get(['creditIdentifier', 'licenseKey']);
-          identifier = stored.creditIdentifier || stored.licenseKey || '';
-        }
-        if (identifier) {
-          if (identifier.startsWith('goog_')) headers['X-Google-Id'] = identifier;
-          else if (identifier.startsWith('email_')) headers['X-Identifier'] = identifier;
-          else headers['X-License-Key'] = identifier;
-          const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', { headers });
-          if (balResp.ok) {
-            const balData = await balResp.json();
-            if (balData.balance > 0) {
-              const dedResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ source: 'extension' })
-              });
-              const ded = dedResp.ok ? await dedResp.json() : null;
-              if (ded && ded.success === true) {
-                this.loadCreditBalance();
-                return { allowed: true, credits: true };
-              }
-            }
+        // One atomic call: the server debits only if the balance covers it.
+        const headers = await this._creditAuthHeaders();
+        if (headers) {
+          const dedResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ source: 'extension' })
+          });
+          const ded = dedResp.ok ? await dedResp.json() : null;
+          if (ded && ded.success === true) {
+            this.loadCreditBalance();
+            return { allowed: true, credits: true };
           }
         }
       } catch (e) {
@@ -1661,44 +1668,28 @@ class LISAPopup {
 
   async openCreditCheckout(bundle) {
     try {
-      // Prefer Google ID (stable across reinstalls) → fallback to license key → fallback to email prompt
-      let identifier = '';
+      // Credits go to whoever the server can verify: the signed-in Google
+      // account, else the license key. Without either, they go to the
+      // checkout email, and the PAYG key emailed after payment unlocks them.
       let email = '';
-
+      let headers = null;
       try {
-        const token = await new Promise((resolve) => {
-          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
-        });
-        if (token) {
-          const r = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
-          if (r.ok) {
-            const d = await r.json();
-            if (d.sub) identifier = `goog_${d.sub}`;
-          }
-        }
+        headers = await this._creditAuthHeaders({ preferLicense: this.isPayg });
       } catch (e) {
-        console.debug('[LISA] Could not get Google ID for credit checkout:', e);
+        console.debug('[LISA] Could not get credentials for credit checkout:', e);
       }
-
-      if (!identifier) {
-        const licenseKey = this.licenseKey || '';
-        if (licenseKey) {
-          identifier = licenseKey;
-        } else {
-          email = prompt('Enter your email to link credits to your account:') || '';
-          if (!email) return;
-          identifier = 'email_' + email;
-        }
+      if (!headers) {
+        email = prompt('Enter your email. Your credits and a PAYG key will be sent to it:') || '';
+        if (!email) return;
+        headers = { 'Content-Type': 'application/json' };
       }
       const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/purchase', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bundle, email, identifier })
+        headers,
+        body: JSON.stringify({ bundle, email })
       });
       const data = await response.json();
       if (data.checkout_url) {
-        // Store identifier so credit balance can be checked later
-        chrome.storage.sync.set({ creditIdentifier: identifier });
         this.closeUpgradeModal();
         chrome.tabs.create({ url: data.checkout_url });
       } else {
@@ -1712,51 +1703,10 @@ class LISAPopup {
 
   async loadCreditBalance() {
     try {
-      // Build identifier — same priority order as openCreditCheckout
-      let identifier = '';
-      let headers = { 'Content-Type': 'application/json' };
-
       // A PAYG key's credits are what it spends (see _chargePaygCredit), so
       // show that balance — not a Google identity's, which may differ.
-      if (this.isPayg) {
-        const { licenseKey } = await chrome.storage.sync.get(['licenseKey']);
-        if (licenseKey) identifier = licenseKey;
-      }
-
-      try {
-        const token = identifier ? null : await new Promise((resolve) => {
-          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
-        });
-        if (token) {
-          const r = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
-          if (r.ok) {
-            const d = await r.json();
-            if (d.sub) identifier = `goog_${d.sub}`;
-          }
-        }
-      } catch (e) {
-        console.debug('[LISA] Could not get Google ID for credit balance:', e);
-      }
-
-      if (!identifier) {
-        const stored = await chrome.storage.sync.get(['creditIdentifier', 'licenseKey']);
-        const licenseKey = stored.licenseKey || '';
-        if (stored.creditIdentifier) {
-          identifier = stored.creditIdentifier;
-        } else if (licenseKey) {
-          identifier = licenseKey;
-          headers['X-License-Key'] = licenseKey;
-        } else {
-          return;
-        }
-      }
-      if (identifier.startsWith('goog_')) {
-        headers['X-Google-Id'] = identifier;
-      } else if (identifier.startsWith('email_')) {
-        headers['X-Identifier'] = identifier;
-      } else {
-        headers['X-License-Key'] = identifier;
-      }
+      const headers = await this._creditAuthHeaders({ preferLicense: this.isPayg });
+      if (!headers) return;
 
       const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
         headers

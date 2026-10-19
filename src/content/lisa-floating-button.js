@@ -92,44 +92,35 @@ class LISAFloatingButton {
     // have them checked here at all and would always just hit the free
     // daily-5 cap instead.
     // PAYG keys were already charged (or found empty) above.
+    // The server only accepts verified credentials for credits (a Google
+    // access token it checks with Google, or a license key) — never a
+    // self-declared X-Google-Id / X-Identifier. Content scripts don't get
+    // chrome.identity, so on most pages this falls to the license key.
     if (tierInfo.isPayg !== true) try {
-      let identifier = '';
       const headers = { 'Content-Type': 'application/json' };
-
       const token = await new Promise((resolve) => {
-        chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+        try {
+          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
+        } catch (_) {
+          resolve(null);
+        }
       });
       if (token) {
-        const idResp = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`);
-        if (idResp.ok) {
-          const idData = await idResp.json();
-          if (idData.sub) identifier = `goog_${idData.sub}`;
-        }
-      }
-      if (!identifier) {
-        const stored = await chrome.storage.sync.get(['creditIdentifier', 'licenseKey']);
-        identifier = stored.creditIdentifier || stored.licenseKey || '';
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        const stored = await chrome.storage.sync.get(['licenseKey']);
+        if (stored.licenseKey) headers['X-License-Key'] = stored.licenseKey;
       }
 
-      if (identifier) {
-        if (identifier.startsWith('goog_')) headers['X-Google-Id'] = identifier;
-        else if (identifier.startsWith('email_')) headers['X-Identifier'] = identifier;
-        else headers['X-License-Key'] = identifier;
-
-        const balResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', { headers });
-        if (balResp.ok) {
-          const balData = await balResp.json();
-          if (balData.balance > 0) {
-            // Deduct 1 credit — allow only if the server confirms it
-            const dedResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ source: 'extension' })
-            });
-            const ded = dedResp.ok ? await dedResp.json() : null;
-            if (ded && ded.success === true) return { allowed: true, credits: true };
-          }
-        }
+      if (headers['Authorization'] || headers['X-License-Key']) {
+        // One atomic call: the server debits only if the balance covers it.
+        const dedResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ source: 'extension' })
+        });
+        const ded = dedResp.ok ? await dedResp.json() : null;
+        if (ded && ded.success === true) return { allowed: true, credits: true };
       }
     } catch (e) {
       console.debug('[LISA] PAYG credit check failed:', e);

@@ -47,6 +47,18 @@ class LISAFloatingButton {
     }
   }
   
+  // Google access token via the service worker: content scripts don't get
+  // chrome.identity. Null if the user hasn't signed in with Google in the
+  // popup (never prompts) or the extension is reloading.
+  async _getGoogleToken() {
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: 'getGoogleAuthToken' });
+      return (resp && resp.token) || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   async checkFloatingLimit(type) {
     // Read fresh: the popup may have validated/changed the license since
     // this page loaded.
@@ -94,17 +106,11 @@ class LISAFloatingButton {
     // PAYG keys were already charged (or found empty) above.
     // The server only accepts verified credentials for credits (a Google
     // access token it checks with Google, or a license key) — never a
-    // self-declared X-Google-Id / X-Identifier. Content scripts don't get
-    // chrome.identity, so on most pages this falls to the license key.
+    // self-declared X-Google-Id / X-Identifier. The token comes from the
+    // service worker (content scripts don't get chrome.identity).
     if (tierInfo.isPayg !== true) try {
       const headers = { 'Content-Type': 'application/json' };
-      const token = await new Promise((resolve) => {
-        try {
-          chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
-        } catch (_) {
-          resolve(null);
-        }
-      });
+      const token = await this._getGoogleToken();
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       } else {
@@ -128,9 +134,7 @@ class LISAFloatingButton {
 
     // Try backend identity check first (survives reinstalls)
     try {
-      const token = await new Promise((resolve) => {
-        chrome.identity.getAuthToken({ interactive: false }, (t) => resolve(t || null));
-      });
+      const token = await this._getGoogleToken();
       if (token) {
         const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/limits/check', {
           method: 'POST',

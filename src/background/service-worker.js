@@ -1320,6 +1320,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  // Google sign-in token for content scripts (the floating button), which
+  // can't call chrome.identity themselves. Non-interactive only: a sign-in
+  // prompt must never pop up over a web page; the user signs in from the
+  // popup. Only this extension's own scripts can reach this handler (web
+  // pages can't message it), and the token is verified server-side.
+  if (request.action === 'getGoogleAuthToken') {
+    if (sender.id !== chrome.runtime.id) {
+      sendResponse({ token: null });
+      return false;
+    }
+    try {
+      chrome.identity.getAuthToken({ interactive: false }, (token) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({ token: null });
+          return;
+        }
+        sendResponse({ token: token || null });
+      });
+    } catch (_) {
+      sendResponse({ token: null });
+      return false;
+    }
+    return true; // async response
+  }
+
   // ACM handoff — open a fresh tab on the target platform and inject the
   // handoff payload as a file, reusing the same injectFileAttachment path
   // the library's manual inject already uses. A new tab has two race

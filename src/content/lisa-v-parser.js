@@ -12,6 +12,7 @@ class LisaVParser {
     // messages a virtualized long conversation has unmounted).
     this.usedFallbackCapture = false;
     this.apiMessageCount = null;
+    this.filter = null; // set by loadMessages() for a partial export
   }
 
   // One retry before giving up on the API — a lot of API-capture failures
@@ -342,13 +343,8 @@ class LisaVParser {
     return consolidated;
   }
   // Main extraction method - platform agnostic
-  async extractConversation() {
-    try {
-    this.blocks = [];
-    const platform = this.detectPlatform();
-    
-    // Add meta block
-    this.blocks.push({
+  _metaBlock(platform) {
+    return {
       t: 'meta',
       id: `lisa-${Date.now()}`,
       ver: '1.0',
@@ -356,7 +352,30 @@ class LisaVParser {
       title: this.getSmartTitle(),
       url: window.location.href,
       timestamp: new Date().toISOString()
-    });
+    };
+  }
+
+  // A partial export (floating button Options / Choose messages): LISA-V built
+  // from the chosen messages only. finalize() then hashes exactly these blocks
+  // and records `filter` in the meta block, so nobody mistakes the file for the
+  // whole conversation. `messages` are captured messages ({role, content,
+  // artifacts?}), the same shape the API captures return.
+  async loadMessages(messages, filter) {
+    this.blocks = [this._metaBlock(this.detectPlatform())];
+    for (const msg of messages) {
+      this.blocks.push(...(await this._apiMessageToBlocks(msg)));
+    }
+    this.filter = filter || null;
+    return this.blocks;
+  }
+
+  async extractConversation() {
+    try {
+    this.blocks = [];
+    const platform = this.detectPlatform();
+    
+    // Add meta block
+    this.blocks.push(this._metaBlock(platform));
 
     // Platform-specific message extraction
     let messages = [];
@@ -1685,6 +1704,7 @@ class LisaVParser {
       ? conversationBlocks.splice(metaIndex, 1)[0]
       : { t: "meta", id: "unknown", platform: "unknown", ver: "1.0", timestamp: new Date().toISOString() };
     if (this.apiMessageCount != null) metaBlock.apiMessageCount = this.apiMessageCount;
+    if (this.filter) metaBlock.filter = this.filter;
     this.blocks.push(metaBlock);
 
     // Line 2: lite manifest — receiving AI knows file scope immediately
@@ -1700,7 +1720,8 @@ class LisaVParser {
     this.blocks.push({
       t: 'instructions',
       role: 'system',
-      v: 'LISA-V verbatim export. Block types: u=user message, a_text=assistant response, code=code block, next=action item, rel=relationship. Read the anchor block above for session context and dominant concepts. Continue the conversation from the last turn. Integrity verified via per-block SHA-256 hashes and merkle root in the final manifest block.'
+      v: 'LISA-V verbatim export. Block types: u=user message, a_text=assistant response, code=code block, next=action item, rel=relationship. Read the anchor block above for session context and dominant concepts. Continue the conversation from the last turn. Integrity verified via per-block SHA-256 hashes and merkle root in the final manifest block.' +
+        (this.filter ? ` PARTIAL EXPORT: only ${this.filter.kept} of ${this.filter.total} messages (${this.filter.label}) are included; this is not the whole conversation.` : '')
     });
     // Lines 6-N: next blocks — open tasks before any conversation content
     this.blocks.push(...nextBlocks);
@@ -1711,6 +1732,10 @@ class LisaVParser {
     // Relationships after conversation
     this.blocks.push(...relationships);
 
+    // Lite manifest gets its final count before hashing: changing a block after
+    // the Merkle root is computed made every export fail verification.
+    this.blocks[liteManifestIndex].blockCount = this.blocks.length + 1;
+
     // Full manifest at bottom for integrity verification
     const merkleRoot = await this.getMerkleRoot();
     this.blocks.push({
@@ -1719,9 +1744,6 @@ class LisaVParser {
       blockCount: this.blocks.length + 1,
       timestamp: new Date().toISOString()
     });
-
-    // Update lite manifest with actual block count
-    this.blocks[liteManifestIndex].blockCount = this.blocks.length;
 
     // Closing sys block
     this.blocks.push({

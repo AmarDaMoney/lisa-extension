@@ -5,6 +5,13 @@
 const LISA_FAB_API_ORIGIN = 'https://api.sat-chain.com';
 const LISA_FAB_APP_ORIGIN = 'https://nexus.sat-chain.com';
 
+// Advanced options, remembered in chrome.storage.sync. `include` filters what
+// Markdown, LISA-V and Inference Shield export; Handoff always sends both sides
+// (a one-sided handoff gives the new AI a broken context) and only takes
+// `handoffFormat`.
+const LISA_FAB_OPTION_DEFAULTS = { include: 'all', handoffFormat: 'lisa' };
+const LISA_FAB_INCLUDE_LABELS = { all: 'Whole conversation', user: 'My messages only', assistant: 'AI replies only' };
+
 class LISAFloatingButton {
   constructor() {
     this.button = null;
@@ -313,6 +320,49 @@ class LISAFloatingButton {
       .lisa-menu-item:hover {
         background: #3b82f6;
       }
+      .lisa-scope-note {
+        padding: 5px 16px;
+        font-size: 11px;
+        color: #fbbf24;
+        border-bottom: 1px solid #333;
+      }
+      .lisa-panel-title {
+        padding: 8px 16px;
+        border-bottom: 1px solid #333;
+        color: #9ca3af;
+        font-size: 12px;
+      }
+      .lisa-opt-group { padding: 2px 16px 8px; }
+      .lisa-opt {
+        display: flex; align-items: center; gap: 8px;
+        color: #e5e7eb; font-size: 13px; padding: 4px 0; cursor: pointer;
+      }
+      .lisa-opt input { accent-color: #3b82f6; margin: 0; }
+      .lisa-opt-hint { color: #6b7280; font-size: 11px; padding: 0 16px 8px; }
+      .lisa-pick-list { max-height: 320px; overflow-y: auto; border-top: 1px solid #333; border-bottom: 1px solid #333; }
+      .lisa-pick-row {
+        display: flex; gap: 8px; align-items: flex-start;
+        padding: 6px 16px; color: #e5e7eb; font-size: 12px; cursor: pointer;
+      }
+      .lisa-pick-row:hover { background: #2a2a30; }
+      .lisa-pick-row input { accent-color: #3b82f6; margin: 2px 0 0; flex: none; }
+      .lisa-pick-row .lisa-pick-who { flex: none; width: 18px; }
+      .lisa-pick-row .lisa-pick-text {
+        overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      }
+      .lisa-pick-bar { display: flex; gap: 6px; padding: 6px 16px; flex-wrap: wrap; align-items: center; }
+      .lisa-pick-count { color: #9ca3af; font-size: 11px; margin-left: auto; }
+      .lisa-chip-btn {
+        background: #2a2a30; border: 1px solid #3f3f46; color: #e5e7eb;
+        border-radius: 6px; font-size: 11px; padding: 3px 8px; cursor: pointer;
+      }
+      .lisa-chip-btn:hover { border-color: #3b82f6; }
+      .lisa-pick-actions { display: flex; gap: 6px; padding: 8px 16px; }
+      .lisa-pick-actions button {
+        flex: 1; background: #3b82f6; border: none; color: #fff;
+        border-radius: 6px; padding: 7px 6px; font-size: 12px; cursor: pointer;
+      }
+      .lisa-pick-actions button:disabled { opacity: 0.4; cursor: default; }
       .lisa-menu-section-label {
         padding: 6px 16px 2px;
         font-size: 10px;
@@ -481,11 +531,14 @@ class LISAFloatingButton {
         await this._showHandoffDestinations(menu);
         return;
       }
+      if (!action) return;
       menu.remove();
       if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
       else if (action === "checkpoint") await this.contextCheckpoint();
       else if (action === "inference-shield") await this.checkWithInferenceShield();
+      else if (action === "options") await this.showOptionsPanel();
+      else if (action === "pick") await this.showMessagePicker();
     });
 
     // Close on outside click
@@ -502,7 +555,190 @@ class LISAFloatingButton {
   async _renderMainMenuInto(menu) {
     const acm = window.__lisaACM;
     const acmStatus = acm ? acm.getStatus() : null;
-    menu.innerHTML = this._buildMenuHeader(acmStatus) + this._buildMenuItems(acmStatus);
+    const options = await this._getOptions();
+    // A filter that's on is always visible, so nobody gets a partial export by surprise.
+    const scopeNote = options.include !== 'all'
+      ? `<div class="lisa-scope-note" data-action="options" style="cursor:pointer" title="Change in Options">Saving: ${LISA_FAB_INCLUDE_LABELS[options.include]}</div>`
+      : '';
+    menu.innerHTML = this._buildMenuHeader(acmStatus) + scopeNote + this._buildMenuItems(acmStatus);
+  }
+
+  async _getOptions() {
+    try {
+      const stored = await chrome.storage.sync.get('lisaFabOptions');
+      return { ...LISA_FAB_OPTION_DEFAULTS, ...(stored.lisaFabOptions || {}) };
+    } catch (_) {
+      return { ...LISA_FAB_OPTION_DEFAULTS };
+    }
+  }
+
+  async _setOptions(patch) {
+    const options = { ...(await this._getOptions()), ...patch };
+    try { await chrome.storage.sync.set({ lisaFabOptions: options }); } catch (_) { /* keep working without storage */ }
+    return options;
+  }
+
+  // A panel anchored to the floating button, replacing the menu (Options, Choose messages).
+  _openPanel(className, html) {
+    document.querySelectorAll('.lisa-action-menu, .lisa-fab-panel').forEach(el => el.remove());
+    const panel = document.createElement('div');
+    panel.className = `lisa-fab-panel ${className}`;
+    panel.innerHTML = html;
+    const btn = this.button.getBoundingClientRect();
+    panel.style.cssText = `
+      position: fixed;
+      bottom: ${window.innerHeight - btn.top + 10}px;
+      right: ${window.innerWidth - btn.right}px;
+      width: 340px;
+      max-width: calc(100vw - 24px);
+      background: #1f1f23;
+      border: 1px solid #3b82f6;
+      border-radius: 8px;
+      z-index: 2147483647;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      animation: lisa-menu-unfold 0.2s ease;
+    `;
+    document.body.appendChild(panel);
+    setTimeout(() => {
+      document.addEventListener('click', function closePanel(e) {
+        if (!panel.contains(e.target)) {
+          panel.remove();
+          document.removeEventListener('click', closePanel);
+        }
+      });
+    }, 100);
+    return panel;
+  }
+
+  async showOptionsPanel() {
+    const options = await this._getOptions();
+    const radio = (name, value, label, current) => `
+      <label class="lisa-opt"><input type="radio" name="${name}" value="${value}" ${current === value ? 'checked' : ''}> ${label}</label>`;
+    const panel = this._openPanel('lisa-options-panel', `
+      <div class="lisa-panel-title">⚙ Options (remembered)</div>
+      <div class="lisa-menu-section-label">Include in Markdown, LISA-V and Inference Shield</div>
+      <div class="lisa-opt-group">
+        ${radio('include', 'all', 'Whole conversation', options.include)}
+        ${radio('include', 'user', 'My messages only', options.include)}
+        ${radio('include', 'assistant', 'AI replies only', options.include)}
+      </div>
+      <div class="lisa-menu-section-label">Handoff format</div>
+      <div class="lisa-opt-group">
+        ${radio('handoffFormat', 'lisa', 'LISA (compact: start and end word for word, middle compressed)', options.handoffFormat)}
+        ${radio('handoffFormat', 'markdown', 'Markdown (the full conversation, word for word)', options.handoffFormat)}
+      </div>
+      <div class="lisa-opt-hint">Handoff always includes both sides. Partial exports are labelled as partial.</div>
+    `);
+    panel.addEventListener('change', async (e) => {
+      if (e.target.name === 'include' || e.target.name === 'handoffFormat') {
+        await this._setOptions({ [e.target.name]: e.target.value });
+        this.showToast(e.target.name === 'include'
+          ? `Saving: ${LISA_FAB_INCLUDE_LABELS[e.target.value]}`
+          : `Handoff format: ${e.target.value === 'markdown' ? 'Markdown' : 'LISA'}`);
+      }
+    });
+  }
+
+  // Tick individual messages, then save or check just those. The selection is
+  // for this conversation only; it starts from the Include option.
+  async showMessagePicker() {
+    const panel = this._openPanel('lisa-pick-panel', `
+      <div class="lisa-panel-title">☑ Choose messages</div>
+      <div class="lisa-pick-bar"><span class="lisa-pick-count">Loading messages…</span></div>`);
+    const conversation = await this._captureConversation();
+    if (!document.body.contains(panel)) return;
+    if (!conversation) {
+      panel.querySelector('.lisa-pick-count').textContent = 'No messages found';
+      return;
+    }
+    const options = await this._getOptions();
+    const msgs = conversation.messages;
+    const matches = (m, include) => include === 'all' || (include === 'user' ? m.role === 'user' : m.role !== 'user');
+    const selected = new Set(msgs.map((m, i) => (matches(m, options.include) ? i : -1)).filter(i => i >= 0));
+
+    panel.innerHTML = `
+      <div class="lisa-panel-title">☑ Choose messages</div>
+      <div class="lisa-pick-bar">
+        <button class="lisa-chip-btn" data-pick="all">All</button>
+        <button class="lisa-chip-btn" data-pick="user">Mine</button>
+        <button class="lisa-chip-btn" data-pick="assistant">AI</button>
+        <button class="lisa-chip-btn" data-pick="none">None</button>
+        <span class="lisa-pick-count"></span>
+      </div>
+      <div class="lisa-pick-list"></div>
+      <div class="lisa-pick-actions">
+        <button data-do="md">📋 Markdown</button>
+        <button data-do="lisav">📝 LISA-V</button>
+        <button data-do="shield">🛡 Shield</button>
+      </div>`;
+    const list = panel.querySelector('.lisa-pick-list');
+    msgs.forEach((m, i) => {
+      // Page text goes in as text, never as HTML.
+      const row = document.createElement('label');
+      row.className = 'lisa-pick-row';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.dataset.index = String(i);
+      box.checked = selected.has(i);
+      const who = document.createElement('span');
+      who.className = 'lisa-pick-who';
+      who.textContent = m.role === 'user' ? '👤' : '🤖';
+      const text = document.createElement('span');
+      text.className = 'lisa-pick-text';
+      const content = typeof m.content === 'string' ? m.content : '';
+      text.textContent = content.replace(/\s+/g, ' ').trim().slice(0, 160) || '(no text)';
+      row.append(box, who, text);
+      list.appendChild(row);
+    });
+    const refresh = () => {
+      panel.querySelector('.lisa-pick-count').textContent = `${selected.size} of ${msgs.length} selected`;
+      panel.querySelectorAll('[data-do]').forEach(b => { b.disabled = selected.size === 0; });
+      list.querySelectorAll('input').forEach(box => { box.checked = selected.has(Number(box.dataset.index)); });
+    };
+    refresh();
+    list.addEventListener('change', (e) => {
+      const i = Number(e.target.dataset.index);
+      if (e.target.checked) selected.add(i); else selected.delete(i);
+      refresh();
+    });
+    panel.addEventListener('click', async (e) => {
+      const pick = e.target.dataset?.pick;
+      if (pick) {
+        selected.clear();
+        if (pick !== 'none') msgs.forEach((m, i) => { if (matches(m, pick)) selected.add(i); });
+        refresh();
+        return;
+      }
+      const todo = e.target.dataset?.do;
+      if (!todo || selected.size === 0) return;
+      panel.remove();
+      const override = { conversation, keep: new Set(selected) };
+      if (todo === 'md') await this.saveAsMarkdown(override);
+      else if (todo === 'lisav') await this.saveLisaV(override);
+      else if (todo === 'shield') await this.checkWithInferenceShield(override);
+    });
+  }
+
+  // Applies the Include option, or a message picker selection, to a captured
+  // conversation. `filter` is null when every message is kept.
+  async _scopeConversation(conversation, override) {
+    const msgs = conversation.messages;
+    let kept, label, include;
+    if (override && override.keep) {
+      kept = msgs.filter((m, i) => override.keep.has(i));
+      include = 'picked';
+      label = `${kept.length} selected message${kept.length === 1 ? '' : 's'}`;
+    } else {
+      include = (await this._getOptions()).include;
+      kept = include === 'all' ? msgs : msgs.filter(m => (include === 'user' ? m.role === 'user' : m.role !== 'user'));
+      label = LISA_FAB_INCLUDE_LABELS[include] || include;
+    }
+    const partial = kept.length < msgs.length;
+    return {
+      conversation: { ...conversation, messages: kept },
+      filter: partial ? { include, label, kept: kept.length, total: msgs.length } : null,
+    };
   }
 
   _buildMenuHeader(acmStatus) {
@@ -533,6 +769,9 @@ class LISAFloatingButton {
       ` : ''}
       <div class="lisa-menu-section-label">Protect</div>
       <div class="lisa-menu-item" data-action="inference-shield" title="Open this conversation in Inference Shield to see what it reveals about your technology before you share it">🛡 Inference Shield</div>
+      <div class="lisa-menu-section-label">Advanced</div>
+      <div class="lisa-menu-item" data-action="pick" title="Tick the messages you want, then save them or check them with Inference Shield">☑ Choose messages…</div>
+      <div class="lisa-menu-item" data-action="options" title="Save only your messages or only the AI's replies; choose the Handoff format">⚙ Options</div>
     `;
   }
 
@@ -554,12 +793,14 @@ class LISAFloatingButton {
 
   // Markdown for a captured conversation; shared by Save as Markdown and
   // Inference Shield so both show the same text.
-  _conversationToMarkdown(messages) {
+  _conversationToMarkdown(messages, filter = null) {
     const title = messages.title || document.title || 'Conversation';
     const platform = messages.platform || 'AI';
     const date = new Date().toISOString().split('T')[0];
     let md = `# ${title}\n`;
-    md += `> ${platform} conversation — exported ${date}\n\n---\n\n`;
+    md += `> ${platform} conversation — exported ${date}\n`;
+    if (filter) md += `> Partial export: ${filter.label} (${filter.kept} of ${filter.total} messages). Not the whole conversation.\n`;
+    md += `\n---\n\n`;
 
     for (const msg of messages.messages) {
       const role = msg.role === 'user' ? 'User' : 'Assistant';
@@ -612,19 +853,25 @@ class LISAFloatingButton {
 
   // Open the conversation in Inference Shield (a new tab next to this one).
   // Free: it's only a hand-off; Shield charges when the user presses Run.
-  async checkWithInferenceShield() {
+  async checkWithInferenceShield(override = null) {
     try {
       this.showToast("Opening Inference Shield...");
-      const conversation = await this._captureConversation();
-      if (!conversation) {
+      const captured = override?.conversation || await this._captureConversation();
+      if (!captured) {
         this.showToast("❌ No messages found", true);
         return;
       }
+      const { conversation, filter } = await this._scopeConversation(captured, override);
+      if (!conversation.messages.length) {
+        this.showToast(`❌ No messages to check (${filter?.label || 'empty'})`, true);
+        return;
+      }
       const title = conversation.title || document.title || 'Conversation';
+      const scope = filter ? ` (${filter.label})` : '';
       const response = await chrome.runtime.sendMessage({
         action: 'openInferenceShield',
-        text: this._conversationToMarkdown(conversation),
-        source: `${conversation.platform || 'AI'} conversation "${title}"`.slice(0, 80),
+        text: this._conversationToMarkdown(conversation, filter),
+        source: `${conversation.platform || 'AI'} conversation "${title}"${scope}`.slice(0, 80),
       });
       if (!response || !response.ok) this.showToast("❌ Couldn't open Inference Shield", true);
     } catch (e) {
@@ -633,7 +880,7 @@ class LISAFloatingButton {
     }
   }
 
-  async saveAsMarkdown() {
+  async saveAsMarkdown(override = null) {
     try {
       const limitCheck = await this.checkFloatingLimit('md');
       if (!limitCheck.allowed) {
@@ -644,10 +891,10 @@ class LISAFloatingButton {
       this.showToast("Exporting as Markdown...");
 
       // Use API capture if available, else fall back to LisaVParser
-      let messages = null;
+      let messages = override?.conversation || null;
       let usedFallbackCapture = false;
 
-      if (window.__LISA_CLAUDE_API_CAPTURE) {
+      if (!messages && window.__LISA_CLAUDE_API_CAPTURE) {
         const isShared = window.location.pathname.startsWith('/share/');
         messages = await this._captureViaApiWithRetry(window.__LISA_CLAUDE_API_CAPTURE, isShared);
       }
@@ -670,10 +917,18 @@ class LISAFloatingButton {
         return;
       }
 
+      const scoped = await this._scopeConversation(messages, override);
+      if (!scoped.conversation.messages.length) {
+        this.showToast(`❌ No messages to save (${scoped.filter?.label || 'empty'})`, true);
+        return;
+      }
+      messages = scoped.conversation;
+
       // Build clean markdown
-      const title = messages.title || document.title || 'Conversation';
+      const baseTitle = messages.title || document.title || 'Conversation';
+      const title = scoped.filter ? `${baseTitle} (${scoped.filter.label})` : baseTitle;
       const platform = messages.platform || 'AI';
-      const md = this._conversationToMarkdown(messages);
+      const md = this._conversationToMarkdown(messages, scoped.filter);
 
       // Save formatted markdown to library
       const response = await chrome.runtime.sendMessage({
@@ -711,7 +966,7 @@ class LISAFloatingButton {
       this.showToast('❌ Could not save', true);
     }
   }
-  async saveLisaV() {
+  async saveLisaV(override = null) {
     try {
       // Check free tier limit
         const limitCheck = await this.checkFloatingLimit('lisav');
@@ -722,9 +977,28 @@ class LISAFloatingButton {
         }
       this.showToast("Extracting LISA-V...");
       
-      // Use LISA-V parser for verbatim extraction
+      // Use LISA-V parser for verbatim extraction. With a filter (Options) or a
+      // picked selection, LISA-V is built from just those messages; finalize()
+      // hashes exactly them and marks the file as partial.
       const parser = new LisaVParser();
-      await parser.extractConversation();
+      const options = await this._getOptions();
+      let title = null;
+      if (override || options.include !== 'all') {
+        const captured = override?.conversation || await this._captureConversation();
+        if (!captured) {
+          this.showToast("❌ No messages found", true);
+          return;
+        }
+        const scoped = await this._scopeConversation(captured, override);
+        if (!scoped.conversation.messages.length) {
+          this.showToast(`❌ No messages to save (${scoped.filter?.label || 'empty'})`, true);
+          return;
+        }
+        await parser.loadMessages(scoped.conversation.messages, scoped.filter);
+        if (scoped.filter) title = `${parser.getSmartTitle()} (${scoped.filter.label})`;
+      } else {
+        await parser.extractConversation();
+      }
       await parser.finalize();
       const lisaV = parser.toArray();
       const stats = parser.getStats();
@@ -737,7 +1011,7 @@ class LISAFloatingButton {
           stats: stats,
           platform: parser.detectPlatform(),
           url: window.location.href,
-          title: parser.getSmartTitle()
+          title: title || parser.getSmartTitle()
         }
       });
       
@@ -835,7 +1109,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     destPanel.innerHTML = `
       <div style="padding:8px 16px;border-bottom:1px solid #333;color:#9ca3af;font-size:12px;">Hand off to:</div>
       <div style="padding:6px 16px;font-size:11px;color:rgba(255,255,255,0.5);border-bottom:1px solid #333;">
-        💡 Tip: checkpointing first makes this handoff richer.
+        💡 Tip: checkpointing first makes this handoff richer.<br>
+        Format: ${(await this._getOptions()).handoffFormat === 'markdown' ? 'Markdown (full text)' : 'LISA (compact)'} · change in ⚙ Options
       </div>
       ${allTargets.map(t => `
         <div class="lisa-menu-item" data-url="${t.url}" data-platform="${t.platform}">
@@ -907,6 +1182,32 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       const conversation = await this._captureConversation();
       if (!conversation) {
         this.showToast("No messages to hand off", true);
+        return;
+      }
+
+      const handoffFormat = (await this._getOptions()).handoffFormat;
+      const safeName = (ext) => {
+        const t = (conversation.title || document.title || 'handoff').normalize('NFC').replace(/[^\p{L}\p{M}\p{N} -]/gu, '').trim();
+        const cut = Array.from(t).slice(0, 50).join('').trim().replace(/\s+/g, '_') || 'handoff';
+        const plat = String(conversation.platform || acm._detectPlatform()).replace(/[^\p{L}\p{M}\p{N}]+/gu, '_');
+        return `${cut}-lisa-${plat}.${ext}`;
+      };
+      if (handoffFormat === 'markdown') {
+        // Options → Handoff format: Markdown. The whole conversation word for
+        // word, both sides, no compression.
+        const md = '> LISA context handoff: the full conversation below, word for word. Read it, then continue from where it ends.\n\n'
+          + this._conversationToMarkdown(conversation);
+        this.showToast("Opening new tab and transferring context...");
+        const mdResult = await chrome.runtime.sendMessage({
+          action: 'acmHandoffToNewTab', url: targetUrl, fileContent: md, filename: safeName('md'), mimeType: 'text/markdown'
+        });
+        if (mdResult && mdResult.success) {
+          if (!limitCheck.credits) await this.incrementFloatingLimit('handoff');
+          const waits = mdResult.method === 'clipboard' || mdResult.method === 'pasteIntercept';
+          this.showToast(`Handoff ${waits ? 'ready — press Ctrl+V' : 'injected'} into the new tab.`);
+        } else {
+          this.showToast("Could not auto-transfer — " + (mdResult?.error || "open the new tab and paste manually"), true);
+        }
         return;
       }
 

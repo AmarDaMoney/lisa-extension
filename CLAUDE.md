@@ -298,6 +298,21 @@ responses are skipped. Used by `GrokParser`, `LisaVParser`, ACM and
 Handoff (`_getApiCapture`); DOM capture remains the fallback. Console:
 `[LISA] Grok API capture: N messages (…)`. Conversation URLs: `/c/<id>`.
 
+### Floating button: Options and Choose messages (advanced mode)
+"⚙ Options" (remembered in `chrome.storage.sync` as `lisaFabOptions`): **Include** = whole
+conversation / my messages only / AI replies only, applied to Markdown, LISA-V and Inference Shield;
+**Handoff format** = LISA (the compact JSON payload) or Markdown (the full conversation word for
+word, `.md`). Handoff always sends both sides: a one-sided handoff gives the new AI a broken context.
+An active filter shows as an amber "Saving: …" line at the top of the menu. "☑ Choose messages…"
+lists the captured messages (`_captureConversation()`) with checkboxes (All / Mine / AI / None,
+starting from Include) and saves or checks just those; the selection isn't remembered.
+Partial exports say so everywhere: the title gets "(AI replies only)" / "(N selected messages)",
+Markdown gets a "Partial export" line, and LISA-V is rebuilt from the chosen messages
+(`LisaVParser.loadMessages()`) so `finalize()` hashes exactly them and records `filter`
+`{include, label, kept, total}` in the meta block plus a PARTIAL EXPORT note in the instructions block.
+`finalize()` sets the lite manifest's `blockCount` *before* computing the Merkle root (it used to
+change it afterwards, so no export verified).
+
 ### Inference Shield hand-off (shield.sat-chain.com)
 "Check with Inference Shield" opens the Shield app (a SAT-CHAIN product on the
 same LISA key and credits) in a new tab next to the current one, from three

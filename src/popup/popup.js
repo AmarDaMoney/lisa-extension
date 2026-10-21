@@ -1,5 +1,5 @@
 // LISA Extension - Popup Logic
-// v0.52.9 - Auto-embed integrity hash, auto-renewal/cancellation notice
+// v0.53.0 - LISA Suite: Check with Inference Shield, one credit balance across the suite
 
 class LISAPopup {
   constructor() {

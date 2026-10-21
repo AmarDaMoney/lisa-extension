@@ -2,7 +2,7 @@
  * LISA Local Disambiguator (Tier 1 — offline)
  * Uses compromise.js for NER + basic coreference resolution.
  * No API calls, no cost, runs entirely in browser.
- * Version: 0.52.9
+ * Version: 0.53.0
  */
 
 const LocalDisambiguator = {

@@ -1,6 +1,10 @@
 // LISA Floating Save Button
 // Shared across all AI platform parsers (Premium Feature)
 
+// Same addresses as src/stripe/stripe-config.js (content scripts can't load it).
+const LISA_FAB_API_ORIGIN = 'https://api.sat-chain.com';
+const LISA_FAB_APP_ORIGIN = 'https://nexus.sat-chain.com';
+
 class LISAFloatingButton {
   constructor() {
     this.button = null;
@@ -71,7 +75,7 @@ class LISAFloatingButton {
     // through uncharged. Out of credits → normal free rules below.
     if (tierInfo.isPayg === true && tierInfo.licenseKey) {
       try {
-        const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+        const resp = await fetch(`${LISA_FAB_API_ORIGIN}/api/credits/deduct`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-License-Key': tierInfo.licenseKey },
           body: JSON.stringify({ source: 'extension' })
@@ -120,7 +124,7 @@ class LISAFloatingButton {
 
       if (headers['Authorization'] || headers['X-License-Key']) {
         // One atomic call: the server debits only if the balance covers it.
-        const dedResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+        const dedResp = await fetch(`${LISA_FAB_API_ORIGIN}/api/credits/deduct`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ source: 'extension' })
@@ -136,7 +140,7 @@ class LISAFloatingButton {
     try {
       const token = await this._getGoogleToken();
       if (token) {
-        const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/limits/check', {
+        const resp = await fetch(`${LISA_FAB_API_ORIGIN}/api/limits/check`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, action: type })
@@ -1154,12 +1158,12 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     modal.querySelector('.lisa-maybe-later').addEventListener('click', () => modal.remove());
 
     modal.querySelector('.lisa-upgrade-now').addEventListener('click', () => {
-      window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank');
+      window.open(`${LISA_FAB_APP_ORIGIN}/pricing`, '_blank');
       modal.remove();
     });
 
     modal.querySelector('.lisa-buy-credits').addEventListener('click', () => {
-      window.open('https://lisa-web-backend-production.up.railway.app/pricing#credits', '_blank');
+      window.open(`${LISA_FAB_APP_ORIGIN}/pricing#credits`, '_blank');
       modal.remove();
     });
   }

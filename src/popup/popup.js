@@ -80,7 +80,7 @@ class LISAPopup {
   async checkForUpdates() {
     try {
       const currentVersion = chrome.runtime.getManifest().version;
-      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/version');
+      const response = await fetch(`${LISA_API_ORIGIN}/api/version`);
       if (!response.ok) return;
       
       const data = await response.json();
@@ -231,7 +231,7 @@ class LISAPopup {
     try {
       const { licenseKey } = await chrome.storage.sync.get(['licenseKey']);
       if (!licenseKey) return false;
-      const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+      const resp = await fetch(`${LISA_API_ORIGIN}/api/credits/deduct`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-License-Key': licenseKey },
         body: JSON.stringify({ source: 'extension' })
@@ -278,7 +278,7 @@ class LISAPopup {
         // One atomic call: the server debits only if the balance covers it.
         const headers = await this._creditAuthHeaders();
         if (headers) {
-          const dedResp = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/deduct', {
+          const dedResp = await fetch(`${LISA_API_ORIGIN}/api/credits/deduct`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ source: 'extension' })
@@ -317,7 +317,7 @@ class LISAPopup {
       // Server-side verification (H-2 fix)
       if (storage.licenseKey) {
         try {
-          const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/validate-license', {
+          const resp = await fetch(`${LISA_API_ORIGIN}/api/validate-license`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key: storage.licenseKey })
@@ -738,7 +738,7 @@ class LISAPopup {
       this.validateLicenseKey();
     });
     document.getElementById('settingsSubscribeBtn').addEventListener('click', () => {
-      window.open('https://lisa-web-backend-production.up.railway.app/pricing', '_blank');
+      window.open(`${LISA_APP_ORIGIN}/pricing`, '_blank');
     });
 
     document.getElementById('settingsOpenAppBtn').addEventListener('click', () => {
@@ -789,7 +789,7 @@ class LISAPopup {
         newsletterBtn.disabled = true;
         newsletterBtn.textContent = '...';
         try {
-          const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/newsletter/subscribe', {
+          const resp = await fetch(`${LISA_API_ORIGIN}/api/newsletter/subscribe`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, source: 'popup' })
@@ -1232,7 +1232,7 @@ class LISAPopup {
       const storage = await chrome.storage.sync.get(['licenseKey']);
       const licenseKey = storage.licenseKey || '';
       if (!licenseKey) return;
-      const resp = await fetch('https://lisa-web-backend-production.up.railway.app/api/usage', {
+      const resp = await fetch(`${LISA_API_ORIGIN}/api/usage`, {
         headers: { 'X-License-Key': licenseKey }
       });
       if (!resp.ok) return;
@@ -1308,7 +1308,7 @@ class LISAPopup {
 
       const controller = new AbortController();
       const fetchTimeout = setTimeout(() => controller.abort(), 240000); // 4 minutes
-      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/compress', {
+      const response = await fetch(`${LISA_API_ORIGIN}/api/compress`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1683,7 +1683,7 @@ class LISAPopup {
         if (!email) return;
         headers = { 'Content-Type': 'application/json' };
       }
-      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/purchase', {
+      const response = await fetch(`${LISA_API_ORIGIN}/api/credits/purchase`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ bundle, email })
@@ -1708,7 +1708,7 @@ class LISAPopup {
       const headers = await this._creditAuthHeaders({ preferLicense: this.isPayg });
       if (!headers) return;
 
-      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/credits/balance', {
+      const response = await fetch(`${LISA_API_ORIGIN}/api/credits/balance`, {
         headers
       });
       if (!response.ok) return;
@@ -1739,8 +1739,8 @@ class LISAPopup {
 
   openAppPage() {
     const appUrl = this.userTier === 'premium' 
-      ? 'https://lisa-web-backend-production.up.railway.app/app'
-      : 'https://lisa-web-backend-production.up.railway.app/landing';
+      ? `${LISA_APP_ORIGIN}/app`
+      : `${LISA_APP_ORIGIN}/landing`;
 
     this.trackEvent('app_page_clicked');
     chrome.tabs.create({ url: appUrl });
@@ -1921,7 +1921,7 @@ class LISAPopup {
       // Call the app API to validate the license (key sent in body, not URL)
       let response;
       try {
-        response = await fetch('https://lisa-web-backend-production.up.railway.app/api/validate-license', {
+        response = await fetch(`${LISA_API_ORIGIN}/api/validate-license`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -2642,7 +2642,7 @@ class LISAPopup {
       }
 
       // Send to App API
-      const appUrl = 'https://lisa-web-backend-production.up.railway.app';
+      const appUrl = LISA_API_ORIGIN;
       const apiResponse = await fetch(`${appUrl}/api/snapshots`, {
         method: 'POST',
         headers: {
@@ -2778,7 +2778,7 @@ class LISAPopup {
 
     try {
       const version = chrome.runtime.getManifest().version;
-      const response = await fetch('https://lisa-web-backend-production.up.railway.app/api/feedback', {
+      const response = await fetch(`${LISA_API_ORIGIN}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject, message, email, version })

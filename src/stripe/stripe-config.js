@@ -1,3 +1,10 @@
+// LISA backend addresses for extension pages (popup, success page). The API and
+// the Nexus web pages run on the same Railway service under our own domains, so
+// a host move is a DNS change. The old *.up.railway.app address stays allowed
+// in manifest.json as a fallback.
+const LISA_API_ORIGIN = 'https://api.sat-chain.com';
+const LISA_APP_ORIGIN = 'https://nexus.sat-chain.com';
+
 /**
  * LISA - Stripe Configuration
  * Manages Stripe API keys and configuration
@@ -26,7 +33,7 @@ const STRIPE_CONFIG = {
   },
 
   // API endpoints (use your backend)
-  apiBaseUrl: 'https://lisa-web-backend-production.up.railway.app/api',
+  apiBaseUrl: LISA_API_ORIGIN + '/api',
   
   endpoints: {
     createPaymentIntent: '/stripe/create-payment-intent',

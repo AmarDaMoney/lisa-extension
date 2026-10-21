@@ -38,8 +38,8 @@ class StripeClient {
       const userID = await this.getUserID();
       
       // Get the success/cancel URLs for the extension
-      const successUrl = 'https://lisa-web-backend-production.up.railway.app/payment-success?session_id={CHECKOUT_SESSION_ID}';
-      const cancelUrl = 'https://lisa-web-backend-production.up.railway.app/pricing?canceled=true';
+      const successUrl = LISA_APP_ORIGIN + '/payment-success?session_id={CHECKOUT_SESSION_ID}';
+      const cancelUrl = LISA_APP_ORIGIN + '/pricing?canceled=true';
       
       console.debug('[LISA Stripe] Creating checkout session...', { priceId, billingCycle });
       

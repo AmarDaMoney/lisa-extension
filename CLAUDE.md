@@ -117,7 +117,13 @@ Edit `src/content/lisa-floating-button.js`. The button HTML, CSS, and JS are all
 Export logic lives in `src/background/service-worker.js` (LISACompressor class) and `src/shared/export-builders.js`.
 
 ### Backend/API
-The backend is at `https://lisa-web-backend-production.up.railway.app`. License validation, subscription management, and cloud sync go through it. The CSP in manifest.json must allow connect-src to this domain.
+The backend (lisa-web-backend on Railway) answers on our own domains: API calls go to
+`https://api.sat-chain.com` and the Nexus pages people open (pricing, app, payment success) are
+`https://nexus.sat-chain.com`. Extension pages take both from `LISA_API_ORIGIN` / `LISA_APP_ORIGIN`
+in `src/stripe/stripe-config.js`; the floating button (a content script) has its own
+`LISA_FAB_API_ORIGIN` / `LISA_FAB_APP_ORIGIN`. The old `lisa-web-backend-production.up.railway.app`
+stays in host_permissions and the CSP as a fallback. The CSP in manifest.json must allow connect-src
+to every backend domain. License validation, subscription management, and cloud sync go through it.
 
 ## Active development
 

@@ -1725,7 +1725,7 @@ class LISAPopup {
     }
   }
   async showNewsletterIfEligible() {
-    if (this.isPremium) return;
+    if (this.userTier === 'premium') return; // this.isPremium is never set in the popup
     try {
       const { newsletterSubscribed } = await chrome.storage.local.get('newsletterSubscribed');
       if (!newsletterSubscribed) {

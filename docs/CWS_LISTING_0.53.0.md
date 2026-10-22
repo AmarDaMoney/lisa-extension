@@ -58,12 +58,19 @@ creditworthiness.
 **Privacy policy URL:** change to `https://nexus.sat-chain.com/privacy` (our own domain; covers the
 extension, Nexus and Inference Shield).
 
-## 4. Images (optional but recommended)
+## 4. Images
 
-- Small promo tile / marquee: the LISA Suite image (neon L + Inference Shield logos, navy and gold).
-- Screenshots (1280×800): the floating menu, Handoff destinations, Options / Choose messages, the popup
-  library, and Inference Shield opened from a selection. The guide screenshots get recaptured with the
-  new logos as part of this release; reuse them.
+**Screenshots** (ready, 1280×800, in `docs/cws-screenshots-0.53.0/`, upload in this order; delete the
+five 0.52.x ones first: they show the old logo, "LISA Core", "tamper-proof" and unsourced
+compression numbers):
+1. `1-any-ai.png`: popup + floating menu, the 12 platforms
+2. `2-handoff.png`: Handoff destinations
+3. `3-choose-what-to-save.png`: Choose messages + Options
+4. `4-inference-shield.png`: Inference Shield result with SAT-CHAIN checks
+5. `5-lisa-suite.png`: one key across extension, Nexus and Shield (Nexus Library)
+
+Captured from the real UI (popup, floating button, Shield, Nexus) with demo data, then framed.
+Recapture when the UI changes. Optional: small promo tile 440×280 with the neon L.
 
 ## 5. Expect after upload
 

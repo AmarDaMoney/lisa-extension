@@ -96,6 +96,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
 - **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.9 → stay on 0.53.0 until that ships).
+- **0.53.0 (unreleased, on `claude/confident-fermat-lkl9o9`):** backend domains, Inference Shield hand-off, floating-button advanced mode, Merkle fix. Before the CWS upload: new icons (the neon L, `lisa-web-backend/static/assets/lisa-logo.png`, as `public/icon16/48/128.png`), Amar tests unpacked against the live backend, then fast-forward `main`. Listing text: `docs/CWS_LISTING_0.53.0.md`. The 0.52.9 in the store still calls the old Railway address, which stays working as a fallback.
 - **Keep `main` and `feature/acm` in sync:** after every push to `feature/acm`, fast-forward `main` to it (`git merge --ff-only`) and push `main`. Never force-push either.
 - **Commits:** Descriptive messages. Reference the platform name if the change is platform-specific.
 - **Testing:** Load unpacked in Chrome, test on the target AI platform. No automated test suite currently.

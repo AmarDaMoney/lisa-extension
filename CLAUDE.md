@@ -350,6 +350,16 @@ no caller. Leave as-is unless picking them up deliberately.
   Plan: annotate, don't rewrite. Cheap T1 rules next (Role, Priority,
   Completion, Temporal), then have the paid AI Compress prompt emit
   category-tagged fields to cover all 10 in T2.
+- **Agent relay (Amar's idea, parked; possible paid feature)** — automate the copy-paste loop
+  between two AI agents working on one job, e.g. a Claude Code session (writes the plan and the
+  prompt) and Claude in Chrome (acts in a web admin such as cPanel/WordPress, reports back). Today
+  Amar carries each prompt and report by hand. LISA already captures conversations and hands them
+  between platforms (Handoff), so the relay is that move in a loop: capture agent A's last message,
+  deliver it to agent B, bring B's answer back. Open questions: can LISA read/write the Claude in
+  Chrome side panel (another extension's page; likely not, so maybe via a claude.ai tab or a shared
+  file), how the code session receives it, and safety: a human approves each hop, secrets never
+  ride along, and each agent treats the other's text as data, not instructions (prompt injection).
+  Monetize as credits per relayed round.
 - **Second extension (Amar's idea, parked)** — LISA-format extraction /
   summarizing of *any* web page text for AI consumption (saving tokens on AI
   reading), the backend's original purpose before LISA focused on AI

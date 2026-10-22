@@ -13,51 +13,17 @@ It keeps the search words people use ("AI chat exporter"). Optional, if you want
 **Summary** (from `manifest.json` → `description`, updated, 122 of 132 characters):
 > Save, compress and hand off AI chats across 12 platforms. One key and credit balance with LISA Nexus and Inference Shield.
 
-**Description** (paste as is):
-
-> **Your AI conversations, saved, portable and ready for your next AI.**
->
-> LISA adds an "Export to LISA" button to your AI chats. Save any conversation in one click, compress it
-> into a compact LISA file any AI can pick up from, or hand it off to another AI and keep working with
-> your full context.
->
-> **Works on 12 platforms:** Claude, Claude Code on the web, ChatGPT, Gemini, Grok, Mistral, DeepSeek,
-> Microsoft Copilot, Perplexity, HuggingChat, Meta AI and Poe.
->
-> **SAVE**
-> • Markdown: the whole conversation as readable text
-> • LISA-Verbatim: structured, word for word, with integrity hashes that show if it was changed later
-> • Choose what to keep: the whole conversation, only your messages, only the AI's replies, or the exact
->   messages you tick
->
-> **CONTINUE ANYWHERE**
-> • Checkpoint: the AI sums up where things stand (decisions, open questions, constraints)
-> • Handoff: open a new chat on another AI (or the same one) with your context attached, so you don't
->   start from zero when a conversation gets too long
-> • Compress: a compact LISA token that keeps the decisions, tasks and key facts, much smaller than the
->   full chat
->
-> **YOUR LIBRARY**
-> • Every save lands in a library in your browser: open, re-export or hand off later
-> • Optional sync to your online Library in LISA Nexus, to reach it from any device
->
-> **CHECK BEFORE YOU PUBLISH: Inference Shield**
-> Right-click any text, or use the floating button, and choose "Check with Inference Shield". It opens
-> Inference Shield, a SAT-CHAIN tool that finds the phrases revealing how your technology works and
-> rewrites them, so your public text doesn't give your methods away.
->
-> **ONE KEY FOR THE LISA SUITE**
-> One license key and one credit balance work in the extension, LISA Nexus (nexus.sat-chain.com) and
-> Inference Shield (shield.sat-chain.com). New keys come with 50 free credits. Pay as you go with
-> credits that never expire, or choose a Pro, Team or Enterprise plan.
->
-> **PRIVACY**
-> Your saved conversations stay in your browser unless you choose to sync them. Nothing is sent to
-> Inference Shield until you pick that action, and nothing is analysed until you press Run there.
-> Payments are handled by Stripe. We don't sell your data.
->
-> Help and guide: nexus.sat-chain.com/guide · Contact: contact@sat-chain.com
-> LISA is made by SAT-CHAIN LLC.
+**Description:** paste the whole of `docs/CWS_DESCRIPTION_0.53.0.txt` (about 13,500 of the 16,000
+characters the store allows). It keeps the long, explanatory listing (the translation principle, ACM,
+the pipeline) and updates it for the suite launch. What changed from the 0.52.9 text, and why:
+- New "v0.53.0: the LISA Suite" block and an Inference Shield section ("coming soon" was out of date).
+- Pricing: one key across the suite, 50 free credits with a key, Pro includes 300 Shield credits a
+  month, Team and Enterprise mentioned.
+- Accuracy: "10 languages" (the code detects 6 scripts plus English and other Latin-script languages);
+  "tamper-proof" → changes are detectable; "zero server uploads" → text leaves the browser only for the
+  online features the user picks (AI compression, sync, Inference Shield); "understands exactly the
+  same" → "essentially"; "Every other tool" → "Most tools"; library "search" removed (the popup has
+  none); MCP marked early access; version 0.53.0.
 
 ## 2. What's new in 0.53.0 (release notes, if shown)
 

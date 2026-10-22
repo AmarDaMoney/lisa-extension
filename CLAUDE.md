@@ -117,6 +117,23 @@ Edit `src/content/lisa-floating-button.js`. The button HTML, CSS, and JS are all
 ### Export format changes
 Export logic lives in `src/background/service-worker.js` (LISACompressor class) and `src/shared/export-builders.js`.
 
+**Compressed export anchor** (`generateSemanticAnchor`): fields are only ever added, never renamed.
+- Platform notices delivered as user turns (Claude Code "Stop hook feedback", `<system-reminder>`,
+  task notifications, "[Request interrupted…") get role `system` (`lisaExportRole()` in
+  export-builders.js; Markdown tag `S:`), never `user`; counted as `message_count.system`.
+- `changes`: what the assistant changed, where and to what value (`extractActions`: change verb in
+  action position + a target such as `NAME=value`, a backticked identifier, a file or a commit;
+  proposals/conditionals excluded; secrets masked by `redactSecrets`). Also appended to that turn's
+  summary as "Changed: …" when the summary dropped it.
+- A LISA checkpoint reply (CURRENT STATE / … / NEXT, `checkpoint-detect.js`) is parsed into the anchor
+  instead of guessed: `checkpoint` {current_state, objective, key_context, next}, `decisions`, `open`,
+  `resolutions` (RESOLVED), `follow_ups` (NEXT), `constraints` (checkpoint first, then the user's own
+  rules). Latest checkpoint wins per section; earlier ones fill empty sections.
+- Constraints are also read clause by clause from the raw user turns (rules stated up front).
+- key_entities keep compound names whole ("SAT-CHAIN LLC", "SHA-256"), never license keys, and drop
+  generic tokens (`ANCHOR_GENERIC_ENTITIES` / `ANCHOR_GENERIC_CONCEPTS`).
+- Check with `node eval/run.js` (ratios) and by diffing anchors on `eval/corpus/*`.
+
 ### Backend/API
 The backend (lisa-web-backend on Railway) answers on our own domains: API calls go to
 `https://api.sat-chain.com` and the Nexus pages people open (pricing, app, payment success) are

@@ -25,8 +25,11 @@ var CHECKPOINT_SECTIONS = ['CURRENT STATE', 'OBJECTIVE', 'DECISIONS', 'OPEN', 'R
 // works whether the AI writes "CURRENT STATE:" plain or bolds/numbers it
 // ("**CURRENT STATE:**", "### Current State:", "1. Current State:", ...).
 function stripCheckpointMarkdown(line) {
+  // Underscores only as emphasis (_word_, __word__): inside identifiers
+  // (SHIELD_GHOST_MODEL, snake_case) they are part of the name.
   return line
-    .replace(/[*_~`]/g, '')
+    .replace(/[*~`]/g, '')
+    .replace(/(^|[^\w])_{1,2}([^_\n]+?)_{1,2}(?![\w])/g, '$1$2')
     .replace(/^#{1,6}\s*/, '')
     .replace(/^[-•]\s*/, '')
     .replace(/^\d+[.)]\s*/, '')

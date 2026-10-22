@@ -30,6 +30,35 @@ function msgText(m) {
   return '';
 }
 
+// Tokens too generic to anchor a conversation: time zones, format and
+// protocol acronyms, and everyday words that TextRank promotes in chats
+// about tools ("stop", "text").
+const ANCHOR_GENERIC_ENTITIES = new Set(['UTC','GMT','API','APIS','URL','URLS','JSON','HTTP','HTTPS','HTML','PDF',
+  'CLI','SDK','UI','UX','ID','IDS','FAQ','ETA','ASAP','FYI','TBD','EOD','PST','PDT','EST','EDT','CET','CEST','BST',
+  'WARNING','TODO','LLM','LLMS']);
+const ANCHOR_GENERIC_CONCEPTS = new Set(['stop','text','message','messages','time','today','thing','things','way',
+  'question','questions','answer','reply','note','notes','list','word','words','page','section','item','items',
+  'people','lot','stuff','minute','minutes','hour','hours','day','days','week']);
+
+// key_entities without generic tokens or duplicates. (Acronyms that only
+// occur inside a compound name are already dropped per message.)
+function anchorEntities(values, max = 12) {
+  // One entry per name: case-insensitive, and the longest form wins
+  // ("SAT-CHAIN" folds into "SAT-CHAIN LLC").
+  const unique = [];
+  for (const v of values) {
+    const k = v.toLowerCase();
+    if (!unique.some(u => u.toLowerCase() === k)) unique.push(v);
+  }
+  return unique.filter(v => !ANCHOR_GENERIC_ENTITIES.has(v) &&
+      !unique.some(w => w !== v && w.toLowerCase().startsWith(v.toLowerCase() + ' ')))
+    .slice(0, max);
+}
+
+function anchorConcepts(terms, max) {
+  return terms.filter(t => !t.split(' ').every(w => ANCHOR_GENERIC_CONCEPTS.has(w))).slice(0, max);
+}
+
 class LISACompressor {
   constructor() {
     this.compressionRatio = null;
@@ -65,18 +94,41 @@ class LISACompressor {
       'DELETE','DEPLOY','COMMIT','MERGE','FETCH','PATCH','RESET','DEBUG','PARSE','PRINT',
       'THROW','CATCH','BREAK','RETURN','SELECT','CREATE','INSERT','REMOVE','EXPORT','IMPORT',
       'TODO','FIXME','HACK','NOTE','ERROR','WARN','INFO',
-      'EOF','PYEOF','RAWEOF','HEREDOC','ENDIF','ENDFOR','STDOUT','STDERR','ARGV']);
+      'EOF','PYEOF','RAWEOF','HEREDOC','ENDIF','ENDFOR','STDOUT','STDERR','ARGV',
+      // LISA checkpoint section headers
+      'CURRENT','OBJECTIVE','DECISIONS','RESOLVED','CONSTRAINTS','CAN','WILL','MUST','SHOULD']);
     const patterns = {
       urls: /https?:\/\/[^\s\"'<>)\]]+/g,
       emails: /[\w.-]+@[\w.-]+\.\w+/g,
       mentions: /@[a-zA-Z]\w{1,30}/g,
       hashtags: /#\w+/g,
+      // Names kept whole: hyphenated ("SAT-CHAIN", "Inference-Shield"),
+      // optionally with a company suffix ("SAT-CHAIN LLC", "Acme Inc").
+      compoundNames: /\b[A-Z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+(?:\s(?:LLC|Inc|Ltd|GmbH|Corp|PLC|SAS|SARL)\b)?|\b[A-Z][A-Za-z0-9&]+\s(?:LLC|Inc|Ltd|GmbH|Corp|PLC|SAS|SARL)\b/g,
       technicalTerms: /\b[A-Z][A-Za-z0-9]+(?:[A-Z][a-z]+)+\b/g,
-      acronyms: /\b[A-Z]{3,}\b/g
+      // Not a file name's stem: CLAUDE.md, HANDOFF.md are files, not acronyms.
+      acronyms: /\b[A-Z]{3,}\b(?!\.[a-z]{1,5}\b)/g
     };
+    const compounds = [];
+    // License keys are credentials, not names: never let them (or their
+    // parts, "PAYG") become entities.
+    text = String(text).replace(/\bLISA-(?:PAYG|PRO|TEAM|ENT)-[A-Z0-9]{8,}\b/gi, ' ');
+    let withoutCompounds = text;
     for (const [type, pattern] of Object.entries(patterns)) {
       let matches = [...new Set(text.match(pattern) || [])];
-      if (type === 'acronyms') matches = matches.filter(m => !acronymNoise.has(m) && m.length >= 3);
+      if (type === 'compoundNames') {
+        // Never a license key, a hash-like token or a version string.
+        // Every hyphen part capitalized or numeric ("SHA-256", "Inference-Shield"),
+        // so sentence-initial words like "Two-session" or "Step-by-step" stay out.
+        matches = matches.filter(m => m.length <= 40 && !/[A-Za-z0-9]{16,}/.test(m) &&
+          m.split(/\s/)[0].split('-').every(part => /^[A-Z0-9]/.test(part)) &&
+          m.split(/[-\s]/).some(part => /[A-Za-z]{2,}/.test(part)));  // not a regex range like A-Z
+        compounds.push(...matches);
+        withoutCompounds = compounds.reduce((t, c) => t.split(c).join(' '), text);
+      }
+      if (type === 'acronyms') matches = matches.filter(m => !acronymNoise.has(m) && m.length >= 3 &&
+        // Only a part of a compound name here ("SAT" in "SAT-CHAIN LLC"), never on its own.
+        !(compounds.some(c => c.split(/[-\s]/).includes(m)) && !new RegExp('(?<![\\w-])' + m + '(?![\\w-])').test(withoutCompounds)));
       if (type === 'technicalTerms') matches = matches.filter(m => m.length <= 40);
       if (type === 'hashtags') matches = matches.filter(m => !/^#[0-9a-fA-F]{3,8}$/.test(m) && !/^#\d+$/.test(m));
       if (type === 'mentions') matches = matches.filter(m => !/^@(?:staticmethod|classmethod|property|override|abstractmethod|dataclass|pytest|app|router|api|param|returns?|deprecated|todo|fixme|hack|suppress|noinspection)$/i.test(m));
@@ -581,6 +633,8 @@ class LISACompressor {
 
     conversation.messages.forEach(message => {
       const content = message.content || message.v || '';
+      // Platform notices delivered as user turns are never the user's words.
+      const role = (typeof lisaExportRole === 'function') ? lisaExportRole({ role: message.role, content: msgText(message) }) : message.role;
       const tokens = this.tokenize(content);
       
       // Lean token object — drop empty arrays, context block, per-concept weight
@@ -589,12 +643,27 @@ class LISACompressor {
         if (tokens.concepts && tokens.concepts.length > 0) lean.concepts = tokens.concepts.map(({ weight, ...c }) => c);
         if (tokens.relationships && tokens.relationships.length > 0) lean.relationships = tokens.relationships;
 
-        compressed.semanticTokens.push({
-          role: message.role,
+        const token = {
+          role,
           index: message.index,
           tokens: lean,
           summary: this.summarize(content)
-        });
+        };
+        // Changes the assistant made (what, where, to what value) must
+        // survive summarizing: a summary that keeps "delete the variable"
+        // but drops "set X = Y" loses the state a continuation needs.
+        // A checkpoint restates the session; its lines go to anchor.checkpoint, not changes.
+        const isCheckpoint = typeof detectCheckpointInMessage === 'function' && !!detectCheckpointInMessage({ role, content: msgText(message), index: message.index });
+        if (role === 'assistant' && !isCheckpoint) {
+          const actions = this.extractActions(msgText(message));
+          if (actions.length) {
+            token.actions = actions;
+            const summaryLower = token.summary.toLowerCase();
+            const missing = actions.filter(a => !summaryLower.includes(a.toLowerCase().slice(0, 40)));
+            if (missing.length) token.summary = (token.summary ? token.summary.replace(/\s*$/, ' ') : '') + 'Changed: ' + missing.join('; ') + (/[.!?]$/.test(missing[missing.length - 1]) ? '' : '.');
+          }
+        }
+        compressed.semanticTokens.push(token);
     });
 
     // ── Step 6: Global trim pass ──
@@ -630,6 +699,40 @@ class LISACompressor {
     compressed._instructions = 'LISA semantic export. Each semanticTokens entry = one conversation turn with entities, weighted concepts, relationships, and intent. Read anchor for session context. Use semanticTokens[].summary for condensed turns. Upload to any AI and say: read this LISA file and continue the conversation.';
 
     return compressed;
+  }
+
+  // Masks secret values in a change line: values of KEY/SECRET/TOKEN/
+  // PASSWORD-style names, LISA license keys, API-key-shaped strings.
+  redactSecrets(text) {
+    return text
+      .replace(/\b([A-Z][A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASS|PRIVATE|CREDENTIALS?)[A-Z0-9_]*)\s*=\s*(?:"[^"]*"|'[^']*'|\S+)/g, '$1=<secret>')
+      .replace(/\bLISA-(?:PAYG|PRO|TEAM|ENT)-[A-Z0-9]{8,}\b/gi, 'LISA-…(key)')
+      .replace(/\b(?:sk|pk|rk|whsec|re|ghp|gho|xox[abp])[-_][A-Za-z0-9_-]{16,}\b/g, '<secret>')
+      .replace(/\b[A-Za-z0-9+\/_-]{40,}={0,2}(?![\w.\/])/g, m => /[0-9]/.test(m) && /[A-Za-z]/.test(m) && !/^[0-9a-f]{40}$/.test(m) ? '<secret>' : m);
+  }
+
+  // Sentences in which the assistant reports a change it made, with its
+  // target: a backticked identifier, a CONSTANT_NAME, NAME=value, a file,
+  // or a commit. Questions and conditionals ("if you want, I can delete…")
+  // are proposals, not changes. Max 3 per message, secrets masked.
+  extractActions(text) {
+    if (!text || typeof text !== 'string') return [];
+    const body = text.replace(/^[ \t]*```[\s\S]*?^[ \t]*```[ \t]*$/gm, ' ');
+    const sentences = body.split(/\n+|(?<=[.!?])\s+(?=[A-Z*`(])/).map(s => s.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/\*\*/g, '').trim());
+    // The verb must be in action position: at the start ("Pushed …"), after
+    // a subject ("I set …", "We've added …") or passive ("is pinned to …").
+    // Otherwise "rule set" or "the added cost" would count as changes.
+    const verb = /(?:^|\b(?:I|we|I've|we've|I have|we have|I've also|I also|also|is|are|was|were|been|now)\s+)(?:set|changed|updated|fixed|deleted|removed|added|created|renamed|pushed|deployed|redeployed|enabled|disabled|switched|pinned|bumped|moved|replaced|rotated|merged|reverted|installed|configured|committed)\b/i;
+    const target = /`[^`]{2,80}`|\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b|\b[a-z][a-z0-9]*_[a-z0-9_]+\b|\b[a-z]+[A-Z]\w*\(\)|\b[\w.-]+\s*=\s*\S+|\b[\w.\/-]+\.(?:js|ts|py|json|md|html|css|toml|txt|ya?ml)\b|\b[0-9a-f]{7,40}\b/;
+    const notDone = /\?$|\b(?:if|would|could|should|shall|whether|want me to|do you|can I|let me know|to undo|next step)\b/i;
+    const out = [];
+    for (const s of sentences) {
+      if (s.length < 15 || s.length > 260 || !verb.test(s) || !target.test(s) || notDone.test(s)) continue;
+      const line = this.redactSecrets(s.replace(/`([^`]+)`/g, '$1')).replace(/\s+/g, ' ').trim();
+      if (!out.includes(line)) out.push(line);
+      if (out.length === 3) break;
+    }
+    return out;
   }
 
   summarize(text) {
@@ -828,7 +931,7 @@ class LISACompressor {
     const allText = sample.map(m => msgText(m)).join(' ');
     // Reuse TextRank for consistent concept extraction
     const concepts = this.extractConcepts(allText);
-    const dominantConcepts = concepts.slice(0, 6).map(c => c.term);
+    const dominantConcepts = anchorConcepts(concepts.map(c => c.term), 6);
     const coreTopic = conversation.title ||
       (userMsgs[0]?.content || userMsgs[0]?.v || '').substring(0, 100).replace(/\n/g, ' ').trim();
     return {
@@ -837,7 +940,7 @@ class LISACompressor {
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
       generated_by:      'LISA v0.53.0',
-      key_entities:    this.extractEntities(allText).flatMap(e => e.values).slice(0, 12),
+      key_entities:    anchorEntities(this.extractEntities(allText).flatMap(e => e.values)),
       note:              'Lightweight anchor — raw verbatim format'
     };
   }
@@ -847,14 +950,15 @@ class LISACompressor {
     const msgs = rawMessages || [];
     const userTokens      = tokens.filter(t => t.role === 'user');
     const assistantTokens = tokens.filter(t => t.role === 'assistant');
+    const systemCount     = tokens.filter(t => t.role === 'system').length;
     const conceptMap = {};
     tokens.forEach(t => {
       (t.tokens?.concepts || []).forEach(c => {
         conceptMap[c.term] = (conceptMap[c.term] || 0) + (c.weight || 1);
       });
     });
-    const dominantConcepts = Object.entries(conceptMap)
-      .sort((a, b) => b[1] - a[1]).slice(0, 8).map(([term]) => term);
+    const dominantConcepts = anchorConcepts(Object.entries(conceptMap)
+      .sort((a, b) => b[1] - a[1]).map(([term]) => term), 8);
     const entitySet = new Set();
     tokens.forEach(t => {
       (t.tokens?.entities || []).forEach(e => (e.values || []).forEach(v => entitySet.add(v)));
@@ -890,7 +994,7 @@ class LISACompressor {
       platform:          compressed.metadata?.platform || 'unknown',
       message_count:     { user: userTokens.length, assistant: assistantTokens.length },
       dominant_concepts: dominantConcepts,
-      key_entities:      [...entitySet].slice(0, 12),
+      key_entities:      anchorEntities([...entitySet]),
       session_intent:    sessionIntent,
       session_register:  register,
       generated_by:      'LISA v0.53.0'
@@ -910,7 +1014,70 @@ class LISACompressor {
       anchor.follow_ups  = sessionEvents.open_tasks;
       anchor.constraints = sessionEvents.constraints;
     }
+    if (systemCount) anchor.message_count.system = systemCount;
+    // What the assistant changed, where and to what value (secrets masked).
+    const changes = tokens.filter(t => t.actions).flatMap(t => t.actions.map(change => ({ change, at: t.index })));
+    if (changes.length) anchor.changes = changes.slice(-15);
+    this.applyCheckpoints(anchor, rawMessages);
     return anchor;
+  }
+
+  // A LISA checkpoint reply (CURRENT STATE / OBJECTIVE / DECISIONS / OPEN /
+  // RESOLVED / CONSTRAINTS / KEY CONTEXT / NEXT) is the conversation's own
+  // statement of where it stands: its sections go into the anchor as they
+  // are instead of being guessed by NLP. The latest checkpoint wins section
+  // by section; earlier ones fill sections it leaves empty. Existing fields
+  // keep their item shapes, with source: 'checkpoint'.
+  applyCheckpoints(anchor, rawMessages) {
+    if (typeof detectCheckpointInMessage !== 'function' || !rawMessages) return;
+    const found = [];
+    rawMessages.forEach((m, i) => {
+      const text = msgText(m);
+      const cp = text && detectCheckpointInMessage({ role: m.role, content: text, index: m.index ?? i });
+      if (cp) found.push({ cp, at: m.index ?? i });
+    });
+    if (!found.length) return;
+    const pick = (key) => {
+      for (let k = found.length - 1; k >= 0; k--) {
+        const v = found[k].cp[key];
+        if (Array.isArray(v) ? v.length : v) return { value: v, at: found[k].at };
+      }
+      return null;
+    };
+    const items = (key) => pick(key) || { value: [], at: null };
+    const latest = found[found.length - 1];
+    const state = pick('currentState'), objective = pick('objective');
+    anchor.checkpoint = {
+      at: latest.at,
+      count: found.length,
+      current_state: state ? state.value : '',
+      objective: objective ? objective.value : '',
+      key_context: items('keyContext').value,
+      next: items('next').value
+    };
+    const asProposals = (key, extra = {}) => { const { value, at } = items(key); return value.map(p => ({ proposal: p, at, source: 'checkpoint', ...extra })); };
+    const decisions = asProposals('decisions');
+    const open = asProposals('open');
+    const resolved = asProposals('resolved');
+    const next = asProposals('next');
+    const constraintsCp = items('constraints');
+    const constraints = constraintsCp.value.map(text => ({ text, at: constraintsCp.at, by: 'assistant', source: 'checkpoint' }));
+    if (decisions.length) anchor.decisions = decisions;
+    if (open.length) anchor.open = open;
+    if (resolved.length) anchor.resolutions = resolved;
+    if (next.length || open.length) anchor.follow_ups = next.length ? next : open;
+    if (constraints.length) {
+      // Checkpoint constraints first; rules the user stated that it doesn't repeat follow.
+      const seen = new Set(constraints.map(c => c.text.toLowerCase()));
+      const rest = (anchor.constraints || []).filter(c => c.by === 'user' && !seen.has(c.text.toLowerCase()));
+      anchor.constraints = [...constraints, ...rest].slice(0, 16);
+    }
+    if (anchor.session_register === 'technical') {
+      if (open.length) anchor.open_tasks = open;
+    } else if (anchor.session_register === 'philosophical') {
+      if (resolved.length) anchor.conclusions = resolved;
+      if (open.length) anchor.open_questions = open;
+    }
   }
 
   // ── Session-Level Event Extractor (Tier 1) ──
@@ -1006,7 +1173,34 @@ class LISACompressor {
       /\b(?:toujours|jamais|il faut|obligatoire|ne pas oublier|imp\u00e9ratif|critique)\b[^.;\n]{3,80}/gi
     ];
     const constraints = [];
+    // Rules the user states ("Rules: never …; ask before …; … only …") live
+    // in their own raw words; the summary keeps one or two at best. Read
+    // every user turn clause by clause first.
+    if (rawMessages) {
+      const ruleMarker = /\b(?:never|always|must|don'?t|do not|only|ask (?:me )?(?:first|before)|before \w+ing|no [\w-]+(?: [\w-]+)? unless|make sure|without asking|required|mandatory|non-negotiable|jamais|toujours|il faut|obligatoire|ne pas)\b/i;
+      rawMessages.forEach((m, i) => {
+        if (m.role !== 'user' || (typeof lisaSystemNotice === 'function' && lisaSystemNotice(msgText(m)))) return;
+        const clauses = msgText(m)
+          .replace(/^[ \t]*```[\s\S]*?^[ \t]*```[ \t]*$/gm, ' ')
+          .replace(/\s*\n\s*(?![-*•]|\d+[.)])/g, ' ')
+          .split(/;|\n|(?<=[.!])\s+(?=[A-Z])|(?:^|\s)(?:Rules|Constraints|Règles):\s*/);
+        clauses.forEach(raw => {
+          let text = raw.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').replace(/^(?:Rules|Constraints|Règles)\s*:\s*/i, '').trim();
+          // Cut at a closing parenthesis the clause never opened ("…unless asked): repo, repo").
+          const opens = (text.match(/\(/g) || []).length;
+          const firstClose = text.indexOf(')');
+          if (firstClose !== -1 && opens === 0) text = text.slice(0, firstClose);
+          text = text.trim().replace(/[.,:]$/, '');
+          if (text.length < 15 || text.length > 200 || /\?$/.test(text) || !ruleMarker.test(text)) return;
+          // Pasted code or logs, and stories about what happened, aren't rules.
+          if (/\d{3,}\s{2,}|[{}]|=>|\/\/|\b(?:const|let|var|function|return|document\.|def|import)\b/.test(text)) return;
+          if (/\b(?:was|were|been|did|because|verified|showed|found|noticed|returned|produced|oops)\b/i.test(text)) return;
+          if (!constraints.some(c => c.text.toLowerCase() === text.toLowerCase())) constraints.push({ text, at: m.index ?? i, by: 'user' });
+        });
+      });
+    }
     summaries.forEach(s => {
+      if (s.role === 'system') return;
       constraintPatterns.forEach(p => {
         const re = new RegExp(p.source, p.flags);
         let match;
@@ -1024,7 +1218,7 @@ class LISACompressor {
       decisions: decisions.slice(0, 10),
       open_tasks,
       files_changed: [...fileSet].slice(0, 20),
-      constraints: constraints.slice(0, 8)
+      constraints: constraints.slice(0, 12)
     };
   }
 }

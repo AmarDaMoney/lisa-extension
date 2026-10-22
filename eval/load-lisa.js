@@ -55,11 +55,11 @@ function loadLisa() {
   ctx.importScripts = (...rel) =>
     rel.forEach(r => run(path.join(SRC, 'background', r)));
 
-  // Load in production order
-  run(path.join(SRC, 'shared', 'snapshot-shim.js'));
+  // Load in production order. service-worker.js importScripts the shim,
+  // semantic-analyzer, checkpoint-detect and export-builders itself; loading
+  // them here too redeclares their top-level consts.
   run(path.join(SRC, 'lib', 'compromise.js'));
   run(path.join(SRC, 'utils', 'local-disambiguator.js'));
-  run(path.join(SRC, 'utils', 'semantic-analyzer.js'));
   run(path.join(SRC, 'background', 'service-worker.js'));
 
   // Pull classes/constructors out of the VM scope

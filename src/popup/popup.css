@@ -58,7 +58,8 @@ header {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: linear-gradient(135deg, var(--primary-color) 0%, #1d4ed8 100%);
+  /* Deep indigo of the LISA logo tile, so the logo blends into the header */
+  background: linear-gradient(135deg, #22069e 0%, #150257 60%, #0f0242 100%);
   color: white;
 }
 

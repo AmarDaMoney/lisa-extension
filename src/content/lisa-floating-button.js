@@ -292,21 +292,36 @@ class LISAFloatingButton {
         0%, 100% { opacity: 1; transform: scale(1); }
         50% { opacity: 0.6; transform: scale(1.3); }
       }
+      /* A compact bubble above the floating button: long messages wrap onto
+         several lines instead of stretching across the page. */
       .lisa-toast {
+        --lisa-toast-bg: #10b981;
         position: fixed;
-        bottom: 80px;
+        bottom: 92px;
         right: 24px;
-        padding: 12px 20px;
-        background: #10b981;
+        max-width: min(300px, calc(100vw - 48px));
+        padding: 11px 15px;
+        background: var(--lisa-toast-bg);
         color: white;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-radius: 12px;
+        font: 500 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        text-align: left;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.25);
         z-index: 100000;
         animation: lisa-slide-up 0.3s ease;
       }
-      .lisa-toast.error { background: #ef4444; }
+      .lisa-toast::after {
+        content: "";
+        position: absolute;
+        bottom: -6px;
+        right: 34px;
+        border: 6px solid transparent;
+        border-bottom: 0;
+        border-top-color: var(--lisa-toast-bg);
+      }
+      .lisa-toast.error { --lisa-toast-bg: #ef4444; }
       @keyframes lisa-slide-up {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }

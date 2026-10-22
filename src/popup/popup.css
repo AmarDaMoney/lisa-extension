@@ -74,6 +74,7 @@ header {
 
 .logo h1 {
   font-size: 20px;
+  line-height: 1;
   font-weight: 700;
 }
 
@@ -88,8 +89,15 @@ header {
 }
 
 .header-logo {
-  width: 40px;
-  height: 40px;
+  width: 54px;
+  height: 54px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .header-actions {

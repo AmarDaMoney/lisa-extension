@@ -96,7 +96,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
 - **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.9 → stay on 0.53.0 until that ships).
-- **0.53.0 (unreleased, on `claude/confident-fermat-lkl9o9`):** backend domains, Inference Shield hand-off, floating-button advanced mode, Merkle fix. Icons are the neon L (`public/icon16/48/128.png`, `logo.png`; rounded-corner transparent) and the popup header is the logo's deep indigo so they blend. Before the CWS upload: Amar tests unpacked against the live backend, then fast-forward `main`. Listing text: `docs/CWS_LISTING_0.53.0.md`. The 0.52.9 in the store still calls the old Railway address, which stays working as a fallback.
+- **0.53.0 (unreleased, on `claude/confident-fermat-lkl9o9`):** backend domains, Inference Shield hand-off, floating-button advanced mode, Merkle fix. Popup header: logo, "LISA", "Your AI memory", and **? Help / ⚙ Settings** at the top right (moved from the footer, which scrolls away under the library); badges and version on the second row. Icons are the neon L (`public/icon16/48/128.png`, `logo.png`; rounded-corner transparent) and the popup header is the logo's deep indigo so they blend. Before the CWS upload: Amar tests unpacked against the live backend, then fast-forward `main`. Listing text: `docs/CWS_LISTING_0.53.0.md`. The 0.52.9 in the store still calls the old Railway address, which stays working as a fallback.
 - **Keep `main` and `feature/acm` in sync:** after every push to `feature/acm`, fast-forward `main` to it (`git merge --ff-only`) and push `main`. Never force-push either.
 - **Commits:** Descriptive messages. Reference the platform name if the change is platform-specific.
 - **Testing:** Load unpacked in Chrome, test on the target AI platform. No automated test suite currently.
@@ -300,7 +300,7 @@ Handoff (`_getApiCapture`); DOM capture remains the fallback. Console:
 `[LISA] Grok API capture: N messages (…)`. Conversation URLs: `/c/<id>`.
 
 ### Floating button: Options and Choose messages (advanced mode)
-"⚙ Options" (remembered in `chrome.storage.sync` as `lisaFabOptions`): **Include** = whole
+"⚙ Options" (under the folding **Advanced** group, next to the folding **Protect** group; kept for the page only in `this._pageOptions`, reset on reload so a filter never surprises a later save): **Include** = whole
 conversation / my messages only / AI replies only, applied to Markdown, LISA-V and Inference Shield;
 **Handoff format** = LISA (the compact JSON payload) or Markdown (the full conversation word for
 word, `.md`). Handoff always sends both sides: a one-sided handoff gives the new AI a broken context.

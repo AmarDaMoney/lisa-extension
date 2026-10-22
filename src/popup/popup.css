@@ -57,13 +57,16 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  flex-wrap: wrap;
+  row-gap: 10px;
+  padding: 14px 18px;
   /* Deep indigo of the LISA logo tile, so the logo blends into the header */
   background: linear-gradient(135deg, #22069e 0%, #150257 60%, #0f0242 100%);
   color: white;
 }
 
 .logo {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -75,6 +78,7 @@ header {
 }
 
 .subtitle {
+  white-space: nowrap;
   font-size: 11px;
   opacity: 0.9;
   background: rgba(255, 255, 255, 0.2);
@@ -84,9 +88,47 @@ header {
 }
 
 .header-logo {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 8px;
+  width: 40px;
+  height: 40px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.user-status {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.user-status .version {
+  margin-left: auto;
+}
+
+.user-status .upgrade-badge {
+  margin-left: 0;
+}
+
+.header-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.header-icon:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .version {

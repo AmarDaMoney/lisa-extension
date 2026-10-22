@@ -5,7 +5,8 @@
 const LISA_FAB_API_ORIGIN = 'https://api.sat-chain.com';
 const LISA_FAB_APP_ORIGIN = 'https://nexus.sat-chain.com';
 
-// Advanced options, remembered in chrome.storage.sync. `include` filters what
+// Advanced options, for this page only: they reset to the defaults on reload, so
+// nobody saves a partial export days later by surprise. `include` filters what
 // Markdown, LISA-V and Inference Shield export; Handoff always sends both sides
 // (a one-sided handoff gives the new AI a broken context) and only takes
 // `handoffFormat`.
@@ -370,6 +371,13 @@ class LISAFloatingButton {
         color: #6b7280;
         text-transform: uppercase;
       }
+      /* Protect and Advanced fold away until clicked */
+      .lisa-menu-group { margin: 0; padding: 0; border: 0; }
+      .lisa-menu-summary { list-style: none; cursor: pointer; user-select: none; padding-bottom: 6px; }
+      .lisa-menu-summary::-webkit-details-marker { display: none; }
+      .lisa-menu-summary::after { content: "▸"; float: right; font-size: 11px; transition: transform 0.15s; }
+      .lisa-menu-group[open] > .lisa-menu-summary::after { transform: rotate(90deg); }
+      .lisa-menu-summary:hover { color: #9ca3af; }
       @keyframes lisa-menu-unfold {
         from { opacity: 0; transform: scale(0.95) translateY(-6px); }
         to { opacity: 1; transform: scale(1) translateY(0); }
@@ -564,18 +572,12 @@ class LISAFloatingButton {
   }
 
   async _getOptions() {
-    try {
-      const stored = await chrome.storage.sync.get('lisaFabOptions');
-      return { ...LISA_FAB_OPTION_DEFAULTS, ...(stored.lisaFabOptions || {}) };
-    } catch (_) {
-      return { ...LISA_FAB_OPTION_DEFAULTS };
-    }
+    return { ...LISA_FAB_OPTION_DEFAULTS, ...(this._pageOptions || {}) };
   }
 
   async _setOptions(patch) {
-    const options = { ...(await this._getOptions()), ...patch };
-    try { await chrome.storage.sync.set({ lisaFabOptions: options }); } catch (_) { /* keep working without storage */ }
-    return options;
+    this._pageOptions = { ...(await this._getOptions()), ...patch };
+    return this._pageOptions;
   }
 
   // A panel anchored to the floating button, replacing the menu (Options, Choose messages).
@@ -616,7 +618,7 @@ class LISAFloatingButton {
     const radio = (name, value, label, current) => `
       <label class="lisa-opt"><input type="radio" name="${name}" value="${value}" ${current === value ? 'checked' : ''}> ${label}</label>`;
     const panel = this._openPanel('lisa-options-panel', `
-      <div class="lisa-panel-title">⚙ Options (remembered)</div>
+      <div class="lisa-panel-title">⚙ Options (this page, until you reload)</div>
       <div class="lisa-menu-section-label">Include in Markdown, LISA-V and Inference Shield</div>
       <div class="lisa-opt-group">
         ${radio('include', 'all', 'Whole conversation', options.include)}
@@ -767,11 +769,15 @@ class LISAFloatingButton {
       <div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>
       <div class="lisa-menu-item" data-action="handoff" title="Pick a destination and hand off your context">🔄 Handoff</div>
       ` : ''}
-      <div class="lisa-menu-section-label">Protect</div>
-      <div class="lisa-menu-item" data-action="inference-shield" title="Open this conversation in Inference Shield to see what it reveals about your technology before you share it">🛡 Inference Shield</div>
-      <div class="lisa-menu-section-label">Advanced</div>
-      <div class="lisa-menu-item" data-action="pick" title="Tick the messages you want, then save them or check them with Inference Shield">☑ Choose messages…</div>
-      <div class="lisa-menu-item" data-action="options" title="Save only your messages or only the AI's replies; choose the Handoff format">⚙ Options</div>
+      <details class="lisa-menu-group">
+        <summary class="lisa-menu-section-label lisa-menu-summary">Protect</summary>
+        <div class="lisa-menu-item" data-action="inference-shield" title="Open this conversation in Inference Shield to see what it reveals about your technology before you share it">🛡 Inference Shield</div>
+      </details>
+      <details class="lisa-menu-group">
+        <summary class="lisa-menu-section-label lisa-menu-summary">Advanced</summary>
+        <div class="lisa-menu-item" data-action="pick" title="Tick the messages you want, then save them or check them with Inference Shield">☑ Choose messages…</div>
+        <div class="lisa-menu-item" data-action="options" title="Save only your messages or only the AI's replies; choose the Handoff format">⚙ Options</div>
+      </details>
     `;
   }
 

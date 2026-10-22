@@ -1718,7 +1718,11 @@ class LISAPopup {
       const count = document.getElementById('creditCount');
       if (badge && count) {
         count.textContent = balance.toLocaleString(); // template already says "credits"
-        badge.style.display = balance > 0 ? 'inline-block' : 'none';
+        // Signed in: always show the balance, 0 included, so an empty balance
+        // isn't mistaken for "no credits feature". At 0 it turns amber and says why.
+        badge.style.display = 'inline-block';
+        badge.style.background = balance > 0 ? 'var(--accent, #6366f1)' : '#b45309';
+        badge.title = balance > 0 ? 'Your credit balance' : 'No credits left. Click to top up.';
       }
     } catch (e) {
       console.debug('[LISA] Could not load credit balance:', e);

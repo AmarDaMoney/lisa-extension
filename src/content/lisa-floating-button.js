@@ -763,6 +763,51 @@ class LISAFloatingButton {
     return null;
   }
 
+  // The conversation's messages from the platform's API (ChatGPT), cached for 20 s.
+  async _inlineStarMessages() {
+    const api = window.__LISA_CHATGPT_API_CAPTURE;
+    if (!api || typeof api.extractViaAPI !== 'function') return null;
+    const id = this._starStorageKey();
+    const c = this._starApiCache;
+    if (c && c.id === id && Date.now() - c.at < 20000) return c.msgs;
+    if (!this._starApiPending) {
+      this._starApiPending = api.extractViaAPI().then((r) => {
+        const norm = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+        const msgs = ((r && r.messages) || []).map((m) => {
+          const full = norm(m.content);
+          return { m: { role: m.role === 'user' ? 'user' : 'assistant', content: m.content }, full, probe: full.slice(0, 80) };
+        }).filter((x) => x.probe.length >= 4);
+        this._starApiCache = { id, at: Date.now(), msgs };
+        return msgs;
+      }).catch(() => null).finally(() => { this._starApiPending = null; });
+    }
+    const fresh = await this._starApiPending;
+    return fresh || (c && c.id === id ? c.msgs : null);
+  }
+
+  // The message under `node`, found by its text: the largest element around it that
+  // holds exactly one message of the conversation (a short message whose text also
+  // appears inside a longer one doesn't count against the longer one).
+  async _inlineStarTargetByText(node) {
+    const msgs = await this._inlineStarMessages();
+    if (!msgs || !msgs.length || !node) return null;
+    const norm = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    let el = node.nodeType === 1 ? node : node.parentElement;
+    let best = null;
+    for (let depth = 0; el && el !== document.body && depth < 30; depth++, el = el.parentElement) {
+      if (el.id === 'lisa-floating-btn' || (typeof el.className === 'string' && /(^|\s)lisa-/.test(el.className))) return null;
+      const t = norm(el.textContent);
+      if (t.length > 400000) break;
+      let hits = msgs.filter((x) => t.includes(x.probe));
+      if (hits.length > 1) hits = hits.filter((h) => !hits.some((o) => o !== h && o.full.length > h.full.length && o.full.includes(h.probe)));
+      if (hits.length === 0) continue;
+      if (hits.length > 1) break;
+      if (best && best.msg !== hits[0].m) break;
+      best = { el, role: hits[0].m.role, msg: hits[0].m };
+    }
+    return best;
+  }
+
   // What the page shows of a message: its text, and a probe (letters and digits of
   // its first real paragraph, so platform labels like "You said" stay out).
   _inlineStarRead(el) {
@@ -792,7 +837,8 @@ class LISAFloatingButton {
     btn.type = 'button';
     btn.className = 'lisa-inline-star';
     document.body.appendChild(btn);
-    let current = null, hideTimer = null;
+    let current = null, hideTimer = null, textTimer = null;
+    const byText = location.hostname.includes('chatgpt.com');
     const place = () => {
       if (!current || !document.contains(current.el)) { btn.style.display = 'none'; current = null; return; }
       const r = current.el.getBoundingClientRect();
@@ -804,11 +850,18 @@ class LISAFloatingButton {
     const show = async (target) => {
       if (!this._starStorageKey()) return;
       current = target;
-      const { text, probe } = this._inlineStarRead(target.el);
-      if (probe.length < 3) { current = null; btn.style.display = 'none'; return; }
-      const stars = await this._getStars();
-      if (current !== target) return;
-      const on = stars.has('p:' + (target.role === 'user' ? 'u' : 'a') + ':' + probe) || this._isStarred({ role: target.role, content: text }, stars);
+      let on;
+      if (target.msg) {
+        const stars = await this._getStars();
+        if (current !== target) return;
+        on = this._isStarred(target.msg, stars);
+      } else {
+        const { text, probe } = this._inlineStarRead(target.el);
+        if (probe.length < 3) { current = null; btn.style.display = 'none'; return; }
+        const stars = await this._getStars();
+        if (current !== target) return;
+        on = stars.has('p:' + (target.role === 'user' ? 'u' : 'a') + ':' + probe) || this._isStarred({ role: target.role, content: text }, stars);
+      }
       btn.classList.toggle('on', on);
       btn.textContent = on ? '★' : '☆';
       btn.title = on ? 'Starred: kept word for word. Click to remove the star.'
@@ -822,7 +875,18 @@ class LISAFloatingButton {
       if (t) {
         clearTimeout(hideTimer);
         if (!current || current.el !== t.el) show(t);
-      } else if (current) {
+        return;
+      }
+      if (byText && !(current && current.el.contains(e.target))) {
+        // No platform markup to go by (ChatGPT): find the message by its text.
+        clearTimeout(textTimer);
+        const node = e.target;
+        textTimer = setTimeout(async () => {
+          const m = await this._inlineStarTargetByText(node);
+          if (m) { clearTimeout(hideTimer); if (!current || current.el !== m.el) show(m); }
+        }, 120);
+      }
+      if (current && !current.el.contains(e.target)) {
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => { btn.style.display = 'none'; current = null; }, 600);
       }
@@ -833,6 +897,17 @@ class LISAFloatingButton {
       e.preventDefault(); e.stopPropagation();
       const target = current;
       if (!target) return;
+      if (target.msg) {
+        const stars = await this._getStars();
+        const on = !this._isStarred(target.msg, stars);
+        if (on) stars.add(this._starKey(target.msg)); else this._unstar(target.msg, stars);
+        if (!(await this._setStars(stars))) { this.showToast('Could not save the star', true); return; }
+        btn.classList.toggle('on', on);
+        btn.textContent = on ? '★' : '☆';
+        btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : 'Keep this message word for word in compressed exports and Handoff';
+        this.showToast(on ? '⭐ Kept word for word in compressed exports and Handoff' : 'Star removed');
+        return;
+      }
       const { text, probe } = this._inlineStarRead(target.el);
       const probeKey = 'p:' + (target.role === 'user' ? 'u' : 'a') + ':' + probe;
       const stars = await this._getStars();

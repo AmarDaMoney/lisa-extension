@@ -453,6 +453,7 @@ class LISAPopup {
       this.updatePlatformStatus(`✅ ${platform} detected`, true);
       document.getElementById('extractBtn').disabled = false;
       this.activeTabId = tab.id;
+      this.activeTabUrl = tab.url;
       this.showPageActions = platform !== 'Web Page (Universal)';
 
       // Quick language detection from page sample
@@ -1166,6 +1167,18 @@ class LISAPopup {
   // of its own — see downloadSnapshot/injectSnapshotAsMarkdown/etc).
   // Returns [] rather than throwing if there's no conversationId or
   // nothing stored yet.
+  // Messages starred in the floating button's "Choose messages" (lisaStarKey fingerprints).
+  async _getStarredKeys(conversationId = (this.activeTabUrl && getConversationIdFromUrl(this.activeTabUrl)?.id) || this.currentConversation?.conversationId) {
+    if (!conversationId) return [];
+    try {
+      const key = `lisa-stars-${conversationId}`;
+      const result = await chrome.storage.local.get(key);
+      return Array.isArray(result[key]) ? result[key] : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   async _getCheckpointHistory(conversationId = this.currentConversation?.conversationId) {
     if (!conversationId) return [];
     try {
@@ -1272,7 +1285,7 @@ class LISAPopup {
           const preComputedWork = entityCount + conceptCount + relationshipCount;
           // Measure what the user actually downloads (lean export), not the full compressedData
           const checkpointHistory = await this._getCheckpointHistory();
-          const _lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory });
+          const _lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory, starredKeys: await this._getStarredKeys() });
           // ?? '' — a short conversation gets buildLeanExport's verbatim payload,
           // which has no anchor/semantic_anchors; JSON.stringify(undefined) is
           // undefined, and .length on it crashed the whole compress.
@@ -1622,7 +1635,7 @@ class LISAPopup {
     const title = lisaSafeTitle(this.compressedData.metadata?.title || '');
     const filename = title ? `${title}-lisa-${platform}-${timestamp}.json` : `lisa-${platform}-${timestamp}.json`;
 
-    const lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory: await this._getCheckpointHistory() });
+    const lean = buildLeanExport(this.compressedData, (this.currentConversation && this.currentConversation.messages) || [], { checkpointHistory: await this._getCheckpointHistory(), starredKeys: await this._getStarredKeys() });
 
     const downloadData = {
       _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensedturns, or messages[].tokens for full semantic analysis. Upload to any AI and say: read this LISA file and continue the conversation.',
@@ -2384,7 +2397,7 @@ class LISAPopup {
         const raw = snapshot.capture?.content || snapshot.raw || snapshot;
         const rawMessages = snapshot.capture?.messages || raw.messages || [];
         const snapConvId = snapshot.url ? getConversationIdFromUrl(snapshot.url)?.id : null;
-        const data = buildLeanExport(raw, rawMessages, { checkpointHistory: await this._getCheckpointHistory(snapConvId) });
+        const data = buildLeanExport(raw, rawMessages, { checkpointHistory: await this._getCheckpointHistory(snapConvId), starredKeys: await this._getStarredKeys(snapConvId) });
         data.format = fmt; // preserve the original label (ai-compressed vs compressed)
         data.url = raw.metadata?.originalUrl || raw.metadata?.url || '';
         data.exportedAt = new Date().toISOString();

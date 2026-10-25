@@ -374,7 +374,15 @@ class LISAFloatingButton {
       .lisa-pick-row .lisa-pick-who { flex: none; width: 18px; }
       .lisa-pick-row .lisa-pick-text {
         overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        flex: 1;
       }
+      .lisa-pick-row .lisa-star {
+        flex: none; background: none; border: none; cursor: pointer; padding: 0 2px;
+        font-size: 15px; line-height: 1; color: #52525b;
+      }
+      .lisa-pick-row .lisa-star.on { color: #facc15; }
+      .lisa-pick-row .lisa-star:hover { color: #fde68a; }
+      .lisa-star-hint { color: #9ca3af; font-size: 11px; padding: 0 16px 6px; }
       .lisa-pick-bar { display: flex; gap: 6px; padding: 6px 16px; flex-wrap: wrap; align-items: center; }
       .lisa-pick-count { color: #9ca3af; font-size: 11px; margin-left: auto; }
       .lisa-chip-btn {
@@ -674,6 +682,47 @@ class LISAFloatingButton {
     });
   }
 
+  // Starred messages ("Choose messages" → ★) stay word for word in compressed
+  // exports and Handoff. Same fingerprint as lisaStarKey() in
+  // shared/export-builders.js (not loaded in content scripts): keep them in step.
+  _starKey(m) {
+    const role = m && (m.role === 'user' || m.role === 'human') ? 'u' : 'a';
+    const text = String((m && m.content) || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return role + ':' + h.toString(16) + ':' + text.length;
+  }
+
+  _starStorageKey() {
+    const id = window.__lisaACM && window.__lisaACM.conversationId;
+    return id ? `lisa-stars-${id}` : null;
+  }
+
+  async _getStars() {
+    const key = this._starStorageKey();
+    if (!key) return new Set();
+    try {
+      const r = await chrome.storage.local.get(key);
+      return new Set(Array.isArray(r[key]) ? r[key] : []);
+    } catch (_) {
+      return new Set();
+    }
+  }
+
+  async _setStars(stars) {
+    const key = this._starStorageKey();
+    if (!key) return false;
+    try {
+      await chrome.storage.local.set({ [key]: [...stars] });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // Tick individual messages, then save or check just those. The selection is
   // for this conversation only; it starts from the Include option.
   async showMessagePicker() {
@@ -690,6 +739,8 @@ class LISAFloatingButton {
     const msgs = conversation.messages;
     const matches = (m, include) => include === 'all' || (include === 'user' ? m.role === 'user' : m.role !== 'user');
     const selected = new Set(msgs.map((m, i) => (matches(m, options.include) ? i : -1)).filter(i => i >= 0));
+    const stars = await this._getStars();
+    const canStar = !!this._starStorageKey();
 
     panel.innerHTML = `
       <div class="lisa-panel-title">☑ Choose messages</div>
@@ -700,6 +751,7 @@ class LISAFloatingButton {
         <button class="lisa-chip-btn" data-pick="none">None</button>
         <span class="lisa-pick-count"></span>
       </div>
+      ${canStar ? '<div class="lisa-star-hint">★ = keep word for word in compressed exports and Handoff (remembered for this conversation)</div>' : ''}
       <div class="lisa-pick-list"></div>
       <div class="lisa-pick-actions">
         <button data-do="md">📋 Markdown</button>
@@ -723,6 +775,15 @@ class LISAFloatingButton {
       const content = typeof m.content === 'string' ? m.content : '';
       text.textContent = content.replace(/\s+/g, ' ').trim().slice(0, 160) || '(no text)';
       row.append(box, who, text);
+      if (canStar) {
+        const star = document.createElement('button');
+        star.type = 'button';
+        star.className = 'lisa-star' + (stars.has(this._starKey(m)) ? ' on' : '');
+        star.dataset.star = String(i);
+        star.textContent = '★';
+        star.title = 'Keep this message word for word in compressed exports and Handoff';
+        row.appendChild(star);
+      }
       list.appendChild(row);
     });
     const refresh = () => {
@@ -737,6 +798,15 @@ class LISAFloatingButton {
       refresh();
     });
     panel.addEventListener('click', async (e) => {
+      const starIndex = e.target.dataset?.star;
+      if (starIndex !== undefined) {
+        e.preventDefault(); // the row is a label: don't toggle its checkbox
+        const key = this._starKey(msgs[Number(starIndex)]);
+        if (stars.has(key)) stars.delete(key); else stars.add(key);
+        e.target.classList.toggle('on', stars.has(key));
+        if (!(await this._setStars(stars))) this.showToast('Could not save the star', true);
+        return;
+      }
       const pick = e.target.dataset?.pick;
       if (pick) {
         selected.clear();
@@ -1320,6 +1390,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       // storage so future handoffs on this conversation don't need to
       // re-detect it.
       const checkpointRawSet = new Set(checkpointHistory.map(cp => cp.raw));
+      const stars = await this._getStars();
       const segments = [];
       let segmentStart = 0;
       for (let i = 0; i < middleRange.length; i++) {
@@ -1340,10 +1411,11 @@ Keep it tight — this is for continuity, not a report. Only include what matter
             isCheckpoint = true;
           }
         }
-        if (isCheckpoint) {
+        const isStarred = !isCheckpoint && stars.has(this._starKey(msg));
+        if (isCheckpoint || isStarred) {
           const segment = middleRange.slice(segmentStart, i);
           if (segment.length > 0) segments.push({ type: 'compressed', segment });
-          segments.push({ type: 'checkpoint', message: msg });
+          segments.push({ type: isCheckpoint ? 'checkpoint' : 'starred', message: msg });
           segmentStart = i + 1;
         }
       }
@@ -1359,8 +1431,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       const anchors = [];
       let sessionMetadata = null;
       for (const block of segments) {
-        if (block.type === 'checkpoint') {
-          middle.push({ type: 'checkpoint', ...verbatim(block.message) });
+        if (block.type === 'checkpoint' || block.type === 'starred') {
+          middle.push({ type: block.type, ...verbatim(block.message) });
           continue;
         }
         const segmentConversation = { ...conversation, messages: block.segment };
@@ -1380,7 +1452,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         if (!sessionMetadata && lean.session_metadata) sessionMetadata = lean.session_metadata;
       }
 
-      const instructions = 'LISA context handoff. "opening", "middle", and "closing" are the conversation itself, in order — read them first: "opening"/"closing" are verbatim (how it started, how it ended); "middle" is an ordered array where entries with type "checkpoint" are the AI\'s own verbatim checkpoint replies from earlier in this conversation and entries with type "compressed" are LISA-compressed conversation in between. Continue from the last checkpoint entry\'s "NEXT" section if one exists, otherwise from where "closing" leaves off. "anchors" and "session_metadata" at the end are supplementary analysis (key entities/topics), not part of the conversation flow.';
+      const instructions = 'LISA context handoff. "opening", "middle", and "closing" are the conversation itself, in order — read them first: "opening"/"closing" are verbatim (how it started, how it ended); "middle" is an ordered array where entries with type "checkpoint" are the AI\'s own verbatim checkpoint replies from earlier in this conversation and entries with type "starred" are messages the user marked as important, verbatim (treat them as exact); entries with type "compressed" are LISA-compressed conversation in between. Continue from the last checkpoint entry\'s "NEXT" section if one exists, otherwise from where "closing" leaves off. "anchors" and "session_metadata" at the end are supplementary analysis (key entities/topics), not part of the conversation flow.';
 
       const payload = {
         _instructions: instructions,

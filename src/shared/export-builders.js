@@ -53,6 +53,21 @@ function lisaExportRole(m) {
 
 const LISA_ROLE_TAG = { user: 'U', assistant: 'A', system: 'S' };
 
+// A starred message's fingerprint: role + FNV-1a of its text (whitespace
+// collapsed), so the same message is recognised again after a reload, in the
+// popup and in the floating button (which carries the same rule inline).
+// Stars live in chrome.storage.local under `lisa-stars-<conversationId>`.
+function lisaStarKey(m) {
+  const role = m && (m.role === 'user' || m.role === 'human') ? 'u' : 'a';
+  const text = String((m && m.content) || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return role + ':' + h.toString(16) + ':' + text.length;
+}
+
 function buildLeanExport(compressed, rawMessages, options = {}) {
   const tokens = compressed.semanticTokens || compressed.messages || compressed.compressed || [];
   const messages = tokens.map(t => ({
@@ -100,6 +115,26 @@ function buildLeanExport(compressed, rawMessages, options = {}) {
     }
   }
 
+  // Messages the user starred ("Choose messages" → ★) stay word for word too,
+  // marked `starred: true`. Opt-in like checkpointHistory: options.starredKeys.
+  // When the compressed turns don't line up with the raw ones (AI Compress
+  // returns anchors, not turns), the starred messages go in starred_messages.
+  let starredExtra = [];
+  if (options.starredKeys && options.starredKeys.length && rawMessages && rawMessages.length) {
+    const starred = new Set(options.starredKeys);
+    if (rawMessages.length === messages.length) {
+      for (let i = 0; i < messages.length; i++) {
+        if (!starred.has(lisaStarKey(rawMessages[i]))) continue;
+        messages[i] = { role: messages[i].role, index: messages[i].index, content: rawMessages[i].content, starred: true };
+      }
+    } else {
+      starredExtra = rawMessages
+        .map((m, i) => ({ m, i }))
+        .filter(({ m }) => starred.has(lisaStarKey(m)))
+        .map(({ m, i }) => ({ role: lisaExportRole(m), index: i, content: m.content, starred: true }));
+    }
+  }
+
   const anchors = Object.fromEntries(
     Object.entries(compressed.semantic_anchors || {}).map(([k, { content, ...rest }]) => {
       const clean = {};
@@ -114,7 +149,7 @@ function buildLeanExport(compressed, rawMessages, options = {}) {
   );
 
   const leanPayload = {
-    _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns; the opening and closing few carry messages[].content verbatim instead.',
+    _instructions: 'LISA semantic export. Read anchor for session context. Use messages[].summary for condensed turns; the opening and closing few carry messages[].content verbatim instead.' + (messages.some(m => m.starred) || starredExtra.length ? ' Messages with "starred": true were marked by the user as important and are kept word for word: treat their content as exact.' : ''),
     platform: compressed.metadata?.platform || 'Unknown',
     title: compressed.metadata?.title || '',
     messageCount: compressed.metadata?.messageCount || messages.length,
@@ -124,6 +159,7 @@ function buildLeanExport(compressed, rawMessages, options = {}) {
     semantic_anchors: anchors,
     session_metadata: compressed.session_metadata || {}
   };
+  if (starredExtra.length) leanPayload.starred_messages = starredExtra;
 
   // Compression gate: if verbatim is smaller, export verbatim
   if (rawMessages && rawMessages.length > 0) {
@@ -249,5 +285,5 @@ function buildMarkdownExport(compressed, rawMessages) {
 
 // Dual-mode: global in browser, module.exports in Node
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildLeanExport, buildMarkdownExport, lisaSafeTitle, lisaSystemNotice, lisaExportRole };
+  module.exports = { buildLeanExport, buildMarkdownExport, lisaSafeTitle, lisaSystemNotice, lisaExportRole, lisaStarKey };
 }

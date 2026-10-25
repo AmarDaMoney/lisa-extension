@@ -104,6 +104,11 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   the popup copies the checkpoint prompt and lists Handoff targets itself); panels anchor via `_anchorRect()` when
   the button is hidden. The checkpoint prompt (`_checkpointPrompt()`, one copy) asks for the conversation's
   language with the section labels kept in English (checkpoint-detect.js reads them).
+  **Stars** (★ in "Choose messages"): kept word for word in compressed exports (`buildLeanExport` option
+  `starredKeys`: `starred: true` on the message, or `starred_messages` when the turns don't line up, as with AI
+  Compress) and in Handoff (`middle` entries of type `starred`). Stored per conversation in
+  `chrome.storage.local` `lisa-stars-<conversationId>` as `lisaStarKey()` fingerprints (role + FNV-1a of the
+  whitespace-collapsed text; the FAB's `_starKey()` is an inline copy: keep them identical).
 - **0.53.1 (submitted to the CWS, in review as of 2026-10-23; the next change bumps to 0.53.2):** 0.53.1 = compressed
   export fixes (system notices labelled, assistant changes kept, compound entities, checkpoint sections parsed
   into the anchor; see "Compressed export anchor" below).

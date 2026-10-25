@@ -788,11 +788,11 @@ class LISAFloatingButton {
       }
       return right > left ? { top, left, right, bottom, width: right - left, height: bottom - top } : el.getBoundingClientRect();
     };
-    // The ☆ belongs to the user's questions only (a starred question also keeps the AI's
-    // answer right after it), shows when the pointer is near the top of the question, and
-    // sits at the question's top right corner. It never sticks to the window: when that
-    // corner scrolls out of view the star goes away, and after a scroll it is shown again
-    // only if the pointer is still at the top of a question.
+    // The ☆ shows when the pointer is near the top of a message (a question or an answer;
+    // a starred question also keeps the AI's answer right after it) and sits at that
+    // message's top right corner. It never sticks to the window: when that corner scrolls
+    // out of view the star goes away, and after a scroll it is shown again only if the
+    // pointer is still at the top of a message.
     const boxOf = (t) => (t.msg ? textBox(t.el) : t.el.getBoundingClientRect());
     const TOP_ZONE = 80;
     const nearTop = (r, y) => y >= r.top - 8 && y <= r.top + TOP_ZONE;
@@ -818,14 +818,15 @@ class LISAFloatingButton {
         if (probe.length < 3) { current = null; btn.style.display = 'none'; return; }
         const stars = await this._getStars();
         if (current !== target) return;
-        on = stars.has('p:u:' + probe) || this._isStarred({ role: 'user', content: text }, stars);
+        on = stars.has('p:' + (target.role === 'user' ? 'u' : 'a') + ':' + probe) || this._isStarred({ role: target.role, content: text }, stars);
       }
       btn.classList.toggle('on', on);
       btn.textContent = on ? '★' : '☆';
-      btn.title = on ? 'Starred: kept word for word. Click to remove the star.'
-        : "Keep this question and the AI's answer word for word in compressed exports and Handoff";
+      btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : offTitle(target);
       place();
     };
+    const offTitle = (t) => (t.role === 'user' ? "Keep this question and the AI's answer word for word in compressed exports and Handoff"
+      : 'Keep this message word for word in compressed exports and Handoff');
     const hideNow = () => { clearTimeout(hideTimer); btn.style.display = 'none'; current = null; };
     const hideSoon = () => { clearTimeout(hideTimer); hideTimer = setTimeout(hideNow, 600); };
     let textHit = null;
@@ -833,10 +834,11 @@ class LISAFloatingButton {
       if (!node || node.nodeType !== 1) return;
       if (node === btn) { clearTimeout(hideTimer); return; }
       if (current && node.closest('button, a, [role="button"], input, textarea, select') && !current.el.contains(node)) { hideNow(); return; }
-      if (current && current.el.contains(node)) { clearTimeout(hideTimer); return; }
+      // Inside the message, the star stays only while the pointer is near its top.
+      if (current && current.el.contains(node)) { if (nearTop(boxOf(current), y)) clearTimeout(hideTimer); else hideSoon(); return; }
       const t = this._inlineStarTarget(node);
       if (t) {
-        if (t.role === 'user' && nearTop(t.el.getBoundingClientRect(), y)) { clearTimeout(hideTimer); show(t); return; }
+        if (nearTop(t.el.getBoundingClientRect(), y)) { clearTimeout(hideTimer); show(t); return; }
       } else if (byText()) {
         // No platform markup to go by: find the message by its text.
         // (the last element's answer is kept, so moving within it doesn't search again)
@@ -844,7 +846,7 @@ class LISAFloatingButton {
         textTimer = setTimeout(async () => {
           let m = textHit && textHit.node === node && Date.now() - textHit.at < 5000 ? textHit.m : undefined;
           if (m === undefined) { m = await this._inlineStarTargetByText(node, x, y); textHit = { node, m, at: Date.now() }; }
-          if (m && m.role === 'user' && nearTop(textBox(m.el), y) && (!current || current.el !== m.el)) { clearTimeout(hideTimer); show(m); }
+          if (m && nearTop(textBox(m.el), y) && (!current || current.el !== m.el)) { clearTimeout(hideTimer); show(m); }
         }, 120);
       }
       if (current) hideSoon();
@@ -881,7 +883,7 @@ class LISAFloatingButton {
         if (!(await this._setStars(stars))) { this.showToast('Could not save the star', true); return; }
         btn.classList.toggle('on', on);
         btn.textContent = on ? '★' : '☆';
-        btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : "Keep this question and the AI's answer word for word in compressed exports and Handoff";
+        btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : offTitle(target);
         this.showToast(on ? '⭐ Kept word for word in compressed exports and Handoff' : 'Star removed');
         return;
       }
@@ -894,7 +896,7 @@ class LISAFloatingButton {
       if (!(await this._setStars(stars))) { this.showToast('Could not save the star', true); return; }
       btn.classList.toggle('on', on);
       btn.textContent = on ? '★' : '☆';
-      btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : "Keep this question and the AI's answer word for word in compressed exports and Handoff";
+      btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : offTitle(target);
       this.showToast(on ? '⭐ Kept word for word in compressed exports and Handoff' : 'Star removed');
     });
   }

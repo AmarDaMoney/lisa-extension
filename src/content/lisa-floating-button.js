@@ -574,6 +574,7 @@ class LISAFloatingButton {
       if (!action) return;
       menu.remove();
       if (action === "export") await this.openExportInPopup();
+      else if (action === "star-last") await this.starMessageContaining(null);
       else if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
       else if (action === "checkpoint") await this.contextCheckpoint();
@@ -687,7 +688,9 @@ class LISAFloatingButton {
   // shared/export-builders.js (not loaded in content scripts): keep them in step.
   _starKey(m) {
     const role = m && (m.role === 'user' || m.role === 'human') ? 'u' : 'a';
-    const text = String((m && m.content) || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
+    // Letters and digits only, lower case: the same message captured as Markdown
+    // or as plain text (API or page) gives the same fingerprint.
+    const text = String((m && m.content) || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').slice(0, 3000);
     let h = 0x811c9dc5;
     for (let i = 0; i < text.length; i++) {
       h ^= text.charCodeAt(i);
@@ -710,6 +713,41 @@ class LISAFloatingButton {
     } catch (_) {
       return new Set();
     }
+  }
+
+  // Star the message that contains `text` (a selection; right-click menu), or the
+  // last AI reply when `text` is null. Starring a starred message unstars it.
+  async starMessageContaining(text) {
+    if (!this._starStorageKey()) {
+      this.showToast('Stars work on a saved conversation page: open the conversation first.', true);
+      return { ok: false };
+    }
+    const conversation = await this._captureConversation();
+    const msgs = (conversation && conversation.messages) || [];
+    const norm = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    let target = null;
+    if (text === null) {
+      for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].role !== 'user') { target = msgs[i]; break; }
+    } else {
+      const probe = norm(text).slice(0, 200);
+      if (probe.length >= 3) {
+        for (let i = msgs.length - 1; i >= 0; i--) if (norm(msgs[i].content).includes(probe)) { target = msgs[i]; break; }
+      }
+    }
+    if (!target) {
+      this.showToast(text === null ? 'No AI reply found on this page' : 'Could not find that message in the conversation', true);
+      return { ok: false };
+    }
+    const stars = await this._getStars();
+    const key = this._starKey(target);
+    const on = !stars.has(key);
+    if (on) stars.add(key); else stars.delete(key);
+    if (!(await this._setStars(stars))) {
+      this.showToast('Could not save the star', true);
+      return { ok: false };
+    }
+    this.showToast(on ? '⭐ Kept word for word in compressed exports and Handoff' : 'Star removed');
+    return { ok: true, starred: on };
   }
 
   async _setStars(stars) {
@@ -867,6 +905,7 @@ class LISAFloatingButton {
       <div class="lisa-menu-section-label">Save</div>
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 LISA-Verbatim</div>
+      <div class="lisa-menu-item" data-action="star-last" title="Keep the AI's last reply word for word when this conversation is compressed or handed off. To star another message, select some of its text and right-click.">⭐ Keep last AI reply</div>
       ${gated ? `
       <div class="lisa-menu-section-label">Context</div>
       <div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>
@@ -1164,12 +1203,14 @@ class LISAFloatingButton {
   // section, so hiding the button loses nothing. The popup copies the checkpoint
   // prompt itself (a page can't write the clipboard while the popup has focus)
   // and lists Handoff destinations itself.
-  async _runPageAction({ which, platform, url }) {
+  async _runPageAction({ which, platform, url, text }) {
     switch (which) {
       case 'save-md': this.saveAsMarkdown(); return { ok: true };
       case 'save-lisav': this.saveLisaV(); return { ok: true };
       case 'inference-shield': await this.checkWithInferenceShield(); return { ok: true };
       case 'pick': await this.showMessagePicker(); return { ok: true };
+      case 'star-selection': return this.starMessageContaining(text);
+      case 'star-last': return this.starMessageContaining(null);
       case 'options': await this.showOptionsPanel(); return { ok: true };
       case 'checkpoint-prompt': return { ok: true, prompt: this._checkpointPrompt() };
       case 'handoff-targets': {

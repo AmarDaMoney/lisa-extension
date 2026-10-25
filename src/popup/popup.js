@@ -503,6 +503,7 @@ class LISAPopup {
         if (!r || !r.ok) return say((r && r.error) || 'That did not work on this page.');
         // Panels open on the page: close the popup so they can be used.
         if (which === 'pick' || which === 'inference-shield') window.close();
+        else if (which === 'star-last') say(r.starred ? '⭐ The last AI reply will be kept word for word.' : 'Star removed.');
         else say('Saving… the file downloads from the page.');
       });
     });

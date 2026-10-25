@@ -59,6 +59,7 @@
           <button class="page-action" data-page-action="handoff" title="Open a fresh session with this conversation">🔄 Handoff</button>
           <button class="page-action" data-page-action="inference-shield" title="See what this conversation reveals before you share it">🛡 Inference Shield</button>
           <button class="page-action" data-page-action="pick" title="Tick the messages to save or check">☑ Choose messages</button>
+          <button class="page-action" data-page-action="star-last" title="Keep the AI's last reply word for word when this conversation is compressed or handed off">⭐ Keep last AI reply</button>
         </div>
         <div id="handoffTargets" class="page-actions-targets" style="display: none;"></div>
         <p id="pageActionStatus" class="page-actions-status"></p>
@@ -521,8 +522,6 @@
           <h3>🌐 Interface language</h3>
           <select id="uiLanguageSelect" class="settings-select" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--text-primary); font-size: 13px;">
             <option value="auto">Automatic (browser language)</option>
-            <option value="en" data-lisa-no-translate>English</option>
-            <option value="fr" data-lisa-no-translate>Français</option>
           </select>
         </section>
 
@@ -594,6 +593,9 @@
   <script src="../shared/export-builders.js"></script>
   <script src="../shared/i18n.js"></script>
   <script src="../shared/i18n/fr.js"></script>
+  <script src="../shared/i18n/es.js"></script>
+  <script src="../shared/i18n/de.js"></script>
+  <script src="../shared/i18n/ar.js"></script>
   <script src="popup-i18n.js"></script>
   <script src="popup.js"></script>
 </body>

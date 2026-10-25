@@ -16,6 +16,11 @@ var LISA_I18N = typeof LISA_I18N !== 'undefined' ? LISA_I18N : {};
 var LISA_UI_LANGUAGES = { en: 'English', fr: 'Français' };
 
 var lisaI18nLang = 'en';
+var LISA_RTL_LANGUAGES = ['ar', 'he'];
+
+function lisaI18nDir() {
+  return LISA_RTL_LANGUAGES.indexOf(lisaI18nLang) >= 0 ? 'rtl' : 'ltr';
+}
 
 function lisaResolveLang(setting) {
   const pick = (code) => (code && (code === 'en' || LISA_I18N[code]) ? code : null);
@@ -88,6 +93,7 @@ function lisaWatchOwn(body, isOwn) {
   const adopt = (el) => {
     if (seen.has(el)) return;
     seen.add(el);
+    if (lisaI18nDir() === 'rtl') el.setAttribute('dir', 'rtl');
     lisaWatch(el);
   };
   Array.from(body.children).forEach(el => { if (isOwn(el)) adopt(el); });

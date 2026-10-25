@@ -53,13 +53,14 @@ function lisaExportRole(m) {
 
 const LISA_ROLE_TAG = { user: 'U', assistant: 'A', system: 'S' };
 
-// A starred message's fingerprint: role + FNV-1a of its text (whitespace
-// collapsed), so the same message is recognised again after a reload, in the
+// A starred message's fingerprint: role + FNV-1a of its letters and digits, so the same message is recognised again after a reload, in the
 // popup and in the floating button (which carries the same rule inline).
 // Stars live in chrome.storage.local under `lisa-stars-<conversationId>`.
 function lisaStarKey(m) {
   const role = m && (m.role === 'user' || m.role === 'human') ? 'u' : 'a';
-  const text = String((m && m.content) || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
+  // Letters and digits only, lower case: the same message captured as Markdown
+  // or as plain text (API or page) gives the same fingerprint.
+  const text = String((m && m.content) || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').slice(0, 3000);
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i);

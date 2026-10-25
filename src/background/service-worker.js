@@ -13,6 +13,8 @@ importScripts('../shared/snapshot-shim.js');
 importScripts('../utils/semantic-analyzer.js');
 importScripts('../shared/checkpoint-detect.js');
 importScripts('../shared/export-builders.js');
+// Interface languages: the right-click menu titles (see shared/i18n.js).
+importScripts('../shared/i18n.js', '../shared/i18n/fr.js', '../shared/i18n/es.js', '../shared/i18n/de.js', '../shared/i18n/ar.js');
 
 // Safe text extraction — m.content can be a string, an array of
 // content blocks (Claude API), or an object. Only strings pass through;
@@ -1978,12 +1980,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // ============================================
 
 function createContextMenus() {
+  // Titles follow the interface language (Settings → Interface language).
+  lisaI18nInit().then(() => createContextMenusNow());
+}
+
+try {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.uiLanguage) createContextMenus();
+  });
+} catch (_) { /* storage events unavailable */ }
+
+function createContextMenusNow() {
   // Remove existing menus first to avoid duplicates
   chrome.contextMenus.removeAll(() => {
     // Export selected text to LISA
     chrome.contextMenus.create({
       id: 'export-selection',
-      title: '📤 Export Selection to LISA',
+      title: lisaT('📤 Export Selection to LISA'),
       contexts: ['selection']
     }, () => {
       if (chrome.runtime.lastError) {
@@ -1994,7 +2007,7 @@ function createContextMenus() {
     // Copy selection as LISA context (MD-wrapped for AI consumption)
     chrome.contextMenus.create({
       id: 'copy-as-lisa',
-      title: '📋 Copy as LISA Context',
+      title: lisaT('📋 Copy as LISA Context'),
       contexts: ['selection']
     }, () => {
       if (chrome.runtime.lastError) {
@@ -2002,10 +2015,26 @@ function createContextMenus() {
       }
     });
     
+    // Star the message the selection is in: kept word for word when the
+    // conversation is compressed or handed off (AI chat pages only).
+    const fabPages = (chrome.runtime.getManifest().content_scripts || [])
+      .filter(cs => (cs.js || []).some(f => f.endsWith('lisa-floating-button.js')))
+      .flatMap(cs => cs.matches || []);
+    chrome.contextMenus.create({
+      id: 'star-message',
+      title: lisaT('⭐ Keep this message word for word'),
+      contexts: ['selection'],
+      documentUrlPatterns: fabPages
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[LISA] Failed to create star-message menu:', chrome.runtime.lastError);
+      }
+    });
+
     // Open the selection in Inference Shield (see INFERENCE SHIELD HAND-OFF)
     chrome.contextMenus.create({
       id: 'check-with-shield',
-      title: '🛡 Check with Inference Shield',
+      title: lisaT('🛡 Check with Inference Shield'),
       contexts: ['selection']
     }, () => {
       if (chrome.runtime.lastError) {
@@ -2084,6 +2113,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   if (info.menuItemId === 'check-with-shield') {
     await handleCheckWithShield(info, tab);
+  }
+  if (info.menuItemId === 'star-message') {
+    try {
+      await chrome.tabs.sendMessage(tab.id, { action: 'lisaPageAction', which: 'star-selection', text: info.selectionText || '' });
+    } catch (_) {
+      showNotification('LISA', 'Reload the page, then try again.');
+    }
   }
 });
 

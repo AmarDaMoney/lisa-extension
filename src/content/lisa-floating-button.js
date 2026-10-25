@@ -737,10 +737,16 @@ class LISAFloatingButton {
       if ((el = node.closest('[data-testid="user-message"]'))) return { el, role: 'user' };
       if ((el = node.closest('[data-is-streaming="false"], [data-testid="assistant-message"]'))) return { el, role: 'assistant' };
     } else if (host.includes('chatgpt.com')) {
-      if ((el = node.closest('[data-message-author-role]'))) {
-        const r = el.getAttribute('data-message-author-role');
-        return r === 'user' || r === 'assistant' ? { el, role: r } : null;
+      // A turn is <article data-turn="user|assistant"> (data-testid conversation-turn-N)
+      // around a [data-message-author-role] message; either one is enough.
+      el = node.closest('[data-message-author-role]');
+      let r = el && el.getAttribute('data-message-author-role');
+      if (!el) {
+        el = node.closest('article[data-turn], [data-testid^="conversation-turn-"]');
+        r = el && (el.getAttribute('data-turn') ||
+          (el.querySelector('[data-message-author-role]') || { getAttribute: () => null }).getAttribute('data-message-author-role'));
       }
+      if (el) return r === 'user' || r === 'assistant' ? { el, role: r } : null;
     } else if (host.includes('deepseek.com')) {
       if ((el = node.closest('.ds-message'))) return { el, role: el.querySelector('.ds-markdown') ? 'assistant' : 'user' };
     } else if (host.includes('gemini.google')) {
@@ -1046,7 +1052,6 @@ class LISAFloatingButton {
       <div class="lisa-menu-section-label">Save</div>
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 LISA-Verbatim</div>
-      <div class="lisa-menu-item" data-action="star-last" title="Keep the AI's last reply word for word when this conversation is compressed or handed off. To star another message, select some of its text and right-click.">⭐ Keep last AI reply</div>
       ${gated ? `
       <div class="lisa-menu-section-label">Context</div>
       <div class="lisa-menu-item" data-action="checkpoint" title="Ask the AI to summarize where things stand — keeps context sharp, improves export quality">🧠 Checkpoint</div>

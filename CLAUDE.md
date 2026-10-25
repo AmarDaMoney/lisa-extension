@@ -109,10 +109,13 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   `_inlineStarTarget()` holds the per-platform selectors. It stores a probe `p:<u|a>:<letters and digits of the
   message's first paragraph>` (max 120): a message is starred when the role matches and its text contains the probe
   (`_isStarred()` in the FAB = `lisaStarredIndexes()` in export-builders.js; keep identical). Selectors confirmed on
-  stand-in pages for Claude and DeepSeek only; ChatGPT, Gemini, Grok need a live check. Other platforms: next.
+  stand-in pages; live-confirmed by Amar on Claude, DeepSeek, Grok, Gemini (2026-10-25). ChatGPT showed no star live:
+  `_inlineStarTarget` now also takes `article[data-turn]` / `[data-testid^="conversation-turn-"]` (needs a live
+  re-check). Other platforms: next. Gemini capture strips its screen-reader labels ("You said", "Gemini said",
+  "Show thinking", FR/ES/DE) wherever they start a block (`geminiPrefix` in lisa-v-parser.js).
   **Stars** (★ in "Choose messages"; right-click a selection → "⭐ Keep this message word for word" (service worker
-  `star-message` menu → `lisaPageAction` `star-selection`, the FAB finds the message containing the text); "⭐ Keep
-  last AI reply" in the floating menu and the popup's "On this page"; a starred user message also keeps the AI reply right
+  `star-message` menu → `lisaPageAction` `star-selection`, the FAB finds the message containing the text; the
+  "⭐ Keep last AI reply" menu item was removed 2026-10-25, the inline ☆ covers it); a starred user message also keeps the AI reply right
   after it: `lisaStarredIndexes()`, and the same rule inline in the FAB's Handoff): kept word for word in compressed exports (`buildLeanExport` option
   `starredKeys`: `starred: true` on the message, or `starred_messages` when the turns don't line up, as with AI
   Compress) and in Handoff (`middle` entries of type `starred`). Stored per conversation in

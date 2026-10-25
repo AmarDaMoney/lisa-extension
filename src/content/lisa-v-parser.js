@@ -869,23 +869,17 @@ class LisaVParser {
     }
     const turns = document.querySelectorAll('.conversation-container');
 
-    // Gemini UI prefixes to strip (multilingual)
-    const geminiPrefixes = [
-      /^Vous avez dit\s*/i,
-      /^You said\s*/i,
-      /^Afficher le raisonnement\s*/i,
-      /^Show thinking\s*/i,
-      /^Gemini a dit\s*/i,
-      /^Gemini said\s*/i
-    ];
+    // Gemini's screen-reader labels ("You said", "Gemini said", "Show thinking", …),
+    // multilingual. They can sit after a newline, Markdown marks or one another,
+    // so strip them repeatedly from the start of each block.
+    const geminiPrefix = /^[\s\u200b#>*_-]*(?:Vous avez dit|You said|Afficher le raisonnement|Show thinking|Gemini a dit|Gemini said|Has dicho|Dijiste|Gemini ha dicho|Gemini dijo|Du hast gesagt|Gemini hat gesagt|Gemini sagte)\s*:?/i;
 
     const stripPrefixes = (blocks) => {
       for (const block of blocks) {
         if (block.v) {
-          for (const re of geminiPrefixes) {
-            block.v = block.v.replace(re, '');
-          }
-          block.v = block.v.trim();
+          let v = block.v;
+          for (let k = 0; k < 4 && geminiPrefix.test(v); k++) v = v.replace(geminiPrefix, '');
+          block.v = v.trim();
         }
       }
       return blocks.filter(b => b.v && b.v.length > 0);

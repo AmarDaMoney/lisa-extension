@@ -225,6 +225,8 @@ LISA_I18N.ru = {
     "Extracting conversation (long conversations may take a minute)...": "Извлечение разговора (длинный разговор может занять минуту)…",
     "Download Markdown": "Скачать Markdown",
     "Download JSONL": "Скачать JSONL",
+    "Keep this question and the AI's answer word for word in compressed exports and Handoff": "Сохранить этот вопрос и ответ ИИ дословно в сжатых экспортах и при передаче",
+    "Starred: kept word for word. Click to remove the star.": "Отмечено звездой: сохраняется дословно. Нажмите, чтобы снять звезду.",
     "Failed to extract. Try refreshing the page.": "Не удалось извлечь. Попробуйте обновить страницу.",
     "Please extract a conversation first": "Сначала извлеките разговор",
     "Compressing to LISA format...": "Сжатие в формат LISA…",

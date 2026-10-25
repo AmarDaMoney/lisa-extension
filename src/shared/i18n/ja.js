@@ -225,6 +225,8 @@ LISA_I18N.ja = {
     "Extracting conversation (long conversations may take a minute)...": "会話を抽出中（長い会話は 1 分ほどかかることがあります）…",
     "Download Markdown": "Markdown をダウンロード",
     "Download JSONL": "JSONL をダウンロード",
+    "Keep this question and the AI's answer word for word in compressed exports and Handoff": "この質問と AI の回答を、圧縮エクスポートと引き継ぎで一字一句そのまま残す",
+    "Starred: kept word for word. Click to remove the star.": "スター付き：一字一句そのまま残します。クリックでスターを外します。",
     "Failed to extract. Try refreshing the page.": "抽出できませんでした。ページを再読み込みしてみてください。",
     "Please extract a conversation first": "先に会話を抽出してください",
     "Compressing to LISA format...": "LISA 形式に圧縮中…",

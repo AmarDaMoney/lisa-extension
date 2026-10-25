@@ -71,15 +71,26 @@ function lisaStarKey(m) {
 
 // Indexes of the messages kept word for word: the starred ones, and the AI's
 // reply right after a starred message of the user's (a question is starred for
-// its answer).
+// its answer). A star is a lisaStarKey() fingerprint or a probe from the page,
+// `p:<u|a>:<letters and digits>` (the ☆ next to a message): a message carries it
+// when the role matches and its text contains the probe. The floating button's
+// _isStarred() applies the same rule: keep them identical.
 function lisaStarredIndexes(messages, starredKeys) {
   const starred = new Set(starredKeys || []);
+  const probes = [...starred].filter(k => k.startsWith('p:')).map(k => ({ role: k[2], text: k.slice(4) }));
+  const isUser = (x) => x && (x.role === 'user' || x.role === 'human');
+  const isStarred = (m) => {
+    if (starred.has(lisaStarKey(m))) return true;
+    if (!probes.length) return false;
+    const role = isUser(m) ? 'u' : 'a';
+    const text = String((m && m.content) || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    return probes.some(p => p.role === role && p.text && text.includes(p.text));
+  };
   const keep = new Set();
   (messages || []).forEach((m, i) => {
-    if (!starred.has(lisaStarKey(m))) return;
+    if (!isStarred(m)) return;
     keep.add(i);
     const next = messages[i + 1];
-    const isUser = (x) => x && (x.role === 'user' || x.role === 'human');
     if (isUser(m) && next && !isUser(next) && lisaExportRole(next) !== 'system') keep.add(i + 1);
   });
   return keep;

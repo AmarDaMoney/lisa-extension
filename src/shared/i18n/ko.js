@@ -225,6 +225,8 @@ LISA_I18N.ko = {
     "Extracting conversation (long conversations may take a minute)...": "대화 추출 중 (긴 대화는 1분 정도 걸릴 수 있습니다)...",
     "Download Markdown": "Markdown 다운로드",
     "Download JSONL": "JSONL 다운로드",
+    "Keep this question and the AI's answer word for word in compressed exports and Handoff": "이 질문과 AI의 답변을 압축 내보내기와 핸드오프에서 그대로 보존",
+    "Starred: kept word for word. Click to remove the star.": "별표됨: 그대로 보존됩니다. 클릭하면 별표가 해제됩니다.",
     "Failed to extract. Try refreshing the page.": "추출하지 못했습니다. 페이지를 새로고침해 보세요.",
     "Please extract a conversation first": "먼저 대화를 추출하세요",
     "Compressing to LISA format...": "LISA 형식으로 압축 중...",

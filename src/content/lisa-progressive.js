@@ -77,7 +77,7 @@ class LisaProgressiveCapture {
       [/gemini\.google/,           /\/app\/([a-zA-Z0-9-]+)/],
       [/grok\.com/,                /\/c\/([a-zA-Z0-9-]+)/],
       [/chat\.mistral\.ai/,        /\/chat\/([a-zA-Z0-9-]+)/],
-      [/chat\.deepseek\.com/,      /\/chat\/([a-zA-Z0-9-]+)/],
+      [/chat\.deepseek\.com/,      /\/chat\/(?:s\/)?([a-zA-Z0-9-]+)/],
       [/perplexity\.ai/,           /\/search\/([a-zA-Z0-9-]+)/],
       [/poe\.com/,                 /\/chat\/([a-zA-Z0-9]+)/],
       [/huggingface\.co/,           /\/chat\/conversation\/([a-f0-9]+)/],

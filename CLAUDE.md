@@ -104,6 +104,12 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   the popup copies the checkpoint prompt and lists Handoff targets itself); panels anchor via `_anchorRect()` when
   the button is hidden. The checkpoint prompt (`_checkpointPrompt()`, one copy) asks for the conversation's
   language with the section labels kept in English (checkpoint-detect.js reads them).
+  **Inline ☆** (claude.ai chats, ChatGPT, DeepSeek, Gemini, Grok; `setupInlineStars()` in the FAB): hovering a message
+  shows one LISA-owned button in <body> placed over it (the chat's own elements are never changed);
+  `_inlineStarTarget()` holds the per-platform selectors. It stores a probe `p:<u|a>:<letters and digits of the
+  message's first paragraph>` (max 120): a message is starred when the role matches and its text contains the probe
+  (`_isStarred()` in the FAB = `lisaStarredIndexes()` in export-builders.js; keep identical). Selectors confirmed on
+  stand-in pages for Claude and DeepSeek only; ChatGPT, Gemini, Grok need a live check. Other platforms: next.
   **Stars** (★ in "Choose messages"; right-click a selection → "⭐ Keep this message word for word" (service worker
   `star-message` menu → `lisaPageAction` `star-selection`, the FAB finds the message containing the text); "⭐ Keep
   last AI reply" in the floating menu and the popup's "On this page"; a starred user message also keeps the AI reply right
@@ -335,6 +341,8 @@ DOM only (`.ds-message`, virtualized): `extractDeepSeekMessages()` sweeps with `
 progressive buffer in capture order (`seq`). Role: a `.ds-message` with a `.ds-markdown` body is the AI's, else the
 user's (`getRoleFromElement`). Before 0.53.2 every buffered turn was 'assistant', so `toMessages()` merged a long
 history into a handful of messages (popup export showed ~5).
+Conversation URLs are `/a/chat/s/<id>`: the id regex skips the `s/` (it used to give every DeepSeek chat the
+id "s", so stars, checkpoints and ACM state were shared between chats).
 
 ### Grok capture (grok.com)
 API-first via `window.__LISA_GROK_API_CAPTURE` in `src/content/grok-parser.js`

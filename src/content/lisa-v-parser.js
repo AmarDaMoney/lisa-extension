@@ -1196,7 +1196,7 @@ class LisaVParser {
     // Scroll sweep for virtualised DeepSeek conversations
     const progressive = window.lisaProgressive;
     const domCount = document.querySelectorAll('.ds-message').length;
-    const currentConvId = window.location.pathname.match(/\/(chat|c)\/([a-zA-Z0-9-]+)/)?.[2] || '';
+    const currentConvId = window.location.pathname.match(/\/(?:chat|c)\/(?:s\/)?([a-zA-Z0-9-]+)/)?.[1] || '';
     const bufferConvId = progressive?.conversationId || '';
     const bufferMatchesConv = !currentConvId || !bufferConvId || bufferConvId.endsWith(currentConvId);
     const bufferReady = progressive && progressive.mode !== 'off' && progressive.buffer.size > domCount && bufferMatchesConv;

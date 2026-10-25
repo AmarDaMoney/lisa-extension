@@ -225,6 +225,8 @@ LISA_I18N.ar = {
     "Extracting conversation (long conversations may take a minute)...": "جارٍ استخراج المحادثة (قد تستغرق المحادثات الطويلة دقيقة)…",
     "Download Markdown": "تنزيل Markdown",
     "Download JSONL": "تنزيل JSONL",
+    "Keep this question and the AI's answer word for word in compressed exports and Handoff": "الاحتفاظ بهذا السؤال وبإجابة الذكاء الاصطناعي حرفيًا في الصادرات المضغوطة وفي النقل",
+    "Starred: kept word for word. Click to remove the star.": "مميّزة بنجمة: تُحفظ حرفيًا. انقر لإزالة النجمة.",
     "Failed to extract. Try refreshing the page.": "تعذّر الاستخراج. جرّب إعادة تحميل الصفحة.",
     "Please extract a conversation first": "استخرج محادثة أولًا",
     "Compressing to LISA format...": "جارٍ الضغط إلى صيغة LISA…",

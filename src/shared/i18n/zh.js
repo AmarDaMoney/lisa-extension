@@ -225,6 +225,8 @@ LISA_I18N.zh = {
     "Extracting conversation (long conversations may take a minute)...": "正在提取对话（长对话可能需要一分钟）…",
     "Download Markdown": "下载 Markdown",
     "Download JSONL": "下载 JSONL",
+    "Keep this question and the AI's answer word for word in compressed exports and Handoff": "在压缩导出和交接中逐字保留这个问题及 AI 的回答",
+    "Starred: kept word for word. Click to remove the star.": "已加星标：将逐字保留。点击取消星标。",
     "Failed to extract. Try refreshing the page.": "提取失败。请尝试刷新页面。",
     "Please extract a conversation first": "请先提取一段对话",
     "Compressing to LISA format...": "正在压缩为 LISA 格式…",

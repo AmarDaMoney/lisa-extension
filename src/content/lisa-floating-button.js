@@ -57,6 +57,7 @@ class LISAFloatingButton {
       if (!result.hideFloatingButton) {
         this.createButton();
       }
+      this.setupInlineStars();
 
     } catch (error) {
       console.debug('[LISA] Could not check premium status');
@@ -699,6 +700,147 @@ class LISAFloatingButton {
     return role + ':' + h.toString(16) + ':' + text.length;
   }
 
+  // A star is either a capture fingerprint (_starKey: Choose messages, right-click,
+  // last reply) or a probe from the page itself, `p:<u|a>:<letters and digits>`
+  // (the ☆ next to a message): a message carries a probe when it has the same role
+  // and its text contains the probe. lisaStarredIndexes() in export-builders.js
+  // applies the same rule: keep them identical.
+  _isStarred(m, stars) {
+    if (!m) return false;
+    if (stars.has(this._starKey(m))) return true;
+    const role = m.role === 'user' || m.role === 'human' ? 'u' : 'a';
+    let text = null;
+    for (const k of stars) {
+      if (!k.startsWith('p:' + role + ':')) continue;
+      if (text === null) text = String(m.content || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+      if (text.includes(k.slice(4))) return true;
+    }
+    return false;
+  }
+
+  _unstar(m, stars) {
+    stars.delete(this._starKey(m));
+    const role = m.role === 'user' || m.role === 'human' ? 'u' : 'a';
+    const text = String(m.content || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    for (const k of [...stars]) if (k.startsWith('p:' + role + ':') && text.includes(k.slice(4))) stars.delete(k);
+  }
+
+  // ☆ next to each message in the chat (hover): one LISA-owned button in <body>,
+  // placed over the hovered message, so the chat page's own elements are never
+  // changed. Starring a question keeps the AI's answer to it as well.
+  _inlineStarTarget(node) {
+    if (!node || !node.closest) return null;
+    const host = location.hostname;
+    let el;
+    if (host.includes('claude.ai')) {
+      if (location.pathname.startsWith('/code/')) return null;
+      if ((el = node.closest('[data-testid="user-message"]'))) return { el, role: 'user' };
+      if ((el = node.closest('[data-is-streaming="false"], [data-testid="assistant-message"]'))) return { el, role: 'assistant' };
+    } else if (host.includes('chatgpt.com')) {
+      if ((el = node.closest('[data-message-author-role]'))) {
+        const r = el.getAttribute('data-message-author-role');
+        return r === 'user' || r === 'assistant' ? { el, role: r } : null;
+      }
+    } else if (host.includes('deepseek.com')) {
+      if ((el = node.closest('.ds-message'))) return { el, role: el.querySelector('.ds-markdown') ? 'assistant' : 'user' };
+    } else if (host.includes('gemini.google')) {
+      if ((el = node.closest('user-query, [class*="user-query"]'))) return { el, role: 'user' };
+      if ((el = node.closest('.presented-response-container, model-response'))) return { el, role: 'assistant' };
+    } else if (host.includes('grok.com')) {
+      const wrap = node.closest('.relative.group.flex.flex-col.justify-center');
+      const bubble = wrap && wrap.querySelector('[class*="message-bubble"]');
+      if (bubble) {
+        if (wrap.className.includes('items-end')) return { el: bubble, role: 'user' };
+        if (wrap.className.includes('items-start')) return { el: bubble, role: 'assistant' };
+      }
+    }
+    return null;
+  }
+
+  // What the page shows of a message: its text, and a probe (letters and digits of
+  // its first real paragraph, so platform labels like "You said" stay out).
+  _inlineStarRead(el) {
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('button, svg, [role="button"], .sr-only, .lisa-inline-star').forEach(n => n.remove());
+    const norm = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    const text = clone.textContent.replace(/\s+/g, ' ').trim();
+    let probe = '';
+    for (const b of clone.querySelectorAll('p, li, h1, h2, h3, h4, pre, td')) {
+      const n = norm(b.textContent);
+      if (n.length >= 12) { probe = n; break; }
+    }
+    if (!probe) probe = norm(text);
+    return { text, probe: probe.slice(0, 120) };
+  }
+
+  setupInlineStars() {
+    if (this._inlineStarsOn || !/claude\.ai|chatgpt\.com|deepseek\.com|gemini\.google|grok\.com/.test(location.hostname)) return;
+    this._inlineStarsOn = true;
+    const css = document.createElement('style');
+    css.textContent = `.lisa-inline-star{position:fixed;z-index:2147483646;display:none;width:28px;height:28px;padding:0;
+      border-radius:50%;border:1px solid rgba(250,204,21,.55);background:rgba(17,24,39,.88);color:#facc15;font:16px/26px system-ui,sans-serif;
+      text-align:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}.lisa-inline-star:hover{background:#111827;transform:scale(1.08)}
+      .lisa-inline-star.on{background:#facc15;color:#111827;border-color:#facc15}`;
+    (document.head || document.documentElement).appendChild(css);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'lisa-inline-star';
+    document.body.appendChild(btn);
+    let current = null, hideTimer = null;
+    const place = () => {
+      if (!current || !document.contains(current.el)) { btn.style.display = 'none'; current = null; return; }
+      const r = current.el.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > innerHeight) { btn.style.display = 'none'; return; }
+      btn.style.top = Math.max(4, r.top + 4) + 'px';
+      btn.style.left = Math.min(innerWidth - 34, r.right + 6 <= innerWidth - 34 ? r.right + 6 : r.right - 34) + 'px';
+      btn.style.display = 'block';
+    };
+    const show = async (target) => {
+      if (!this._starStorageKey()) return;
+      current = target;
+      const { text, probe } = this._inlineStarRead(target.el);
+      if (probe.length < 3) { current = null; btn.style.display = 'none'; return; }
+      const stars = await this._getStars();
+      if (current !== target) return;
+      const on = stars.has('p:' + (target.role === 'user' ? 'u' : 'a') + ':' + probe) || this._isStarred({ role: target.role, content: text }, stars);
+      btn.classList.toggle('on', on);
+      btn.textContent = on ? '★' : '☆';
+      btn.title = on ? 'Starred: kept word for word. Click to remove the star.'
+        : target.role === 'user' ? "Keep this question and the AI's answer word for word in compressed exports and Handoff"
+        : 'Keep this message word for word in compressed exports and Handoff';
+      place();
+    };
+    document.addEventListener('mouseover', (e) => {
+      if (e.target === btn) { clearTimeout(hideTimer); return; }
+      const t = this._inlineStarTarget(e.target);
+      if (t) {
+        clearTimeout(hideTimer);
+        if (!current || current.el !== t.el) show(t);
+      } else if (current) {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { btn.style.display = 'none'; current = null; }, 600);
+      }
+    }, true);
+    addEventListener('scroll', place, true);
+    addEventListener('resize', place);
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const target = current;
+      if (!target) return;
+      const { text, probe } = this._inlineStarRead(target.el);
+      const probeKey = 'p:' + (target.role === 'user' ? 'u' : 'a') + ':' + probe;
+      const stars = await this._getStars();
+      const msg = { role: target.role, content: text };
+      const on = !(stars.has(probeKey) || this._isStarred(msg, stars));
+      if (on) stars.add(probeKey); else { stars.delete(probeKey); this._unstar(msg, stars); }
+      if (!(await this._setStars(stars))) { this.showToast('Could not save the star', true); return; }
+      btn.classList.toggle('on', on);
+      btn.textContent = on ? '★' : '☆';
+      btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : 'Keep this message word for word in compressed exports and Handoff';
+      this.showToast(on ? '⭐ Kept word for word in compressed exports and Handoff' : 'Star removed');
+    });
+  }
+
   _starStorageKey() {
     const id = window.__lisaACM && window.__lisaACM.conversationId;
     return id ? `lisa-stars-${id}` : null;
@@ -739,9 +881,8 @@ class LISAFloatingButton {
       return { ok: false };
     }
     const stars = await this._getStars();
-    const key = this._starKey(target);
-    const on = !stars.has(key);
-    if (on) stars.add(key); else stars.delete(key);
+    const on = !this._isStarred(target, stars);
+    if (on) stars.add(this._starKey(target)); else this._unstar(target, stars);
     if (!(await this._setStars(stars))) {
       this.showToast('Could not save the star', true);
       return { ok: false };
@@ -816,7 +957,7 @@ class LISAFloatingButton {
       if (canStar) {
         const star = document.createElement('button');
         star.type = 'button';
-        star.className = 'lisa-star' + (stars.has(this._starKey(m)) ? ' on' : '');
+        star.className = 'lisa-star' + (this._isStarred(m, stars) ? ' on' : '');
         star.dataset.star = String(i);
         star.textContent = '★';
         star.title = 'Keep this message word for word in compressed exports and Handoff';
@@ -839,9 +980,9 @@ class LISAFloatingButton {
       const starIndex = e.target.dataset?.star;
       if (starIndex !== undefined) {
         e.preventDefault(); // the row is a label: don't toggle its checkbox
-        const key = this._starKey(msgs[Number(starIndex)]);
-        if (stars.has(key)) stars.delete(key); else stars.add(key);
-        e.target.classList.toggle('on', stars.has(key));
+        const m = msgs[Number(starIndex)];
+        if (this._isStarred(m, stars)) this._unstar(m, stars); else stars.add(this._starKey(m));
+        e.target.classList.toggle('on', this._isStarred(m, stars));
         if (!(await this._setStars(stars))) this.showToast('Could not save the star', true);
         return;
       }
@@ -1454,8 +1595,8 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         }
         // A starred question keeps the AI's answer right after it too.
         const prev = i > 0 ? middleRange[i - 1] : null;
-        const isStarred = !isCheckpoint && (stars.has(this._starKey(msg)) ||
-          (prev && prev.role === 'user' && msg.role !== 'user' && stars.has(this._starKey(prev))));
+        const isStarred = !isCheckpoint && (this._isStarred(msg, stars) ||
+          (prev && prev.role === 'user' && msg.role !== 'user' && this._isStarred(prev, stars)));
         if (isCheckpoint || isStarred) {
           const segment = middleRange.slice(segmentStart, i);
           if (segment.length > 0) segments.push({ type: 'compressed', segment });

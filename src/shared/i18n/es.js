@@ -225,6 +225,8 @@ LISA_I18N.es = {
     "Extracting conversation (long conversations may take a minute)...": "Extrayendo la conversación (una conversación larga puede tardar un minuto)…",
     "Download Markdown": "Descargar Markdown",
     "Download JSONL": "Descargar JSONL",
+    "Keep this question and the AI's answer word for word in compressed exports and Handoff": "Conservar esta pregunta y la respuesta de la IA palabra por palabra en las exportaciones comprimidas y el Handoff",
+    "Starred: kept word for word. Click to remove the star.": "Con estrella: se conserva palabra por palabra. Haz clic para quitar la estrella.",
     "Failed to extract. Try refreshing the page.": "No se pudo extraer. Prueba a recargar la página.",
     "Please extract a conversation first": "Primero extrae una conversación",
     "Compressing to LISA format...": "Comprimiendo al formato LISA…",

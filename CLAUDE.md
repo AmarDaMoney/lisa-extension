@@ -109,11 +109,12 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   `_inlineStarTarget()` holds the per-platform selectors. It stores a probe `p:<u|a>:<letters and digits of the
   message's first paragraph>` (max 120): a message is starred when the role matches and its text contains the probe
   (`_isStarred()` in the FAB = `lisaStarredIndexes()` in export-builders.js; keep identical). Selectors confirmed on
-  stand-in pages; live-confirmed by Amar on Claude, DeepSeek, Grok, Gemini (2026-10-25). ChatGPT's page (live
+  stand-in pages; live-confirmed by Amar on Claude, DeepSeek, Grok, Gemini and ChatGPT (2026-10-25). ChatGPT's page (live
   2026-10-25) has no `[data-message-author-role]` and no `article[data-turn]`, so there the ☆ finds the message by
   its text (`_inlineStarTargetByText`): the API messages (`_inlineStarMessages`, cached 20 s), walk up from the
   hovered node to the largest element holding exactly one message; it stores that message's `_starKey` (exact match
-  in exports, since exports read the same API). Other platforms: next. Gemini capture strips its screen-reader labels ("You said", "Gemini said",
+  in exports, since exports read the same API). Only an element with a box under the pointer counts
+  (ChatGPT's display:contents wrappers put the star at 0,0 before). Other platforms: next. Gemini capture strips its screen-reader labels ("You said", "Gemini said",
   "Show thinking", FR/ES/DE) wherever they start a block (`geminiPrefix` in lisa-v-parser.js).
   **Stars** (★ in "Choose messages"; right-click a selection → "⭐ Keep this message word for word" (service worker
   `star-message` menu → `lisaPageAction` `star-selection`, the FAB finds the message containing the text; the

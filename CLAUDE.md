@@ -138,6 +138,8 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   A new or changed English UI text needs its entry in each language file, or it shows in English. Mark user
   content `data-lisa-no-translate` (conversation titles). Adding a language: copy fr.js, add it to popup.html, the service worker's `importScripts`
   and before lisa-floating-button.js in every manifest entry.
+- **0.53.2 upload:** store text `docs/CWS_DESCRIPTION_0.53.2.txt` (the "NEW in v0.53.2" section on top). Package = manifest.json +
+  `src/` + `public/` only (never server/, eval/, docs/, node_modules/). After upload, fast-forward `main` to the branch.
 - **"What's new" after an update:** `LISA_CHANGELOG` in service-worker.js, keyed by exact version; a version without
   a list shows nothing (until 0.53.2 one stale hard-coded list showed on every minor update). Write the list for the
   version you ship; each line needs its entry in the language files. The "vX available" banner reads the backend's

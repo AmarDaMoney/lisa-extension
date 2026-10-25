@@ -1,0 +1,170 @@
+Semantic compression for AI conversations. Save, compress and hand off your chats across 12 AI platforms. Part of the LISA Suite: one key and one credit balance with LISA Nexus and Inference Shield.
+
+Your context, your choice of AI, no starting over.
+
+🎯 WHAT IS LISA?
+A privacy-first browser extension that captures, compresses and preserves your AI conversations, so you don't lose context, don't start over, and don't get locked into one platform. LISA stands for Linguistic Intelligence Semantic Anchoring: structured data that resolves ambiguity before the AI starts reading.
+
+🔒 THE PROBLEM
+Your AI conversations are trapped. ChatGPT won't let you continue in Claude. Gemini doesn't know what you discussed in Grok. Every platform keeps your conversations in its own silo. You created that knowledge. You should own it.
+
+✨ THE SOLUTION
+LISA turns conversations into structured files that work on any AI platform. Inject them from your library, or upload them to Claude, ChatGPT, Gemini, Grok or any supported assistant, and restore your context, including code blocks, decisions and reasoning.
+
+Never re-explain your project to an AI again.
+
+Install LISA, open an AI chat, click the LISA button, and hand the file to a different AI. The first time it picks up where you left off, you'll get it. Every new install starts with 100 free compressions.
+
+🔹🔹🔹
+
+⚡ NEW in v0.53.2
+• Star a message: hover any message in the chat and click ☆. Starring your question keeps the AI's answer too. Starred messages stay word for word when LISA compresses or hands off the conversation.
+• LISA in your language: English, French, Spanish, German, Arabic, Russian, Chinese, Japanese and Korean (Settings → Interface language).
+• Export & compress straight from the floating button.
+• Hide the floating button and keep its actions: they move into the popup ("On this page").
+• Checkpoints are written in your conversation's language.
+• Capture fixes: long DeepSeek conversations export in full, Mistral conversations with code export again, and Gemini exports no longer include its "You said" labels.
+
+🔹🔹🔹
+
+🧩 THE LISA SUITE (since v0.53)
+• One key, one credit balance for the LISA extension, LISA Nexus and Inference Shield. Get a key with 50 free credits.
+• Check with Inference Shield: right-click any text, or use the floating button or your library, to see what your text reveals about your technology before you publish it.
+• Choose what to save: the whole conversation, only your messages, only the AI's replies, or the exact messages you tick.
+• Handoff in two formats: the compact LISA file, or the full conversation word for word (Markdown).
+• A cleaner extension: new LISA logo, Help and Settings at the top of the popup, a shorter floating menu.
+• Faster, more reliable connection through our own servers (api.sat-chain.com).
+
+🔹🔹🔹
+
+✨ LISA's CORE PRINCIPLE: TRANSLATION, NOT TRUNCATION
+
+The compression pipeline is a translator. It translates a human conversation into a signal written for machines. And like any translation, the question is: what carries meaning, and what is just grammar holding the sentence together?
+
+Noise falls into three categories:
+
+Structural glue: "the", "and", "with", "also", "just". These words connect ideas for human readers but carry little meaning on their own. An AI reading "tokens lean lisa conversation fix session" understands essentially what "the tokens in the lean lisa conversation to fix the session" says. The glue is for humans; the AI rebuilds it from context.
+
+Quantifiers without anchors: "all", "two", "some", "many". They modify something, but alone they point to nothing. "Two edits" carries signal; "two" alone doesn't.
+
+Narrative scaffolding: "verified", "noticed", "showed", "because". These describe the act of discovering something, not the thing itself. "Never verified because you didn't reload" is a story about what happened. "Always use getattr() on Stripe objects" is a rule. The receiving AI needs rules, not stories.
+
+Signal is the opposite: words that are definite, specific and meaningful on their own:
+• Domain nouns: "tokens", "compression", "anchor", each names a thing
+• Action verbs in context: "fix", "strip", "merge", each names what happened
+• Named entities: "LISA", "SemanticAnalyzer", "Stripe", each names who or what
+
+Stacked together, signal words form a semantic skeleton the AI expands back into full understanding. Removing the glue doesn't remove meaning; it removes repetition the AI regenerates from context.
+
+This is what a translator does. You don't translate word for word from Arabic to English; you translate meaning. Some Arabic particles have no English equivalent and get dropped; some English articles have no Arabic equivalent and get added. The meaning crosses, the grammar adapts. That is what LISA does between human language and the AI's.
+
+The frequency filter catches what a fixed word list can't: a word that appears in more than a quarter of the sentences is probably glue for this conversation, even if it's a real noun elsewhere. "File" is meaningful in a cooking conversation and noise in a coding session where every other sentence mentions files.
+
+An AI doesn't read words: it reads tokens, word fragments produced by a tokenizer. Every token costs compute, and raw conversation is full of waste: "sure", "got it", "thanks" use tokens that carry no meaning. Pronouns like "he", "it", "the tool" make the AI guess what they refer to. The same long name repeated forty times costs forty times the tokens. None of that ambiguity was yours; it comes from how conversation flows, not from what you meant.
+
+LISA's pipeline works on each layer of that waste. Salience routing scores every turn by how central it is to the conversation and drops the noise. Entity aliasing writes a repeated name once in full, then as a short alias backed by a glossary ("ACME-Tech Co." becomes "ATC"). Coreference resolution links pronouns to the people and things they refer to ("he said it was done" becomes "Amar said the parser was done"). And real token counts (tiktoken, the tokenizer family the models use) show what you actually save. The result: a leaner input in which more of the tokens carry meaning.
+
+🧠 ACTIVE CONTEXT MANAGEMENT (ACM): keep long conversations sharp, and take them anywhere
+
+Long conversations drift. The AI forgets early decisions, repeats itself and loses the thread. LISA watches your conversation and helps you keep it on track.
+
+• Context health at a glance: a dot on the LISA button turns from green to yellow to red as a conversation grows.
+• One-click Checkpoint (recommended): LISA asks the AI to sum up where you stand (decisions, open questions, constraints, next steps) right in your chat. No extra cost: the AI does the remembering.
+• Handoff to a fresh session or another AI: LISA keeps the opening and the latest exchanges word for word, compresses the middle, and opens a new chat with everything attached as a file. Or send the full conversation word for word. Continue on the same platform or a different one.
+• Checkpoints make handoffs smarter: every checkpoint travels in its place in the conversation, and the new session continues from your latest "next steps".
+• Your platforms, your choice: in Settings, pick which AI platforms appear as handoff destinations.
+
+🛡 CHECK BEFORE YOU PUBLISH: INFERENCE SHIELD
+Marketing pages, docs, posts and pitch decks often name the exact tools and methods behind a product. Select the text and right-click "Check with Inference Shield" (or use the floating button or your library): Inference Shield, a SAT-CHAIN tool on the same key and credits, scores what a competitor could infer and rewrites the phrases that give your technology away. Nothing is sent until you choose the action, and nothing is analysed until you press Run.
+
+🌐 SUPPORTED PLATFORMS: 12 AI ASSISTANTS
+Claude, Claude Code on the web, ChatGPT, Gemini, Grok, Mistral, DeepSeek, Microsoft Copilot, Perplexity, HuggingChat, Meta AI and Poe, with full role attribution (who said what).
+
+🚀 KEY FEATURES
+
+📤 ONE-CLICK EXPORT: click the floating LISA button on any supported platform. Long conversations that only partly load on the page (ChatGPT, Grok, Perplexity, Copilot) are captured in full.
+
+✂️ CHOOSE WHAT TO SAVE: the whole conversation, your messages only, the AI's replies only, or the messages you tick. Partial exports are always labelled as partial.
+
+📎 INJECT FROM LIBRARY: pick any saved conversation and inject it into your active AI tab. Continue where you left off, on any platform.
+
+🧠 SEMANTIC PIPELINE, THREE TIERS (the first two need no paid AI):
+• Tier 1 (free, in your browser): language analysis with compromise.js: entity recognition (people, organisations, places), basic pronoun resolution, scored semantic anchors and action items on every capture.
+• Tier 1.5 (free, on our backend): GLiNER entity extraction and fastcoref coreference resolution, without an AI model call.
+• Tier 2 (premium): full AI compression with salience routing, entity aliasing and disambiguation before the AI compresses your text. Real token counts via tiktoken.
+
+💾 FOUR EXPORT FORMATS
+🧠 LISA JSON (semantic): per-message entities and concepts, graph-based concept scoring that handles code (strips code blocks, splits camelCase) and typed relationships (requires, implements, references, supersedes and more; coverage grows with each release).
+🔗 LISA-V (Verbatim+): block-level JSONL with SHA-256 hashes and a Merkle root, so any change to the file is detectable.
+🤖 AI Compressed (premium): backend compression with salience routing, entity aliasing, disambiguation, action items and a reconstruction protocol, with token counts.
+📋 Markdown: a clean .md file, ready to inject or upload into any AI chat.
+
+⚡ INDEXED LIBRARY: browse and manage hundreds of saved conversations; full data loads on demand, so the popup stays fast.
+
+📋 COPY AS LISA CONTEXT: right-click any text, on any page, and copy it wrapped with its source and details, ready to paste into any AI chat.
+
+🤖 LISA MEMORY SERVER (MCP), early access: six tools for AI agents: search your library (with semantic search when available), get a handoff pack, save a snapshot, check your usage (free), and AI compression and reports (metered). Works with Claude Code, Claude Desktop, Cursor and other MCP clients.
+
+🧩 AMBIGUITY CATEGORIES
+LISA targets 10 kinds of conversational ambiguity: referential, temporal, priority, completion, social noise, reasoning, role, dependency, state and relevance. Today Tier 1 filters social noise and resolves basic references, Tier 1.5 adds entity-level and coreference resolution, and Tier 2 handles salience and relevance. Coverage deepens with each release.
+
+🌍 MULTILINGUAL: detects Arabic and Hebrew (with right-to-left support), Chinese, Japanese, Korean and Cyrillic scripts, alongside English and other Latin-script languages such as French and Spanish.
+
+🔬 SEMANTIC ENRICHMENT: scored semantic anchors (the key moments, ranked), action items (decisions and commands), file names, Git references and links, on all 12 platforms.
+
+📖 HOW TO USE
+1️⃣ CAPTURE: click the floating LISA button
+2️⃣ SAVE: download as JSON, JSONL or Markdown, or keep it in your library
+3️⃣ CONTINUE: hand it off, inject it from your library (📎), or upload it to any AI and say "continue where we left off"
+
+💡 WHO IS LISA FOR?
+• Developers: save coding sessions and move context mid-project; connect the LISA Memory Server to Claude Code or Cursor.
+• Researchers: integrity hashes and a Merkle root show whether a saved conversation was changed.
+• Business professionals: client documentation, records and reports through LISA Nexus; check public texts with Inference Shield.
+• Multilingual users: right-to-left and non-Latin scripts handled.
+• Students: build a personal AI knowledge library across platforms.
+• Anyone switching AI platforms: take your conversations with you.
+
+💰 PRICING (one key across the LISA Suite)
+
+FREE
+• 100 free compressions to start, then 5 a day
+• All 12 platforms, local library, in-browser language analysis
+• Right-click Copy as LISA Context
+• Get a key: 50 free credits for online features (LISA Nexus, Inference Shield)
+
+PAY AS YOU GO: no subscription, credits never expire
+💳 100 credits $1 • 500 credits $4 • 1,000 credits $7
+
+PRO: $9.99/month or $89.99/year (save $30)
+🔹 LISA extension: unlimited exports and saves, the full semantic pipeline, MCP access
+🔹 LISA Nexus: AI compression (50 a day), reports, cloud sync, share links, up to 12 semantic anchors
+🔹 Inference Shield: 300 credits every month
+
+TEAM ($59/month) and ENTERPRISE ($199/month): more compressions a day and more monthly credits. Details: nexus.sat-chain.com/pricing
+
+🔒 PRIVACY FIRST
+✅ Local by default: capture, saving and Tier 1 analysis happen in your browser
+✅ Your text leaves your browser only when you choose an online feature: AI compression, sync to LISA Nexus, or Inference Shield
+✅ No tracking of your conversations, no analytics on their content, no selling of your data
+✅ Open, portable JSON, JSONL and Markdown: no lock-in
+
+🛡️ TECHNICAL SPECS
+Version 0.53.0
+• Manifest V3
+• SHA-256 + Merkle root integrity
+• 12 platforms with a unified LISA-V parser
+• In-browser NLP: compromise.js entity recognition and pronoun resolution
+• Backend NLP: GLiNER entity extraction and fastcoref coreference resolution
+• Compression pipeline: salience routing → entity aliasing → disambiguation → AI compression → tiktoken counts
+• MCP server (6 tools, streamable HTTP + stdio)
+• Semantic search embeddings: BGE-small-en-v1.5 (when available)
+• Indexed snapshot storage
+
+🏢 ABOUT SAT-CHAIN LLC
+Built by SAT-CHAIN LLC, founded by Amar Dahmani, a professional translator with 25 years across English, French and Arabic. The LISA Suite: the LISA extension (capture and hand off), LISA Nexus (compress and keep), the LISA Memory Server (MCP for AI agents) and Inference Shield (check what your text reveals).
+
+Most tools save what was said. LISA saves what was meant.
+
+📬 contact@sat-chain.com • 🌐 sat-chain.com
+© 2026 SAT-CHAIN LLC

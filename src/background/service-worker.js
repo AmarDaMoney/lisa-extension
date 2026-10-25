@@ -14,7 +14,7 @@ importScripts('../utils/semantic-analyzer.js');
 importScripts('../shared/checkpoint-detect.js');
 importScripts('../shared/export-builders.js');
 // Interface languages: the right-click menu titles (see shared/i18n.js).
-importScripts('../shared/i18n.js', '../shared/i18n/fr.js', '../shared/i18n/es.js', '../shared/i18n/de.js', '../shared/i18n/ar.js', '../shared/i18n/ru.js', '../shared/i18n/zh.js', '../shared/i18n/ja.js', '../shared/i18n/he.js', '../shared/i18n/ko.js');
+importScripts('../shared/i18n.js', '../shared/i18n/fr.js', '../shared/i18n/es.js', '../shared/i18n/de.js', '../shared/i18n/ar.js', '../shared/i18n/ru.js', '../shared/i18n/zh.js', '../shared/i18n/ja.js', '../shared/i18n/ko.js');
 
 // Safe text extraction — m.content can be a string, an array of
 // content blocks (Claude API), or an object. Only strings pass through;

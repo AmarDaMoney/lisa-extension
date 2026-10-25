@@ -113,7 +113,12 @@ class LisaProgressiveCapture {
 
   getRoleFromElement(el) {
     if (el.getAttribute('data-message-author-role')) return el.getAttribute('data-message-author-role');
+    if (el.getAttribute('data-message-role')) return el.getAttribute('data-message-role') === 'user' ? 'user' : 'assistant';
     if (el.hasAttribute('data-user-message-bubble')) return 'user';
+    // DeepSeek: every turn is a .ds-message; only the AI's has a .ds-markdown body.
+    // Without this every captured turn was 'assistant', and the export merged the
+    // whole history into a few messages.
+    if (el.classList.contains('ds-message')) return el.querySelector('.ds-markdown') ? 'assistant' : 'user';
     if (el.classList.contains('user')) return 'user';
     if (el.getAttribute('data-testid') === 'chatQuestion') return 'user'; // Copilot
     if (el.getAttribute('data-testid') === 'copilot-message-div') return 'assistant'; // ('chatOutput' is the user's own text)

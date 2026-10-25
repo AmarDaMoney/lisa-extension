@@ -100,19 +100,20 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   "📤 Export & compress…" (service worker `openPopupForExport`: leaves `lisaPendingExport` {tabId, at} in
   `chrome.storage.session` and calls `chrome.action.openPopup`; the popup starts the export within 60 s, else the
   page says "click the LISA icon"); popup section **"On this page"** (`#pageActions`) runs the floating button's
-  actions through `lisaPageAction` messages (open by default when the button is hidden, so hiding loses nothing;
+  actions through `lisaPageAction` messages (shown only while the button is hidden, so hiding loses nothing;
   the popup copies the checkpoint prompt and lists Handoff targets itself); panels anchor via `_anchorRect()` when
   the button is hidden. The checkpoint prompt (`_checkpointPrompt()`, one copy) asks for the conversation's
   language with the section labels kept in English (checkpoint-detect.js reads them).
   **Stars** (★ in "Choose messages"; right-click a selection → "⭐ Keep this message word for word" (service worker
   `star-message` menu → `lisaPageAction` `star-selection`, the FAB finds the message containing the text); "⭐ Keep
-  last AI reply" in the floating menu and the popup's "On this page"): kept word for word in compressed exports (`buildLeanExport` option
+  last AI reply" in the floating menu and the popup's "On this page"; a starred user message also keeps the AI reply right
+  after it: `lisaStarredIndexes()`, and the same rule inline in the FAB's Handoff): kept word for word in compressed exports (`buildLeanExport` option
   `starredKeys`: `starred: true` on the message, or `starred_messages` when the turns don't line up, as with AI
   Compress) and in Handoff (`middle` entries of type `starred`). Stored per conversation in
   `chrome.storage.local` `lisa-stars-<conversationId>` as `lisaStarKey()` fingerprints (role + FNV-1a of the
   text's lowercase letters and digits only, so formatting never changes it; the FAB's `_starKey()` is an inline copy: keep them identical).
   **Interface languages** (`src/shared/i18n.js` + one file per language in `src/shared/i18n/`: fr, es, de,
-  ar, ru, zh, ja, he, ko; ar and he are right-to-left via `LISA_RTL_LANGUAGES`; machine-written, a native speaker
+  ar, ru, zh, ja, ko; Arabic is right-to-left via `LISA_RTL_LANGUAGES`; no Hebrew (Amar's decision, 2026-10-25); machine-written, a native speaker
   should review each before it is advertised):
   texts are keyed by their English wording (whitespace collapsed) plus regex `patterns` for texts with numbers;
   nothing in popup.js or the FAB calls a translate function. The popup (`popup-i18n.js`) translates the whole
@@ -328,6 +329,12 @@ by node. No REST history endpoint is visible to the page (only
 dump one turn's outline (tags, data-testid, fai-* classes) from the page
 console, or run `__lisaCopilotCollectAll()` + `LisaVParser` from the
 LISA console context and compare COLLECTED vs EXPORTED.
+
+### DeepSeek capture (chat.deepseek.com)
+DOM only (`.ds-message`, virtualized): `extractDeepSeekMessages()` sweeps with `performScrollSweep` and merges the
+progressive buffer in capture order (`seq`). Role: a `.ds-message` with a `.ds-markdown` body is the AI's, else the
+user's (`getRoleFromElement`). Before 0.53.2 every buffered turn was 'assistant', so `toMessages()` merged a long
+history into a handful of messages (popup export showed ~5).
 
 ### Grok capture (grok.com)
 API-first via `window.__LISA_GROK_API_CAPTURE` in `src/content/grok-parser.js`

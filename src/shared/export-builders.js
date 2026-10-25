@@ -69,6 +69,22 @@ function lisaStarKey(m) {
   return role + ':' + h.toString(16) + ':' + text.length;
 }
 
+// Indexes of the messages kept word for word: the starred ones, and the AI's
+// reply right after a starred message of the user's (a question is starred for
+// its answer).
+function lisaStarredIndexes(messages, starredKeys) {
+  const starred = new Set(starredKeys || []);
+  const keep = new Set();
+  (messages || []).forEach((m, i) => {
+    if (!starred.has(lisaStarKey(m))) return;
+    keep.add(i);
+    const next = messages[i + 1];
+    const isUser = (x) => x && (x.role === 'user' || x.role === 'human');
+    if (isUser(m) && next && !isUser(next) && lisaExportRole(next) !== 'system') keep.add(i + 1);
+  });
+  return keep;
+}
+
 function buildLeanExport(compressed, rawMessages, options = {}) {
   const tokens = compressed.semanticTokens || compressed.messages || compressed.compressed || [];
   const messages = tokens.map(t => ({
@@ -118,20 +134,21 @@ function buildLeanExport(compressed, rawMessages, options = {}) {
 
   // Messages the user starred ("Choose messages" → ★) stay word for word too,
   // marked `starred: true`. Opt-in like checkpointHistory: options.starredKeys.
+  // Starring a question keeps the AI's answer to it too (lisaStarredIndexes).
   // When the compressed turns don't line up with the raw ones (AI Compress
   // returns anchors, not turns), the starred messages go in starred_messages.
   let starredExtra = [];
   if (options.starredKeys && options.starredKeys.length && rawMessages && rawMessages.length) {
-    const starred = new Set(options.starredKeys);
+    const keep = lisaStarredIndexes(rawMessages, options.starredKeys);
     if (rawMessages.length === messages.length) {
       for (let i = 0; i < messages.length; i++) {
-        if (!starred.has(lisaStarKey(rawMessages[i]))) continue;
+        if (!keep.has(i)) continue;
         messages[i] = { role: messages[i].role, index: messages[i].index, content: rawMessages[i].content, starred: true };
       }
     } else {
       starredExtra = rawMessages
         .map((m, i) => ({ m, i }))
-        .filter(({ m }) => starred.has(lisaStarKey(m)))
+        .filter(({ i }) => keep.has(i))
         .map(({ m, i }) => ({ role: lisaExportRole(m), index: i, content: m.content, starred: true }));
     }
   }
@@ -286,5 +303,5 @@ function buildMarkdownExport(compressed, rawMessages) {
 
 // Dual-mode: global in browser, module.exports in Node
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildLeanExport, buildMarkdownExport, lisaSafeTitle, lisaSystemNotice, lisaExportRole, lisaStarKey };
+  module.exports = { buildLeanExport, buildMarkdownExport, lisaSafeTitle, lisaSystemNotice, lisaExportRole, lisaStarKey, lisaStarredIndexes };
 }

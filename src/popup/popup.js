@@ -469,11 +469,12 @@ class LISAPopup {
   async setupPageActions() {
     const section = document.getElementById('pageActions');
     if (!section || !this.showPageActions || !this.activeTabId) return;
-    section.style.display = 'block';
-    try {
-      const { hideFloatingButton } = await chrome.storage.sync.get(['hideFloatingButton']);
-      if (hideFloatingButton) section.open = true;
-    } catch (_) {}
+    // Shown only while the floating button is hidden: then its actions live here.
+    // (Wired either way: hiding the button from this popup reveals the section.)
+    let hidden = false;
+    try { hidden = !!(await chrome.storage.sync.get(['hideFloatingButton'])).hideFloatingButton; } catch (_) {}
+    section.style.display = hidden ? 'block' : 'none';
+    section.open = hidden;
     const status = document.getElementById('pageActionStatus');
     const say = (text) => { status.textContent = text; };
     const ask = async (msg) => {
@@ -654,9 +655,12 @@ class LISAPopup {
           toggleBtn.textContent = resp.visible
             ? '💾 Hide Floating Button'
             : '💾 Show Floating Button';
-          // Hidden: its actions are here.
+          // Hidden: its actions are here. Shown: they are on the page.
           const pageActions = document.getElementById('pageActions');
-          if (!resp.visible && pageActions && pageActions.style.display !== 'none') pageActions.open = true;
+          if (pageActions && this.showPageActions && this.activeTabId) {
+            if (resp.visible) pageActions.style.display = 'none';
+            else { pageActions.style.display = 'block'; pageActions.open = true; }
+          }
         } catch (e) {
           toggleBtn.textContent = '❌ Refresh page first';
         }
@@ -1077,7 +1081,7 @@ class LISAPopup {
   }
 
   async extractConversation() {
-    this.showLoading('Extracting conversation (scrolling through messages — may take a minute)...');
+    this.showLoading('Extracting conversation (long conversations may take a minute)...');
 
 
     try {
@@ -2228,7 +2232,7 @@ class LISAPopup {
         <div class="snapshot-actions">
           <button class="snapshot-btn history" data-root-id="${eRootId}" title="Version History">\ud83d\udd52</button>
           
-          <button class="snapshot-btn download" data-id="${eId}" title="Download JSON">\ud83d\udcbe</button>
+          <button class="snapshot-btn download" data-id="${eId}" title="${this._downloadTitle(snap)}">\ud83d\udcbe</button>
             <button class="snapshot-btn inject" data-id="${eId}" title="Inject context to active AI tab">\ud83d\udcce</button>
           <button class="snapshot-btn send" data-id="${eId}" title="Send to App">\ud83d\udce4</button>
           <button class="snapshot-btn shield" data-id="${eId}" title="Check with Inference Shield: see what it reveals before you share it">\ud83d\udee1\ufe0f</button>
@@ -2364,6 +2368,14 @@ class LISAPopup {
       alert('Could not inject — make sure you are on a supported AI platform');
     }
   }
+  // The library's 💾 says which file it saves (the same choice downloadSnapshot makes).
+  _downloadTitle(snap) {
+    const fmt = snap.format || '';
+    if (fmt === 'lisa-v') return 'Download JSONL';
+    if (fmt === 'markdown' || snap.rebirthHandoff) return 'Download Markdown';
+    return 'Download JSON';
+  }
+
   async downloadSnapshot(id) {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'getFullSnapshot', id });

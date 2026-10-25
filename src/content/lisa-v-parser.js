@@ -1245,7 +1245,7 @@ class LisaVParser {
           const key = (b.v || '').replace(/\s+/g, ' ').substring(0, 200);
           return !domKeys.has(key);
         })
-        .sort((a, b) => a.capturedAt.localeCompare(b.capturedAt))
+        .sort((a, b) => (a.seq || 0) - (b.seq || 0) || a.capturedAt.localeCompare(b.capturedAt))
         .map(b => [{ t: b.t, role: b.role, v: b.v }]);
       if (missing.length > 0) messages.unshift(...missing);
     }

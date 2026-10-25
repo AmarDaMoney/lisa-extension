@@ -1452,7 +1452,10 @@ Keep it tight — this is for continuity, not a report. Only include what matter
             isCheckpoint = true;
           }
         }
-        const isStarred = !isCheckpoint && stars.has(this._starKey(msg));
+        // A starred question keeps the AI's answer right after it too.
+        const prev = i > 0 ? middleRange[i - 1] : null;
+        const isStarred = !isCheckpoint && (stars.has(this._starKey(msg)) ||
+          (prev && prev.role === 'user' && msg.role !== 'user' && stars.has(this._starKey(prev))));
         if (isCheckpoint || isStarred) {
           const segment = middleRange.slice(segmentStart, i);
           if (segment.length > 0) segments.push({ type: 'compressed', segment });

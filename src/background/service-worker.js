@@ -2049,6 +2049,17 @@ function createContextMenusNow() {
 // Create menus on install/update
 
 chrome.runtime.setUninstallURL("https://forms.gle/2Vu8M8NQYP6eKBnR9");
+// Shown once in the popup after an update to that exact version. Plain text
+// (the popup inserts it as text); each line needs its entry in the language files.
+const LISA_CHANGELOG = {
+  '0.53.2': [
+    'Star a message (☆ next to it in the chat): it stays word for word in compressed exports and Handoff',
+    'LISA in your language: Settings → Interface language',
+    'Export & compress straight from the floating button',
+    'Long DeepSeek conversations export in full'
+  ]
+};
+
 chrome.runtime.onInstalled.addListener((details) => {
   console.debug("[LISA] Extension installed/updated:", details.reason);
   createContextMenus();
@@ -2062,28 +2073,17 @@ chrome.runtime.onInstalled.addListener((details) => {
     }
   });
   
-  // Show "What's new" for updates (not fresh installs)
+  // "What's new" after an update (not a fresh install): only for a version that has
+  // its own list in LISA_CHANGELOG. (It used to show one hard-coded list from an
+  // old release on every minor update.) Write the next version's list here.
   if (details.reason === 'update') {
     const currentVersion = chrome.runtime.getManifest().version;
-    const previousVersion = details.previousVersion;
-    
-    // Only show if major or minor version changed (not patch)
-    const [currMajor, currMinor] = currentVersion.split('.').map(Number);
-    const [prevMajor, prevMinor] = (previousVersion || '0.0.0').split('.').map(Number);
-    
-    if (currMajor > prevMajor || currMinor > prevMinor) {
-      // Store flag to show "What's new" when popup opens
-      chrome.storage.local.set({ 
-        showWhatsNew: true,
-        updatedToVersion: currentVersion,
-        changelog: [
-          "Fixed code block detection in conversation capture",
-          "Fixed user/assistant role detection for Claude",
-          "Removed content truncation limits",
-          "Payment system improvements"
-        ]
-      });
-      console.debug('[LISA] Update detected:', previousVersion, '->', currentVersion);
+    const changelog = LISA_CHANGELOG[currentVersion];
+    if (changelog && details.previousVersion !== currentVersion) {
+      chrome.storage.local.set({ showWhatsNew: true, updatedToVersion: currentVersion, changelog });
+      console.debug('[LISA] Update detected:', details.previousVersion, '->', currentVersion);
+    } else {
+      chrome.storage.local.remove(['showWhatsNew', 'updatedToVersion', 'changelog']);
     }
   }
 });

@@ -104,7 +104,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   the popup copies the checkpoint prompt and lists Handoff targets itself); panels anchor via `_anchorRect()` when
   the button is hidden. The checkpoint prompt (`_checkpointPrompt()`, one copy) asks for the conversation's
   language with the section labels kept in English (checkpoint-detect.js reads them).
-  **Inline ☆** (claude.ai chats, ChatGPT, DeepSeek, Gemini, Grok; `setupInlineStars()` in the FAB): hovering a message
+  **Inline ☆** (all 12 platforms; `setupInlineStars()` in the FAB): hovering a message
   shows one LISA-owned button in <body> placed over it (the chat's own elements are never changed);
   `_inlineStarTarget()` holds the per-platform selectors. It stores a probe `p:<u|a>:<letters and digits of the
   message's first paragraph>` (max 120): a message is starred when the role matches and its text contains the probe
@@ -113,8 +113,11 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   2026-10-25) has no `[data-message-author-role]` and no `article[data-turn]`, so there the ☆ finds the message by
   its text (`_inlineStarTargetByText`): the API messages (`_inlineStarMessages`, cached 20 s), walk up from the
   hovered node to the largest element holding exactly one message; it stores that message's `_starKey` (exact match
-  in exports, since exports read the same API). Only an element with a box under the pointer counts
-  (ChatGPT's display:contents wrappers put the star at 0,0 before). Other platforms: next. Gemini capture strips its screen-reader labels ("You said", "Gemini said",
+  in exports, since exports read the same API). The same text finder serves Claude Code and Perplexity (API
+  capture, no usable markup); the other platforms use page selectors from their parsers. Growing a found message's
+  box stops at the first box holding any other message's text. Only an element with a box under the pointer counts
+  (ChatGPT's display:contents wrappers put the star at 0,0 before). Mistral, Copilot, HuggingChat, Meta AI, Poe, Claude Code and Perplexity: stand-in tests only (2026-10-25),
+  need a live check. Gemini capture strips its screen-reader labels ("You said", "Gemini said",
   "Show thinking", FR/ES/DE) wherever they start a block (`geminiPrefix` in lisa-v-parser.js).
   **Stars** (★ in "Choose messages"; right-click a selection → "⭐ Keep this message word for word" (service worker
   `star-message` menu → `lisaPageAction` `star-selection`, the FAB finds the message containing the text; the
@@ -135,7 +138,11 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   A new or changed English UI text needs its entry in each language file, or it shows in English. Mark user
   content `data-lisa-no-translate` (conversation titles). Adding a language: copy fr.js, add it to popup.html, the service worker's `importScripts`
   and before lisa-floating-button.js in every manifest entry.
-- **0.53.1 (submitted to the CWS, in review as of 2026-10-23; the next change bumps to 0.53.2):** 0.53.1 = compressed
+- **"What's new" after an update:** `LISA_CHANGELOG` in service-worker.js, keyed by exact version; a version without
+  a list shows nothing (until 0.53.2 one stale hard-coded list showed on every minor update). Write the list for the
+  version you ship; each line needs its entry in the language files. The "vX available" banner reads the backend's
+  `/api/version` (= the version live in the store).
+- **0.53.1 (live in the Chrome Web Store since 2026-10-25; the next change bumps to 0.53.2):** 0.53.1 = compressed
   export fixes (system notices labelled, assistant changes kept, compound entities, checkpoint sections parsed
   into the anchor; see "Compressed export anchor" below).
 - **0.53.0 (submitted to the CWS, in review as of 2026-10-23):** backend domains, Inference Shield hand-off, floating-button advanced mode, Merkle fix. Popup header: the neon-L logo (54 px, `public/logo.png`), "LISA" over "Your AI Chat Exporter / Library", and **? Help / ⚙ Settings** at the top right (moved from the footer, which scrolls away under the library); badges and version on the second row. Toolbar/store icons (`public/icon16/48/128.png`) stay the previous LISA icon (Amar's choice); only the popup logo is the neon L, on the logo's deep-indigo header. Toasts are compact bubbles above the floating button (max 300 px wide, wrap onto several lines). Before the CWS upload: Amar tests unpacked against the live backend, then fast-forward `main`. Listing text: `docs/CWS_LISTING_0.53.0.md`. Until the review passes, the 0.52.9 in the store calls the old Railway address, which stays working as a fallback (never remove it from the backend while 0.52.9 users exist).
@@ -405,6 +412,10 @@ unimplemented. `acm_getStatus` in `service-worker.js` has a handler but
 no caller. Leave as-is unless picking them up deliberately.
 
 ## Roadmap / parked ideas
+
+- **Mistral code blocks are not captured** (Amar, 2026-10-25): needs the live markup of a Mistral code block
+  (select text inside one, run the ancestor-outline console line). Converter and parser handle `pre`/`code`,
+  so Mistral likely renders code another way.
 
 - **MCP Memory Server** (`lisa-web-backend/lisa_mcp.py`, guide in
   `MCP_SETUP.md` there) — early access. Next: public package (`uvx lisa-mcp`),

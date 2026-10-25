@@ -61,9 +61,7 @@ class LISAPopup {
           </div>
           <div style="background: #f5f5f5; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
             <p style="font-weight: 600; font-size: 13px; margin: 0 0 8px; color: #333;">What's new:</p>
-            <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #555;">
-              ${changelog.map(item => `<li style="margin-bottom: 4px;">${item}</li>`).join('')}
-            </ul>
+            <ul class="whats-new-list" style="margin: 0; padding-left: 18px; font-size: 12px; color: #555;"></ul>
           </div>
           <button id="close-whats-new" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
             Got it!
@@ -72,6 +70,13 @@ class LISAPopup {
       </div>
     `;
     
+    const list = overlay.querySelector('.whats-new-list');
+    for (const item of changelog) {
+      const li = document.createElement('li');
+      li.style.marginBottom = '4px';
+      li.textContent = item;
+      list.appendChild(li);
+    }
     document.body.appendChild(overlay);
     
     document.getElementById('close-whats-new').addEventListener('click', () => {
@@ -88,8 +93,15 @@ class LISAPopup {
       const data = await response.json();
       const latestVersion = data.version;
       
-      // Compare versions (simple string compare works for semver)
-      if (latestVersion > currentVersion) {
+      // Compare numerically: as strings, "0.53.10" < "0.53.9"
+      const newer = (a, b) => {
+        const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+        for (let i = 0; i < Math.max(x.length, y.length); i++) {
+          if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+        }
+        return false;
+      };
+      if (latestVersion && newer(latestVersion, currentVersion)) {
         const { dismissedUpdate } = await chrome.storage.local.get('dismissedUpdate');
         if (dismissedUpdate !== latestVersion) {
           this.showUpdateBanner(latestVersion, data.changelog);

@@ -131,7 +131,7 @@ PRO: $9.99/month or $89.99/year (save $30)
 🔹 LISA Nexus: AI compression (50 a day), reports, cloud sync, share links, up to 12 semantic anchors
 🔹 Inference Shield: 300 credits every month
 
-TEAM ($59/month) and ENTERPRISE ($199/month): more compressions, more keys, more Inference Shield credits. Details: nexus.sat-chain.com/pricing
+TEAM ($59/month) and ENTERPRISE ($199/month): more compressions a day and more monthly credits. Details: nexus.sat-chain.com/pricing
 
 🔒 PRIVACY FIRST
 ✅ Local by default: capture, saving and Tier 1 analysis happen in your browser

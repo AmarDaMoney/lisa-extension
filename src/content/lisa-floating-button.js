@@ -733,7 +733,7 @@ class LISAFloatingButton {
     const host = location.hostname;
     let el;
     if (host.includes('claude.ai')) {
-      if (location.pathname.startsWith('/code/')) return null;
+      if (location.pathname.startsWith('/code/')) return null; // Claude Code: found by text (API)
       if ((el = node.closest('[data-testid="user-message"]'))) return { el, role: 'user' };
       if ((el = node.closest('[data-is-streaming="false"], [data-testid="assistant-message"]'))) return { el, role: 'assistant' };
     } else if (host.includes('chatgpt.com')) {
@@ -752,6 +752,26 @@ class LISAFloatingButton {
     } else if (host.includes('gemini.google')) {
       if ((el = node.closest('user-query, [class*="user-query"]'))) return { el, role: 'user' };
       if ((el = node.closest('.presented-response-container, model-response'))) return { el, role: 'assistant' };
+    } else if (host.includes('chat.mistral.ai')) {
+      if ((el = node.closest('[data-message-author-role]'))) return { el, role: el.getAttribute('data-message-author-role') === 'user' ? 'user' : 'assistant' };
+    } else if (/copilot\.(microsoft\.)?com/.test(host)) {
+      // ('chatOutput' is the user's own text inside chatQuestion, not the reply)
+      if ((el = node.closest('[data-testid="chatQuestion"]'))) return { el: el.querySelector('[class*="UserMessage__message"]') || el, role: 'user' };
+      if ((el = node.closest('[data-testid="copilot-message-div"], .fai-CopilotMessage'))) return { el: el.querySelector('[class*="CopilotMessage__content"]') || el, role: 'assistant' };
+    } else if (host.includes('perplexity.ai')) {
+      return null; // found by text (API)
+    } else if (host.includes('huggingface.co')) {
+      if ((el = node.closest('[data-message-type="user"]'))) return { el, role: 'user' };
+      if ((el = node.closest('[data-message-role="assistant"]'))) return { el, role: 'assistant' };
+    } else if (host.includes('meta.ai')) {
+      if ((el = node.closest('[data-message-type="user"]'))) return { el, role: 'user' };
+      if ((el = node.closest('[data-testid="assistant-message"]'))) return { el, role: 'assistant' };
+    } else if (host.includes('poe.com')) {
+      if ((el = node.closest('[class*="ChatMessage_chatMessage"]'))) {
+        const user = !!el.querySelector('[class*="rightSideMessageBubble"]');
+        const body = el.querySelector(user ? '[class*="Message_messageTextContainer"]' : '[class*="Markdown_markdownContainer"]');
+        return { el: body || el, role: user ? 'user' : 'assistant' };
+      }
     } else if (host.includes('grok.com')) {
       const wrap = node.closest('.relative.group.flex.flex-col.justify-center');
       const bubble = wrap && wrap.querySelector('[class*="message-bubble"]');
@@ -763,9 +783,11 @@ class LISAFloatingButton {
     return null;
   }
 
-  // The conversation's messages from the platform's API (ChatGPT), cached for 20 s.
+  // The conversation's messages from the platform's API (ChatGPT, Claude Code,
+  // Perplexity: the same capture ACM and Handoff use), cached for 20 s.
   async _inlineStarMessages() {
-    const api = window.__LISA_CHATGPT_API_CAPTURE;
+    const acm = window.__lisaACM;
+    const api = acm && typeof acm._getApiCapture === 'function' ? acm._getApiCapture() : null;
     if (!api || typeof api.extractViaAPI !== 'function') return null;
     const id = this._starStorageKey();
     const c = this._starApiCache;
@@ -800,7 +822,10 @@ class LISAFloatingButton {
       if (el.id === 'lisa-floating-btn' || (typeof el.className === 'string' && /(^|\s)lisa-/.test(el.className))) return null;
       const t = norm(el.textContent);
       if (t.length > 400000) break;
-      let hits = msgs.filter((x) => t.includes(x.probe));
+      const raw = msgs.filter((x) => t.includes(x.probe));
+      // Growing a found message's box stops at the first box with any other message in it.
+      if (best && raw.some((h) => h.m !== best.msg)) break;
+      let hits = raw;
       if (hits.length > 1) hits = hits.filter((h) => !hits.some((o) => o !== h && o.full.length > h.full.length && o.full.includes(h.probe)));
       if (hits.length === 0) continue;
       if (hits.length > 1) break;
@@ -829,7 +854,7 @@ class LISAFloatingButton {
   }
 
   setupInlineStars() {
-    if (this._inlineStarsOn || !/claude\.ai|chatgpt\.com|deepseek\.com|gemini\.google|grok\.com/.test(location.hostname)) return;
+    if (this._inlineStarsOn || !/claude\.ai|chatgpt\.com|deepseek\.com|gemini\.google|grok\.com|chat\.mistral\.ai|copilot\.(microsoft\.)?com|perplexity\.ai|huggingface\.co|meta\.ai|poe\.com/.test(location.hostname)) return;
     this._inlineStarsOn = true;
     const css = document.createElement('style');
     css.textContent = `.lisa-inline-star{position:fixed;z-index:2147483646;display:none;width:28px;height:28px;padding:0;
@@ -842,7 +867,11 @@ class LISAFloatingButton {
     btn.className = 'lisa-inline-star';
     document.body.appendChild(btn);
     let current = null, hideTimer = null, textTimer = null;
-    const byText = location.hostname.includes('chatgpt.com');
+    // Platforms whose page has no reliable message markup but whose API LISA reads:
+    // the message under the pointer is found by its text.
+    // (checked per hover: claude.ai moves between chats and Claude Code without a reload)
+    const byText = () => /chatgpt\.com|perplexity\.ai/.test(location.hostname) ||
+      (location.hostname.includes('claude.ai') && location.pathname.startsWith('/code/'));
     const place = () => {
       if (!current || !document.contains(current.el)) { btn.style.display = 'none'; current = null; return; }
       const r = current.el.getBoundingClientRect();
@@ -881,8 +910,8 @@ class LISAFloatingButton {
         if (!current || current.el !== t.el) show(t);
         return;
       }
-      if (byText && !(current && current.el.contains(e.target))) {
-        // No platform markup to go by (ChatGPT): find the message by its text.
+      if (byText() && !(current && current.el.contains(e.target))) {
+        // No platform markup to go by: find the message by its text.
         clearTimeout(textTimer);
         const node = e.target, x = e.clientX, y = e.clientY;
         textTimer = setTimeout(async () => {

@@ -77,166 +77,13 @@ class LISAFloatingButton {
   }
 
   async checkFloatingLimit(type) {
-    // Read fresh: the popup may have validated/changed the license since
-    // this page loaded.
-    let tierInfo = {};
-    try { tierInfo = await chrome.storage.sync.get(['userTier', 'isPayg', 'licenseKey']); } catch (_) {}
-    this.isPremium = tierInfo.userTier === 'premium';
-
-    // PAYG key: Premium features while credits last, 1 credit per action —
-    // checked before the premium shortcut, which used to let PAYG keys
-    // through uncharged. Out of credits → normal free rules below.
-    if (tierInfo.isPayg === true && tierInfo.licenseKey) {
-      try {
-        const resp = await fetch(`${LISA_FAB_API_ORIGIN}/api/credits/deduct`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-License-Key': tierInfo.licenseKey },
-          body: JSON.stringify({ source: 'extension' })
-        });
-        const data = resp.ok ? await resp.json() : null;
-        if (data && data.success === true) return { allowed: true, credits: true };
-      } catch (e) {
-        console.debug('[LISA] PAYG credit charge failed:', e);
-      }
-    } else if (this.isPremium) {
-      // Premium users have no limits
-      return { allowed: true };
-    }
-    // Welcome pool: 100 free operations before daily limits kick in
-    try {
-      const poolResult = await chrome.storage.sync.get(['usageStats']);
-      const pool = poolResult.usageStats?.lifetimeFreePool ?? 0;
-      if (pool > 0) return { allowed: true, remaining: pool, pool: true };
-    } catch (e) { /* fall through to daily limits */ }
-    // PAYG credit check. /api/credits/balance is GET-only and reads the
-    // identity from a header, not a POST body with the raw OAuth token —
-    // this used to send a POST with { token } in the body, which the
-    // backend rejects outright, so this block always silently no-op'd and
-    // Handoff/md/lisav never actually checked or spent PAYG credits. Fixed
-    // to resolve an identifier the same way popup.js's
-    // compressConversation()/loadCreditBalance() do: Google identity first,
-    // then (since this block previously only ever tried Google) a stored
-    // creditIdentifier/licenseKey fallback — without that fallback, a PAYG
-    // user whose credits are tied to a license key, not Google, would never
-    // have them checked here at all and would always just hit the free
-    // daily-5 cap instead.
-    // PAYG keys were already charged (or found empty) above.
-    // The server only accepts verified credentials for credits (a Google
-    // access token it checks with Google, or a license key) — never a
-    // self-declared X-Google-Id / X-Identifier. The token comes from the
-    // service worker (content scripts don't get chrome.identity).
-    if (tierInfo.isPayg !== true) try {
-      const headers = { 'Content-Type': 'application/json' };
-      const token = await this._getGoogleToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      } else {
-        const stored = await chrome.storage.sync.get(['licenseKey']);
-        if (stored.licenseKey) headers['X-License-Key'] = stored.licenseKey;
-      }
-
-      if (headers['Authorization'] || headers['X-License-Key']) {
-        // One atomic call: the server debits only if the balance covers it.
-        const dedResp = await fetch(`${LISA_FAB_API_ORIGIN}/api/credits/deduct`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ source: 'extension' })
-        });
-        const ded = dedResp.ok ? await dedResp.json() : null;
-        if (ded && ded.success === true) return { allowed: true, credits: true };
-      }
-    } catch (e) {
-      console.debug('[LISA] PAYG credit check failed:', e);
-    }
-
-    // Try backend identity check first (survives reinstalls)
-    try {
-      const token = await this._getGoogleToken();
-      if (token) {
-        const resp = await fetch(`${LISA_FAB_API_ORIGIN}/api/limits/check`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, action: type })
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          if (!data.allowed && data.reason !== 'backend_error') {
-            return {
-              allowed: false,
-              message: `Free tier: 5 ${type} saves per day. Upgrade for unlimited!`
-            };
-          }
-          if (data.allowed) return { allowed: true, remaining: data.remaining };
-        }
-      }
-    } catch (e) {
-      console.debug('[LISA] Backend limit check failed, falling back to local:', e);
-    }
-
-    // Fallback: local limit check (no Google auth or backend unreachable)
-    const storageKey = `floating_${type}_today`;
-    const dateKey = 'floating_limit_date';
-    
-    try {
-      const result = await chrome.storage.sync.get([storageKey, dateKey]);
-      const today = new Date().toISOString().slice(0, 10);
-      
-      if (result[dateKey] !== today) {
-        await chrome.storage.sync.set({
-          [dateKey]: today,
-          floating_lisav_today: 0,
-          floating_rawjson_today: 0,
-          floating_md_today: 0,
-          floating_handoff_today: 0
-        });
-        return { allowed: true, remaining: 5 };
-      }
-      
-      const count = result[storageKey] || 0;
-      if (count >= 5) {
-        return { 
-          allowed: false, 
-          message: `Free tier: 5 ${type} saves per day. Upgrade for unlimited!`
-        };
-      }
-      
-      return { allowed: true, remaining: 5 - count };
-    } catch (error) {
-      console.debug('[LISA] Limit check error:', error);
-      return { allowed: true };
-    }
+    // Local work (Markdown, LISA-V, Handoff) is free and unlimited (2026-10-25);
+    // credits pay only for AI features, charged by the backend.
+    return { allowed: true };
   }
 
   async incrementFloatingLimit(type) {
-    if (this.isPremium) return;
-
-    try {
-      const result = await chrome.storage.sync.get(['usageStats']);
-      const stats = result.usageStats || { exportsToday: 0, importsToday: 0, lifetimeFreePool: 100 };
-      if (stats.lifetimeFreePool > 0) {
-        stats.lifetimeFreePool--;
-        await chrome.storage.sync.set({ usageStats: stats });
-        return stats.lifetimeFreePool;
-      }
-      // Pool exhausted — bump this action's own daily counter (the same
-      // floating_{type}_today / floating_limit_date keys checkFloatingLimit's
-      // local fallback reads), not the shared usageStats.exportsToday. That
-      // used to be a bug: md/lisav all funneled into exportsToday regardless
-      // of type, so checkFloatingLimit's per-type read never actually saw an
-      // increment and the local fallback never blocked anything. Re-checks
-      // the date here too in case today's rollover reset hasn't run yet for
-      // this specific type.
-      const storageKey = `floating_${type}_today`;
-      const dateKey = 'floating_limit_date';
-      const dateResult = await chrome.storage.sync.get([storageKey, dateKey]);
-      const today = new Date().toISOString().slice(0, 10);
-      const count = dateResult[dateKey] === today ? (dateResult[storageKey] || 0) : 0;
-      const newCount = count + 1;
-      await chrome.storage.sync.set({ [dateKey]: today, [storageKey]: newCount });
-      return 5 - newCount;
-    } catch (error) {
-      console.debug('[LISA] Limit increment error:', error);
-    }
+    return undefined; // nothing is counted any more (see checkFloatingLimit)
   }
   createButton() {
     if (document.getElementById('lisa-floating-btn')) return;
@@ -655,7 +502,54 @@ class LISAFloatingButton {
     return panel;
   }
 
+  // A key in Settings (any valid key; a free PAYG key counts, whatever its balance).
+  async _hasKey() {
+    try {
+      const r = await chrome.storage.sync.get(['licenseKey', 'userTier', 'isPayg']);
+      return !!r.licenseKey && (r.userTier === 'premium' || r.isPayg === true);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Choose messages and Options come with a free key (Amar, 2026-10-25). Without one,
+  // say so and offer the free key instead of opening the feature.
+  async _requireKey() {
+    if (await this._hasKey()) return true;
+    const panel = this._openPanel('lisa-key-panel', `
+      <div class="lisa-panel-title">🔑 Free key needed</div>
+      <div class="lisa-key-text" style="font-size:13px;line-height:1.5;color:#d4d4d8;margin:6px 0 12px;"></div>
+      <button class="lisa-chip-btn lisa-key-get" type="button">Get a free key</button>`);
+    panel.querySelector('.lisa-key-text').textContent =
+      'Choose messages and Options come with a free key. It also brings 50 credits for AI features. Then add it in LISA → Settings → License key.';
+    panel.querySelector('.lisa-key-get').addEventListener('click', () => {
+      window.open('https://shield.sat-chain.com/app#get-key', '_blank', 'noopener');
+    });
+    return false;
+  }
+
+  // The library is full (no key): hand the user the file instead, so nothing is lost.
+  _downloadInstead(text, filename, mime) {
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: mime }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (_) { /* never break the host page */ }
+    this.showToast('Library full (25 conversations without a key): the file was downloaded instead. Get a free key in Settings to keep more.', true);
+  }
+
+  _fileTitle(title) {
+    return Array.from(String(title || 'conversation').normalize('NFC').replace(/[^\p{L}\p{M}\p{N} -]/gu, '').trim())
+      .slice(0, 50).join('').trim().replace(/\s+/g, '_') || 'conversation';
+  }
+
   async showOptionsPanel() {
+    if (!(await this._requireKey())) return;
     const options = await this._getOptions();
     const radio = (name, value, label, current) => `
       <label class="lisa-opt"><input type="radio" name="${name}" value="${value}" ${current === value ? 'checked' : ''}> ${label}</label>`;
@@ -1019,6 +913,7 @@ class LISAFloatingButton {
   // Tick individual messages, then save or check just those. The selection is
   // for this conversation only; it starts from the Include option.
   async showMessagePicker() {
+    if (!(await this._requireKey())) return;
     const panel = this._openPanel('lisa-pick-panel', `
       <div class="lisa-panel-title">☑ Choose messages</div>
       <div class="lisa-pick-bar"><span class="lisa-pick-count">Loading messages…</span></div>`);
@@ -1349,6 +1244,10 @@ class LISAFloatingButton {
         }
       });
 
+      if (response && response.code === 'LIBRARY_FULL') {
+        this._downloadInstead(md, `${this._fileTitle(title)}-lisa-${platform}.md`, 'text/markdown');
+        return;
+      }
       if (response && response.success) {
         this.showToast("✅ Markdown saved to library!");
         if (usedFallbackCapture) {
@@ -1417,6 +1316,11 @@ class LISAFloatingButton {
         }
       });
       
+      if (response?.code === 'LIBRARY_FULL') {
+        this._downloadInstead(lisaV.map(b => JSON.stringify(b)).join('\n'),
+          `${this._fileTitle(title || parser.getSmartTitle())}-lisa-${parser.detectPlatform()}.jsonl`, 'application/jsonl');
+        return;
+      }
       if (response?.success) {
         const countLabel = stats.apiMessageCount != null
           ? stats.apiMessageCount + " messages, " + stats.totalBlocks + " blocks"

@@ -1261,6 +1261,20 @@ const hasher = new LISAHasher();
 // AUTO-SNAPSHOT MANAGER
 // ============================================
 
+// Free library size (Amar, 2026-10-25): local features are unlimited, the library
+// holds 25 conversations until the user adds a key (a free key, by email, unlocks it).
+const LISA_FREE_LIBRARY_LIMIT = 25;
+
+// A key in Settings: any valid key (a free PAYG key counts, whatever its balance).
+async function lisaHasKey() {
+  try {
+    const r = await chrome.storage.sync.get(['licenseKey', 'userTier', 'isPayg']);
+    return !!r.licenseKey && (r.userTier === 'premium' || r.isPayg === true);
+  } catch (_) {
+    return false;
+  }
+}
+
 class SnapshotManager {
   constructor() {
     this.MAX_SNAPSHOTS = 200;
@@ -1311,12 +1325,7 @@ class SnapshotManager {
   }
 
   async decrementFreePool() {
-    const data = await chrome.storage.sync.get(['usageStats']);
-    const stats = data.usageStats || {};
-    if (typeof stats.lifetimeFreePool === 'number' && stats.lifetimeFreePool > 0) {
-      stats.lifetimeFreePool--;
-      await chrome.storage.sync.set({ usageStats: stats });
-    }
+    // The welcome pool is gone: local saves are free and unlimited (2026-10-25).
   }
 
   async saveSnapshot(conversation, source = 'auto') {
@@ -1327,6 +1336,18 @@ class SnapshotManager {
 
       // Check if this is an update to existing conversation (same URL)
       const existing = index.find(s => s.url === conversation.url && s.source === source);
+
+      // Without a key the library holds LISA_FREE_LIBRARY_LIMIT conversations. A new
+      // version of a conversation already saved is always allowed, and nothing is
+      // ever deleted to make room.
+      if (!existing) {
+        const conversations = new Set(index.map(s => s.rootId || s.id));
+        if (conversations.size >= LISA_FREE_LIBRARY_LIMIT && !(await lisaHasKey())) {
+          const full = new Error(`Your library is full: ${LISA_FREE_LIBRARY_LIMIT} conversations without a key. Get a free key in Settings to keep more. Nothing was deleted.`);
+          full.code = 'LIBRARY_FULL';
+          throw full;
+        }
+      }
 
       const msgs = conversation.messages || [];
       // Resolve format once — single source of truth for top-level and capture
@@ -1886,7 +1907,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
       } catch (error) {
         console.error('[LISA] Extract and save error:', error);
-        sendResponse({ success: false, error: error.message });
+        sendResponse({ success: false, error: error.message, code: error.code });
       }
     })();
     return true; // Keep channel open for async
@@ -1912,7 +1933,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true, snapshot: saved });
       } catch (error) {
         console.error("[LISA] LISA-V save error:", error);
-        sendResponse({ success: false, error: error.message });
+        sendResponse({ success: false, error: error.message, code: error.code });
       }
     })();
     return true;
@@ -2053,6 +2074,7 @@ chrome.runtime.setUninstallURL("https://forms.gle/2Vu8M8NQYP6eKBnR9");
 // (the popup inserts it as text); each line needs its entry in the language files.
 const LISA_CHANGELOG = {
   '0.53.2': [
+    'Everything LISA does on your computer is now free and unlimited: no daily cap',
     'Star a message (☆ next to it in the chat): it stays word for word in compressed exports and Handoff',
     'LISA in your language: Settings → Interface language',
     'Export & compress straight from the floating button',

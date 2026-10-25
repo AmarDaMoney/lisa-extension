@@ -18,8 +18,8 @@ Una sola clave y un solo saldo de créditos para la extensión, LISA Nexus (bibl
 Tu biblioteca se queda en tu navegador. Un texto solo sale de él cuando eliges una función en línea (compresión con IA, sincronización con LISA Nexus, Inference Shield).
 
 💰 PRECIOS
-• Gratis: 100 compresiones para empezar, luego 5 al día, en las 12 plataformas.
-• Clave gratuita: 50 créditos para las funciones en línea.
+• Gratis: todo lo que LISA hace en tu ordenador (guardar, comprimir, transferir, puntos de control, estrellas ☆), sin límite, en las 12 plataformas, con una biblioteca de 25 conversaciones.
+• Clave gratuita (por correo): biblioteca ilimitada, Elegir mensajes y Opciones, y 50 créditos para las funciones de IA.
 • Pago por uso: 100 créditos por 1 $. Los créditos no caducan.
 • Pro: 9,99 $ al mes.
 Detalles: nexus.sat-chain.com/pricing

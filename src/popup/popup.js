@@ -179,21 +179,7 @@ class LISAPopup {
   }
 
   async updateUsageStats(type, limitCheck) {
-    // Free allowances only count free use: Premium (incl. PAYG with
-    // credits) is uncapped, and an action already paid for with a credit
-    // must not also eat the welcome pool / daily count.
-    if (this.userTier === 'premium' || (limitCheck && limitCheck.credits)) return;
-    // Decrement welcome pool first, then count daily
-    if (this.usageStats.lifetimeFreePool > 0) {
-      this.usageStats.lifetimeFreePool--;
-    } else if (type === 'export') {
-      this.usageStats.exportsToday++;
-    } else if (type === 'import') {
-      this.usageStats.importsToday++;
-    } else if (type === 'compress') {
-      this.usageStats.compressToday = (this.usageStats.compressToday || 0) + 1;
-    }
-    await chrome.storage.sync.set({ usageStats: this.usageStats });
+    // Local actions are no longer counted (see checkUsageLimits).
   }
 
   // What a /api/validate-license answer means. Single source of truth for
@@ -260,69 +246,10 @@ class LISAPopup {
   }
 
   async checkUsageLimits(type) {
-    // PAYG key: Premium features while credits last, but every metered
-    // action costs 1 credit — so this runs before the premium shortcut
-    // (which used to let PAYG keys through for free, uncharged). Out of
-    // credits (or server unreachable) → the normal free rules below.
-    if (this.isPayg) {
-      if (type === 'export' && this.userTier === 'premium') return { allowed: true };
-      if (type !== 'export' && await this._chargePaygCredit()) {
-        this.loadCreditBalance();
-        return { allowed: true, credits: true };
-      }
-    } else if (this.userTier === 'premium') {
-      return { allowed: true };
-    }
-
-    // Welcome pool: 100 free compressions, then 5/day
-    const pool = this.usageStats.lifetimeFreePool ?? 0;
-    if (pool > 0) {
-      return { allowed: true, remaining: pool, pool: true };
-    }
-
-    // PAYG credit check — same identifier resolution as checkFloatingLimit()
-    // in lisa-floating-button.js. 'export' (Download JSON) and Save to
-    // Library (same 'export' type/counter) are plain output steps — the
-    // actual compression work already happened and was already charged (or
-    // not) when Compress ran, so neither spends a second credit here. Only
-    // 'compress' (Compress to LISA JSON, which does the real work) is
-    // PAYG-eligible, same as md/lisav/handoff.
-    if (type !== 'export' && !this.isPayg) { // PAYG keys were already charged (or found empty) above
-      try {
-        // One atomic call: the server debits only if the balance covers it.
-        const headers = await this._creditAuthHeaders();
-        if (headers) {
-          const dedResp = await fetch(`${LISA_API_ORIGIN}/api/credits/deduct`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ source: 'extension' })
-          });
-          const ded = dedResp.ok ? await dedResp.json() : null;
-          if (ded && ded.success === true) {
-            this.loadCreditBalance();
-            return { allowed: true, credits: true };
-          }
-        }
-      } catch (e) {
-        console.debug('[LISA] PAYG credit check failed:', e);
-      }
-    }
-
-    const limits = {
-      export: { max: 5, current: this.usageStats.exportsToday },
-      import: { max: 5, current: this.usageStats.importsToday },
-      compress: { max: 5, current: this.usageStats.compressToday || 0 }
-    };
-    const limit = limits[type];
-    if (limit.current >= limit.max) {
-      return {
-        allowed: false,
-        message: `You've used your 100 welcome compressions and today's ${limit.max} daily. PAYG credits or Premium keeps you going — uncapped, across every device.`,
-        current: limit.current,
-        max: limit.max
-      };
-    }
-    return { allowed: true, remaining: limit.max - limit.current };
+    // Everything that runs in the browser is free and unlimited (Amar, 2026-10-25):
+    // no welcome pool, no daily cap, no credit per action. Credits pay only for AI
+    // (AI Compress, LISA Nexus, Inference Shield), charged by the backend itself.
+    return { allowed: true };
   }
 
   async loadUserTier() {
@@ -396,24 +323,6 @@ class LISAPopup {
       if (upgradeHeaderFree) upgradeHeaderFree.innerHTML = '🚀 Never lose a thread';
       const upgradeDescFree = document.querySelector('#freeUpgradeSection .settings-desc');
       if (upgradeDescFree) upgradeDescFree.textContent = 'Keep every conversation across every device — with nothing capped.';
-      // Show remaining exports for free users
-      const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
-      const exportBtn = document.getElementById('exportBtn');
-      const saveToLibraryBtn = document.getElementById('saveToLibraryBtn');
-      
-      if (exportBtn && remaining > 0) {
-        exportBtn.textContent = `Export Conversation (${remaining} left)`;
-      } else if (exportBtn && remaining <= 0) {
-        exportBtn.textContent = `Export Conversation (limit reached)`;
-        exportBtn.disabled = true;
-      }
-      
-      if (saveToLibraryBtn && remaining > 0) {
-        saveToLibraryBtn.textContent = `💾 Save to Library (${remaining} left)`;
-      } else if (saveToLibraryBtn && remaining <= 0) {
-        saveToLibraryBtn.textContent = `💾 Save to Library (limit reached)`;
-        saveToLibraryBtn.disabled = true;
-      }
     }
   }
 
@@ -1335,11 +1244,6 @@ class LISAPopup {
         await this.updateUsageStats('compress', limitCheck);
         this.setupUI(); // Refresh button texts with new count
 
-        if (this.userTier === 'free') {
-          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - (this.usageStats.compressToday || 0);
-          const poolActive = (this.usageStats.lifetimeFreePool ?? 0) > 0;
-          this.updatePlatformStatus(`${remaining} ${poolActive ? 'welcome credits' : 'free compressions'} remaining`, true);
-        }
 
         this.hideLoading();
       } else {
@@ -1693,12 +1597,6 @@ class LISAPopup {
           hasHash: !!this.compressedData.lisaHash 
         });
         
-        // Show remaining exports for free users
-        if (this.userTier === 'free') {
-          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
-            const poolActive = (this.usageStats.lifetimeFreePool ?? 0) > 0;
-            this.updatePlatformStatus(`${remaining} ${poolActive ? 'welcome credits' : 'free exports'} remaining`, true);
-        }
       }
     });
   }
@@ -1750,12 +1648,6 @@ class LISAPopup {
         this.updatePlatformStatus('✅ Saved to library!', true);
         this.loadSnapshots();
 
-        // Show remaining exports for free users
-        if (this.userTier === 'free') {
-          const remaining = (this.usageStats.lifetimeFreePool ?? 0) > 0 ? this.usageStats.lifetimeFreePool : 5 - this.usageStats.exportsToday;
-          const poolActive = (this.usageStats.lifetimeFreePool ?? 0) > 0;
-          this.updatePlatformStatus(`✅ Saved! ${remaining} ${poolActive ? 'welcome credits' : 'free exports'} remaining`, true);
-        }
       } else {
         this.showError(response?.error || 'Failed to save');
       }

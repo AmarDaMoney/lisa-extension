@@ -18,8 +18,8 @@ Une seule clé et un seul solde de crédits pour l'extension, LISA Nexus (biblio
 Votre bibliothèque reste dans votre navigateur. Un texte n'en sort que si vous choisissez une fonction en ligne (compression par IA, synchronisation avec LISA Nexus, Inference Shield).
 
 💰 TARIFS
-• Gratuit : 100 compressions pour commencer, puis 5 par jour, sur les 12 plateformes.
-• Clé gratuite : 50 crédits pour les fonctions en ligne.
+• Gratuit : tout ce que LISA fait sur votre ordinateur (sauvegardes, compression, transfert, points d'étape, étoiles ☆), sans limite, sur les 12 plateformes, avec une bibliothèque de 25 conversations.
+• Clé gratuite (par e-mail) : bibliothèque illimitée, Choisir les messages et Options, et 50 crédits pour les fonctions IA.
 • Paiement à l'usage : 100 crédits pour 1 $. Les crédits n'expirent jamais.
 • Pro : 9,99 $ par mois.
 Détails : nexus.sat-chain.com/pricing

@@ -13,11 +13,12 @@ LISA turns conversations into structured files that work on any AI platform. Inj
 
 Never re-explain your project to an AI again.
 
-Install LISA, open an AI chat, click the LISA button, and hand the file to a different AI. The first time it picks up where you left off, you'll get it. Every new install starts with 100 free compressions.
+Install LISA, open an AI chat, click the LISA button, and hand the file to a different AI. The first time it picks up where you left off, you'll get it. Everything LISA does on your computer is free and unlimited.
 
 🔹🔹🔹
 
 ⚡ NEW in v0.53.2
+• Everything LISA does on your computer is now free and unlimited: no daily cap. A free key (by email) adds an unlimited library, Choose messages and Options, and 50 credits for AI features.
 • Star a message: hover any message in the chat and click ☆. Starring your question keeps the AI's answer too. Starred messages stay word for word when LISA compresses or hands off the conversation.
 • LISA in your language: English, French, Spanish, German, Arabic, Russian, Chinese, Japanese and Korean (Settings → Interface language).
 • Export & compress straight from the floating button.
@@ -128,10 +129,11 @@ LISA targets 10 kinds of conversational ambiguity: referential, temporal, priori
 💰 PRICING (one key across the LISA Suite)
 
 FREE
-• 100 free compressions to start, then 5 a day
+• Unlimited saves, compression, Handoff, checkpoints and ☆ stars, on all 12 platforms
+• A library of 25 conversations in your browser
 • All 12 platforms, local library, in-browser language analysis
 • Right-click Copy as LISA Context
-• Get a key: 50 free credits for online features (LISA Nexus, Inference Shield)
+• Free key (by email): unlimited library, Choose messages and Options, and 50 credits for AI features (AI Compress, LISA Nexus, Inference Shield)
 
 PAY AS YOU GO: no subscription, credits never expire
 💳 100 credits $1 • 500 credits $4 • 1,000 credits $7

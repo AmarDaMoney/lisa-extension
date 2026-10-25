@@ -13,6 +13,6 @@ Paste after 0.53.2 is approved (the texts describe the ☆ stars and the interfa
 Developer Dashboard → LISA → **Store listing** → language menu at the top of the page → pick the language → paste
 the description → Save draft → repeat for each language → Submit for review.
 
-Facts in the texts (keep them true): 12 platforms; free = 100 compressions to start, then 5 a day (extension);
-free key = 50 credits; 100 credits = $1, credits never expire; Pro $9.99/month. Machine-written: a native speaker
+Facts in the texts (keep them true): 12 platforms; everything local is free and unlimited, library of 25
+conversations without a key; free key (email) = unlimited library + Choose messages + Options + 50 credits for AI; 100 credits = $1, credits never expire; Pro $9.99/month. Machine-written: a native speaker
 should read each one when possible. When a fact changes, change `en.txt` and every translation.

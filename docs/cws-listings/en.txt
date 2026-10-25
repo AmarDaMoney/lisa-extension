@@ -18,8 +18,8 @@ One key and one credit balance for the extension, LISA Nexus (web library and AI
 Your library stays in your browser. Text leaves it only when you choose an online feature (AI compression, sync to LISA Nexus, Inference Shield).
 
 💰 PRICING
-• Free: 100 compressions to start, then 5 a day, on all 12 platforms.
-• Free key: 50 credits for online features.
+• Free: everything LISA does on your computer (saves, compression, Handoff, checkpoints, ☆ stars), unlimited, on all 12 platforms, with a library of 25 conversations.
+• Free key (by email): unlimited library, Choose messages and Options, and 50 credits for AI features.
 • Pay as you go: 100 credits for $1. Credits never expire.
 • Pro: $9.99 a month.
 Details: nexus.sat-chain.com/pricing

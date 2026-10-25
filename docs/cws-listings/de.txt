@@ -18,8 +18,8 @@ Ein Schlüssel und ein Guthaben für die Erweiterung, LISA Nexus (Web-Bibliothek
 Deine Bibliothek bleibt in deinem Browser. Text verlässt ihn nur, wenn du eine Online-Funktion wählst (KI-Komprimierung, Synchronisierung mit LISA Nexus, Inference Shield).
 
 💰 PREISE
-• Kostenlos: 100 Komprimierungen zum Start, danach 5 pro Tag, auf allen 12 Plattformen.
-• Kostenloser Schlüssel: 50 Credits für Online-Funktionen.
+• Kostenlos: alles, was LISA auf deinem Computer tut (Speichern, Komprimieren, Übergabe, Checkpoints, ☆ Sterne), unbegrenzt, auf allen 12 Plattformen, mit einer Bibliothek für 25 Unterhaltungen.
+• Kostenloser Schlüssel (per E-Mail): unbegrenzte Bibliothek, Nachrichten auswählen und Optionen sowie 50 Credits für KI-Funktionen.
 • Nach Verbrauch: 100 Credits für 1 $. Credits verfallen nie.
 • Pro: 9,99 $ pro Monat.
 Details: nexus.sat-chain.com/pricing

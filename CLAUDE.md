@@ -138,6 +138,16 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   A new or changed English UI text needs its entry in each language file, or it shows in English. Mark user
   content `data-lisa-no-translate` (conversation titles). Adding a language: copy fr.js, add it to popup.html, the service worker's `importScripts`
   and before lisa-floating-button.js in every manifest entry.
+- **Free model (Amar, 2026-10-25; ships in 0.53.2):** everything that runs in the browser is free and unlimited
+  (Markdown, LISA-V, local compression, Handoff, checkpoints, ☆): `checkUsageLimits` (popup) and `checkFloatingLimit`
+  (FAB) always allow, nothing counts (`updateUsageStats`, `incrementFloatingLimit`, `decrementFreePool` are no-ops;
+  the old 100 welcome pool / 5 a day / 1 credit per local action are gone). Credits pay only for AI (AI Compress,
+  Nexus, Shield), charged by the backend. **Without a key** (no `licenseKey` with `isPayg` or `userTier: premium`):
+  the library holds 25 conversations (`LISA_FREE_LIBRARY_LIMIT`, `lisaHasKey()` in service-worker.js; a new version of
+  a saved conversation is always allowed; nothing is ever deleted; a full library throws `LIBRARY_FULL` and the FAB
+  downloads the file instead), and Choose messages / Options open a "Free key needed" panel (`_requireKey()` in the
+  FAB, link https://shield.sat-chain.com/app#get-key). Any valid key unlocks both, whatever its balance. Backend side:
+  a key at 0 credits keeps the free Nexus compression (1 a day).
 - **0.53.2 upload:** store text `docs/CWS_DESCRIPTION_0.53.2.txt` (the "NEW in v0.53.2" section on top). Package = manifest.json +
   `src/` + `public/` + `_locales/` only (never server/, eval/, docs/, node_modules/). After upload, fast-forward `main` to the branch.
   Store name and summary are localized from 0.53.2: manifest `__MSG_extName__` / `__MSG_extDescription__`,

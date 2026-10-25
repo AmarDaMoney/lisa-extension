@@ -787,8 +787,10 @@ class LISAFloatingButton {
 
   // The message under `node`, found by its text: the largest element around it that
   // holds exactly one message of the conversation (a short message whose text also
-  // appears inside a longer one doesn't count against the longer one).
-  async _inlineStarTargetByText(node) {
+  // appears inside a longer one doesn't count against the longer one) and is really
+  // on screen under the pointer (x, y): layout-only wrappers (display: contents)
+  // have no box and would put the star in the corner.
+  async _inlineStarTargetByText(node, x, y) {
     const msgs = await this._inlineStarMessages();
     if (!msgs || !msgs.length || !node) return null;
     const norm = (t) => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
@@ -803,6 +805,8 @@ class LISAFloatingButton {
       if (hits.length === 0) continue;
       if (hits.length > 1) break;
       if (best && best.msg !== hits[0].m) break;
+      const r = el.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8 || x < r.left - 4 || x > r.right + 4 || y < r.top - 4 || y > r.bottom + 4) continue;
       best = { el, role: hits[0].m.role, msg: hits[0].m };
     }
     return best;
@@ -842,7 +846,7 @@ class LISAFloatingButton {
     const place = () => {
       if (!current || !document.contains(current.el)) { btn.style.display = 'none'; current = null; return; }
       const r = current.el.getBoundingClientRect();
-      if (r.bottom < 0 || r.top > innerHeight) { btn.style.display = 'none'; return; }
+      if (r.width < 8 || r.height < 8 || r.bottom < 0 || r.top > innerHeight) { btn.style.display = 'none'; return; }
       btn.style.top = Math.max(4, r.top + 4) + 'px';
       btn.style.left = Math.min(innerWidth - 34, r.right + 6 <= innerWidth - 34 ? r.right + 6 : r.right - 34) + 'px';
       btn.style.display = 'block';
@@ -880,9 +884,9 @@ class LISAFloatingButton {
       if (byText && !(current && current.el.contains(e.target))) {
         // No platform markup to go by (ChatGPT): find the message by its text.
         clearTimeout(textTimer);
-        const node = e.target;
+        const node = e.target, x = e.clientX, y = e.clientY;
         textTimer = setTimeout(async () => {
-          const m = await this._inlineStarTargetByText(node);
+          const m = await this._inlineStarTargetByText(node, x, y);
           if (m) { clearTimeout(hideTimer); if (!current || current.el !== m.el) show(m); }
         }, 120);
       }

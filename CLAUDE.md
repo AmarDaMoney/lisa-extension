@@ -116,7 +116,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   in exports, since exports read the same API). The same text finder serves Claude Code and Perplexity (API
   capture, no usable markup); the other platforms use page selectors from their parsers. Growing a found message's
   box stops at the first box holding any other message's text. Only an element with a box under the pointer counts
-  (ChatGPT's display:contents wrappers put the star at 0,0 before). A box taller than 85% of the window never counts
+  (ChatGPT's display:contents wrappers put the star at 0,0 before). A message found by its text is often a full-width row, so the star is placed by the box of its text (30 px right of it), not the row (Claude Code: it sat at the window's far edge, 2026-10-25). A box taller than 85% of the window never counts
   (Claude Code: a whole panel once held "one message" and the star sat over its close button); pointing at a
   button/link outside the message or clicking anywhere else hides the star. Mistral, Copilot, HuggingChat, Meta AI, Poe, Claude Code and Perplexity: stand-in tests only (2026-10-25),
   need a live check. Gemini capture strips its screen-reader labels ("You said", "Gemini said",

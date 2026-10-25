@@ -772,12 +772,29 @@ class LISAFloatingButton {
     // (checked per hover: claude.ai moves between chats and Claude Code without a reload)
     const byText = () => /chatgpt\.com|perplexity\.ai/.test(location.hostname) ||
       (location.hostname.includes('claude.ai') && location.pathname.startsWith('/code/'));
+    // A message found by its text can be a full-width row (Claude Code: the star sat at the
+    // window's far edge, away from the bubble): place it by the box of the text itself.
+    const textBox = (el) => {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      let top = Infinity, left = Infinity, right = -Infinity, bottom = -Infinity;
+      for (let n = walker.nextNode(), i = 0; n && i < 400; n = walker.nextNode(), i++) {
+        if (!n.nodeValue.trim() || (n.parentElement && n.parentElement.closest('button, [role="button"]'))) continue;
+        range.selectNodeContents(n);
+        const b = range.getBoundingClientRect();
+        if (b.width < 1 || b.height < 1) continue;
+        top = Math.min(top, b.top); left = Math.min(left, b.left);
+        right = Math.max(right, b.right); bottom = Math.max(bottom, b.bottom);
+      }
+      return right > left ? { top, left, right, bottom, width: right - left, height: bottom - top } : el.getBoundingClientRect();
+    };
     const place = () => {
       if (!current || !document.contains(current.el)) { btn.style.display = 'none'; current = null; return; }
-      const r = current.el.getBoundingClientRect();
+      const r = current.msg ? textBox(current.el) : current.el.getBoundingClientRect();
       if (r.width < 8 || r.height < 8 || r.bottom < 0 || r.top > innerHeight) { btn.style.display = 'none'; return; }
       btn.style.top = Math.max(4, r.top + 4) + 'px';
-      btn.style.left = Math.min(innerWidth - 34, r.right + 6 <= innerWidth - 34 ? r.right + 6 : r.right - 34) + 'px';
+      const gap = current.msg ? 30 : 6;
+      btn.style.left = Math.min(innerWidth - 34, r.right + gap <= innerWidth - 34 ? r.right + gap : r.right - 34) + 'px';
       btn.style.display = 'block';
     };
     const show = async (target) => {

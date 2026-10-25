@@ -104,19 +104,23 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   the popup copies the checkpoint prompt and lists Handoff targets itself); panels anchor via `_anchorRect()` when
   the button is hidden. The checkpoint prompt (`_checkpointPrompt()`, one copy) asks for the conversation's
   language with the section labels kept in English (checkpoint-detect.js reads them).
-  **Stars** (★ in "Choose messages"): kept word for word in compressed exports (`buildLeanExport` option
+  **Stars** (★ in "Choose messages"; right-click a selection → "⭐ Keep this message word for word" (service worker
+  `star-message` menu → `lisaPageAction` `star-selection`, the FAB finds the message containing the text); "⭐ Keep
+  last AI reply" in the floating menu and the popup's "On this page"): kept word for word in compressed exports (`buildLeanExport` option
   `starredKeys`: `starred: true` on the message, or `starred_messages` when the turns don't line up, as with AI
   Compress) and in Handoff (`middle` entries of type `starred`). Stored per conversation in
   `chrome.storage.local` `lisa-stars-<conversationId>` as `lisaStarKey()` fingerprints (role + FNV-1a of the
-  whitespace-collapsed text; the FAB's `_starKey()` is an inline copy: keep them identical).
-  **Interface languages** (`src/shared/i18n.js` + one file per language in `src/shared/i18n/`, French first):
+  text's lowercase letters and digits only, so formatting never changes it; the FAB's `_starKey()` is an inline copy: keep them identical).
+  **Interface languages** (`src/shared/i18n.js` + one file per language in `src/shared/i18n/`: fr, es, de,
+  ar, ru, zh, ja, he, ko; ar and he are right-to-left via `LISA_RTL_LANGUAGES`; machine-written, a native speaker
+  should review each before it is advertised):
   texts are keyed by their English wording (whitespace collapsed) plus regex `patterns` for texts with numbers;
   nothing in popup.js or the FAB calls a translate function. The popup (`popup-i18n.js`) translates the whole
   page as it appears and changes (MutationObserver) and wraps alert/confirm; content scripts translate only
   LISA's own elements (`lisaWatchOwn`: `#lisa-floating-btn` and `.lisa-*` children of body), never the chat
   page. Setting: Settings → Interface language (`uiLanguage` in chrome.storage.sync: auto = browser language).
   A new or changed English UI text needs its entry in each language file, or it shows in English. Mark user
-  content `data-lisa-no-translate` (conversation titles). Adding a language: copy fr.js, add it to popup.html
+  content `data-lisa-no-translate` (conversation titles). Adding a language: copy fr.js, add it to popup.html, the service worker's `importScripts`
   and before lisa-floating-button.js in every manifest entry.
 - **0.53.1 (submitted to the CWS, in review as of 2026-10-23; the next change bumps to 0.53.2):** 0.53.1 = compressed
   export fixes (system notices labelled, assistant changes kept, compound entities, checkpoint sections parsed

@@ -56,6 +56,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -78,6 +83,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -100,6 +110,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -121,6 +136,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -142,6 +162,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -163,6 +188,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -184,6 +214,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -207,6 +242,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -239,6 +279,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -260,6 +305,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -281,6 +331,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -302,6 +357,11 @@
         "src/shared/i18n/es.js",
         "src/shared/i18n/de.js",
         "src/shared/i18n/ar.js",
+        "src/shared/i18n/ru.js",
+        "src/shared/i18n/zh.js",
+        "src/shared/i18n/ja.js",
+        "src/shared/i18n/he.js",
+        "src/shared/i18n/ko.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"

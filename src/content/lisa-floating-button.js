@@ -766,45 +766,44 @@ class LISAFloatingButton {
     btn.type = 'button';
     btn.className = 'lisa-inline-star';
     document.body.appendChild(btn);
-    let current = null, hideTimer = null, textTimer = null;
+    let current = null, hideTimer = null;
     // Platforms whose page has no reliable message markup but whose API LISA reads:
     // the message under the pointer is found by its text.
     // (checked per hover: claude.ai moves between chats and Claude Code without a reload)
     const byText = () => /chatgpt\.com|perplexity\.ai/.test(location.hostname) ||
       (location.hostname.includes('claude.ai') && location.pathname.startsWith('/code/'));
-    // A message found by its text can be a full-width row (Claude Code: the star sat at the
-    // window's far edge, away from the bubble): place it by the box of the text itself.
+    // The star is placed by the box of the message's text, never by its container's: a
+    // container can be a full-width row (Claude Code: the star sat at the window's far edge)
+    // or an inline element whose box is elsewhere (Gemini: the star sat far to the left).
     const textBox = (el) => {
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       const range = document.createRange();
       let top = Infinity, left = Infinity, right = -Infinity, bottom = -Infinity;
       for (let n = walker.nextNode(), i = 0; n && i < 400; n = walker.nextNode(), i++) {
-        if (!n.nodeValue.trim() || (n.parentElement && n.parentElement.closest('button, [role="button"]'))) continue;
+        if (!n.nodeValue.trim() || (n.parentElement && n.parentElement.closest('button, [role="button"], .sr-only, .cdk-visually-hidden'))) continue;
         range.selectNodeContents(n);
         const b = range.getBoundingClientRect();
-        if (b.width < 1 || b.height < 1) continue;
+        if (b.width < 2 || b.height < 2) continue;
         top = Math.min(top, b.top); left = Math.min(left, b.left);
         right = Math.max(right, b.right); bottom = Math.max(bottom, b.bottom);
       }
       return right > left ? { top, left, right, bottom, width: right - left, height: bottom - top } : el.getBoundingClientRect();
     };
-    // The ☆ shows when the pointer is near the top of a message (a question or an answer;
-    // a starred question also keeps the AI's answer right after it) and sits at that
-    // message's top right corner. It never sticks to the window: when that corner scrolls
-    // out of view the star goes away, and after a scroll it is shown again only if the
-    // pointer is still at the top of a message.
-    const boxOf = (t) => (t.msg ? textBox(t.el) : t.el.getBoundingClientRect());
-    const TOP_ZONE = 80;
-    const nearTop = (r, y) => y >= r.top - 8 && y <= r.top + TOP_ZONE;
+    // The ☆ shows while the pointer is anywhere on a message (a question or an answer; a
+    // starred question also keeps the AI's answer right after it) or on the star, and sits
+    // at that message's top right corner. It never sticks to the window: when that corner
+    // scrolls out of view the star goes away, and after a scroll the element under the
+    // pointer is checked again.
     const place = () => {
       if (!current || !document.contains(current.el)) { btn.style.display = 'none'; current = null; return; }
-      const r = boxOf(current);
+      const r = textBox(current.el);
       if (r.width < 8 || r.height < 8 || r.top < 0 || r.top > innerHeight - 30) { btn.style.display = 'none'; return; }
       btn.style.top = Math.round(r.top) + 'px';
-      const gap = current.msg ? 30 : 6;
-      btn.style.left = Math.min(innerWidth - 34, r.right + gap <= innerWidth - 34 ? r.right + gap : r.right - 34) + 'px';
+      btn.style.left = Math.min(innerWidth - 34, r.right + 30 <= innerWidth - 34 ? r.right + 30 : r.right - 34) + 'px';
       btn.style.display = 'block';
     };
+    let placeFrame = 0;
+    const placeSoon = () => { if (!placeFrame) placeFrame = requestAnimationFrame(() => { placeFrame = 0; place(); }); };
     const show = async (target) => {
       if (!this._starStorageKey()) return;
       current = target;
@@ -827,46 +826,54 @@ class LISAFloatingButton {
     };
     const offTitle = (t) => (t.role === 'user' ? "Keep this question and the AI's answer word for word in compressed exports and Handoff"
       : 'Keep this message word for word in compressed exports and Handoff');
-    const hideNow = () => { clearTimeout(hideTimer); btn.style.display = 'none'; current = null; };
-    const hideSoon = () => { clearTimeout(hideTimer); hideTimer = setTimeout(hideNow, 600); };
-    let textHit = null;
+    const hideNow = () => { clearTimeout(hideTimer); hideTimer = null; btn.style.display = 'none'; current = null; };
+    const hideSoon = () => { if (!hideTimer) hideTimer = setTimeout(() => { hideTimer = null; hideNow(); }, 1000); };
+    const keep = () => { clearTimeout(hideTimer); hideTimer = null; };
+    // Text-matched platforms: what each hovered element turned out to be is remembered
+    // (WeakMap, 15 s), so moving over a message searches once, not on every pause.
+    const textFound = new WeakMap();
+    let textSearching = null;
     const consider = (node, x, y) => {
       if (!node || node.nodeType !== 1) return;
-      if (node === btn) { clearTimeout(hideTimer); return; }
+      if (node === btn) { keep(); return; }
       if (current && node.closest('button, a, [role="button"], input, textarea, select') && !current.el.contains(node)) { hideNow(); return; }
-      // Inside the message, the star stays only while the pointer is near its top.
-      if (current && current.el.contains(node)) { if (nearTop(boxOf(current), y)) clearTimeout(hideTimer); else hideSoon(); return; }
+      if (current && current.el.contains(node)) { keep(); return; }
       const t = this._inlineStarTarget(node);
-      if (t) {
-        if (nearTop(t.el.getBoundingClientRect(), y)) { clearTimeout(hideTimer); show(t); return; }
-      } else if (byText()) {
-        // No platform markup to go by: find the message by its text.
-        // (the last element's answer is kept, so moving within it doesn't search again)
-        clearTimeout(textTimer);
-        textTimer = setTimeout(async () => {
-          let m = textHit && textHit.node === node && Date.now() - textHit.at < 5000 ? textHit.m : undefined;
-          if (m === undefined) { m = await this._inlineStarTargetByText(node, x, y); textHit = { node, m, at: Date.now() }; }
-          if (m && nearTop(textBox(m.el), y) && (!current || current.el !== m.el)) { clearTimeout(hideTimer); show(m); }
-        }, 120);
+      if (t) { keep(); show(t); return; }
+      if (byText()) {
+        const hit = textFound.get(node);
+        if (hit && Date.now() - hit.at < 15000) {
+          if (hit.m && document.contains(hit.m.el)) { keep(); if (!current || current.el !== hit.m.el) show(hit.m); return; }
+        } else if (textSearching !== node) {
+          textSearching = node;
+          this._inlineStarTargetByText(node, x, y).then((m) => {
+            textFound.set(node, { m, at: Date.now() });
+            if (textSearching === node) textSearching = null;
+            // Shown only if the pointer is still on that element.
+            if (m && lastNode === node && (!current || current.el !== m.el)) { keep(); show(m); }
+          }, () => { if (textSearching === node) textSearching = null; });
+        }
       }
       if (current) hideSoon();
     };
     // The star never covers the page's own controls, and any click elsewhere puts it away.
     document.addEventListener('mousedown', (e) => { if (e.target !== btn && current) hideNow(); }, true);
-    let lastX = -1, lastY = -1, lastMove = 0, scrollTimer = null;
+    let lastX = -1, lastY = -1, lastMove = 0, lastNode = null, scrollTimer = null;
     document.addEventListener('mousemove', (e) => {
-      lastX = e.clientX; lastY = e.clientY;
+      lastX = e.clientX; lastY = e.clientY; lastNode = e.target;
       const now = Date.now();
-      if (now - lastMove < 60) return;
+      if (now - lastMove < 50) return;
       lastMove = now;
       consider(e.target, lastX, lastY);
     }, true);
+    if (byText()) setTimeout(() => this._inlineStarMessages(), 1500);
     addEventListener('scroll', () => {
-      place();
+      placeSoon();
       clearTimeout(scrollTimer);
       scrollTimer = setTimeout(() => {
         if (lastX < 0) return;
         const node = document.elementFromPoint(lastX, lastY);
+        lastNode = node;
         if (current && (!node || (node !== btn && !current.el.contains(node)))) hideNow();
         consider(node, lastX, lastY);
       }, 150);

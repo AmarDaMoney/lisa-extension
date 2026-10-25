@@ -105,10 +105,14 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   the button is hidden. The checkpoint prompt (`_checkpointPrompt()`, one copy) asks for the conversation's
   language with the section labels kept in English (checkpoint-detect.js reads them).
   **Inline ☆** (all 12 platforms; `setupInlineStars()` in the FAB): questions and answers (a starred question
-  keeps the AI's answer after it). Pointing within the top 80 px of a message (`TOP_ZONE`, mousemove, throttled) shows
-  one LISA-owned button in <body> at the message's top right corner (the chat's own elements are never changed). It shows only while
-  the pointer stays in that top zone (or on the star) and never sticks to the window: when the message's top leaves the screen it hides, and 150 ms after a scroll the element under the pointer is checked again
-  (Amar 2026-10-25: before, the star clamped to the top of the window while scrolling and jumped between messages);
+  keeps the AI's answer after it). Pointing anywhere on a message (mousemove, throttled 50 ms) shows one LISA-owned
+  button in <body> at the top right corner of the message's *text* (`textBox`: union of its text nodes, never the
+  container's box: Claude Code's full-width rows put it at the window edge, Gemini's answer container far to the left),
+  the chat's own elements never changed. It stays while the pointer is on the message or the star and hides 1 s after
+  it leaves; it never sticks to the window: when the message's top leaves the screen it hides, and 150 ms after a
+  scroll the element under the pointer is checked again (Amar 2026-10-25, after trying a top-80-px-only zone: it felt
+  like hunting for the star). Text-matched platforms remember each hovered element's message (WeakMap, 15 s) and
+  search while the pointer moves (no wait for a pause); the API messages are prefetched 1.5 s after load.
   `_inlineStarTarget()` holds the per-platform selectors. It stores a probe `p:<u|a>:<letters and digits of the
   message's first paragraph>` (max 120): a message is starred when the role matches and its text contains the probe
   (`_isStarred()` in the FAB = `lisaStarredIndexes()` in export-builders.js; keep identical). Selectors confirmed on

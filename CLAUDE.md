@@ -104,8 +104,12 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   the popup copies the checkpoint prompt and lists Handoff targets itself); panels anchor via `_anchorRect()` when
   the button is hidden. The checkpoint prompt (`_checkpointPrompt()`, one copy) asks for the conversation's
   language with the section labels kept in English (checkpoint-detect.js reads them).
-  **Inline ☆** (all 12 platforms; `setupInlineStars()` in the FAB): hovering a message
-  shows one LISA-owned button in <body> placed over it (the chat's own elements are never changed);
+  **Inline ☆** (all 12 platforms; `setupInlineStars()` in the FAB): on the user's questions only (a starred
+  question keeps the AI's answer after it; an answer alone is starred by right-click or in Choose messages). Pointing
+  within the top 80 px of a question (`TOP_ZONE`, mousemove, throttled) shows one LISA-owned button in <body> at the
+  question's top right corner (the chat's own elements are never changed). It never sticks to the window: when the
+  question's top leaves the screen it hides, and 150 ms after a scroll the element under the pointer is checked again
+  (Amar 2026-10-25: before, the star clamped to the top of the window while scrolling and jumped between messages);
   `_inlineStarTarget()` holds the per-platform selectors. It stores a probe `p:<u|a>:<letters and digits of the
   message's first paragraph>` (max 120): a message is starred when the role matches and its text contains the probe
   (`_isStarred()` in the FAB = `lisaStarredIndexes()` in export-builders.js; keep identical). Selectors confirmed on

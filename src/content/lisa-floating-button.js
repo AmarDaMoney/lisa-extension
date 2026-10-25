@@ -788,11 +788,19 @@ class LISAFloatingButton {
       }
       return right > left ? { top, left, right, bottom, width: right - left, height: bottom - top } : el.getBoundingClientRect();
     };
+    // The ☆ belongs to the user's questions only (a starred question also keeps the AI's
+    // answer right after it), shows when the pointer is near the top of the question, and
+    // sits at the question's top right corner. It never sticks to the window: when that
+    // corner scrolls out of view the star goes away, and after a scroll it is shown again
+    // only if the pointer is still at the top of a question.
+    const boxOf = (t) => (t.msg ? textBox(t.el) : t.el.getBoundingClientRect());
+    const TOP_ZONE = 80;
+    const nearTop = (r, y) => y >= r.top - 8 && y <= r.top + TOP_ZONE;
     const place = () => {
       if (!current || !document.contains(current.el)) { btn.style.display = 'none'; current = null; return; }
-      const r = current.msg ? textBox(current.el) : current.el.getBoundingClientRect();
-      if (r.width < 8 || r.height < 8 || r.bottom < 0 || r.top > innerHeight) { btn.style.display = 'none'; return; }
-      btn.style.top = Math.max(4, r.top + 4) + 'px';
+      const r = boxOf(current);
+      if (r.width < 8 || r.height < 8 || r.top < 0 || r.top > innerHeight - 30) { btn.style.display = 'none'; return; }
+      btn.style.top = Math.round(r.top) + 'px';
       const gap = current.msg ? 30 : 6;
       btn.style.left = Math.min(innerWidth - 34, r.right + gap <= innerWidth - 34 ? r.right + gap : r.right - 34) + 'px';
       btn.style.display = 'block';
@@ -810,43 +818,57 @@ class LISAFloatingButton {
         if (probe.length < 3) { current = null; btn.style.display = 'none'; return; }
         const stars = await this._getStars();
         if (current !== target) return;
-        on = stars.has('p:' + (target.role === 'user' ? 'u' : 'a') + ':' + probe) || this._isStarred({ role: target.role, content: text }, stars);
+        on = stars.has('p:u:' + probe) || this._isStarred({ role: 'user', content: text }, stars);
       }
       btn.classList.toggle('on', on);
       btn.textContent = on ? '★' : '☆';
       btn.title = on ? 'Starred: kept word for word. Click to remove the star.'
-        : target.role === 'user' ? "Keep this question and the AI's answer word for word in compressed exports and Handoff"
-        : 'Keep this message word for word in compressed exports and Handoff';
+        : "Keep this question and the AI's answer word for word in compressed exports and Handoff";
       place();
     };
     const hideNow = () => { clearTimeout(hideTimer); btn.style.display = 'none'; current = null; };
-    // The star never covers the page's own controls, and any click elsewhere puts it away.
-    document.addEventListener('mousedown', (e) => { if (e.target !== btn && current) hideNow(); }, true);
-    document.addEventListener('mouseover', (e) => {
-      if (e.target === btn) { clearTimeout(hideTimer); return; }
-      if (current && e.target.closest && e.target.closest('button, a, [role="button"], input, textarea, select')
-          && !current.el.contains(e.target)) { hideNow(); return; }
-      const t = this._inlineStarTarget(e.target);
+    const hideSoon = () => { clearTimeout(hideTimer); hideTimer = setTimeout(hideNow, 600); };
+    let textHit = null;
+    const consider = (node, x, y) => {
+      if (!node || node.nodeType !== 1) return;
+      if (node === btn) { clearTimeout(hideTimer); return; }
+      if (current && node.closest('button, a, [role="button"], input, textarea, select') && !current.el.contains(node)) { hideNow(); return; }
+      if (current && current.el.contains(node)) { clearTimeout(hideTimer); return; }
+      const t = this._inlineStarTarget(node);
       if (t) {
-        clearTimeout(hideTimer);
-        if (!current || current.el !== t.el) show(t);
-        return;
-      }
-      if (byText() && !(current && current.el.contains(e.target))) {
+        if (t.role === 'user' && nearTop(t.el.getBoundingClientRect(), y)) { clearTimeout(hideTimer); show(t); return; }
+      } else if (byText()) {
         // No platform markup to go by: find the message by its text.
+        // (the last element's answer is kept, so moving within it doesn't search again)
         clearTimeout(textTimer);
-        const node = e.target, x = e.clientX, y = e.clientY;
         textTimer = setTimeout(async () => {
-          const m = await this._inlineStarTargetByText(node, x, y);
-          if (m) { clearTimeout(hideTimer); if (!current || current.el !== m.el) show(m); }
+          let m = textHit && textHit.node === node && Date.now() - textHit.at < 5000 ? textHit.m : undefined;
+          if (m === undefined) { m = await this._inlineStarTargetByText(node, x, y); textHit = { node, m, at: Date.now() }; }
+          if (m && m.role === 'user' && nearTop(textBox(m.el), y) && (!current || current.el !== m.el)) { clearTimeout(hideTimer); show(m); }
         }, 120);
       }
-      if (current && !current.el.contains(e.target)) {
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => { btn.style.display = 'none'; current = null; }, 600);
-      }
+      if (current) hideSoon();
+    };
+    // The star never covers the page's own controls, and any click elsewhere puts it away.
+    document.addEventListener('mousedown', (e) => { if (e.target !== btn && current) hideNow(); }, true);
+    let lastX = -1, lastY = -1, lastMove = 0, scrollTimer = null;
+    document.addEventListener('mousemove', (e) => {
+      lastX = e.clientX; lastY = e.clientY;
+      const now = Date.now();
+      if (now - lastMove < 60) return;
+      lastMove = now;
+      consider(e.target, lastX, lastY);
     }, true);
-    addEventListener('scroll', place, true);
+    addEventListener('scroll', () => {
+      place();
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        if (lastX < 0) return;
+        const node = document.elementFromPoint(lastX, lastY);
+        if (current && (!node || (node !== btn && !current.el.contains(node)))) hideNow();
+        consider(node, lastX, lastY);
+      }, 150);
+    }, true);
     addEventListener('resize', place);
     btn.addEventListener('click', async (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -859,7 +881,7 @@ class LISAFloatingButton {
         if (!(await this._setStars(stars))) { this.showToast('Could not save the star', true); return; }
         btn.classList.toggle('on', on);
         btn.textContent = on ? '★' : '☆';
-        btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : 'Keep this message word for word in compressed exports and Handoff';
+        btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : "Keep this question and the AI's answer word for word in compressed exports and Handoff";
         this.showToast(on ? '⭐ Kept word for word in compressed exports and Handoff' : 'Star removed');
         return;
       }
@@ -872,7 +894,7 @@ class LISAFloatingButton {
       if (!(await this._setStars(stars))) { this.showToast('Could not save the star', true); return; }
       btn.classList.toggle('on', on);
       btn.textContent = on ? '★' : '☆';
-      btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : 'Keep this message word for word in compressed exports and Handoff';
+      btn.title = on ? 'Starred: kept word for word. Click to remove the star.' : "Keep this question and the AI's answer word for word in compressed exports and Handoff";
       this.showToast(on ? '⭐ Kept word for word in compressed exports and Handoff' : 'Star removed');
     });
   }

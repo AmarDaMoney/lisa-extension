@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "LISA - AI Chat Exporter for Claude, ChatGPT & More",
+    "description": "Extension name in the Chrome Web Store and chrome://extensions (max 75)"
+  },
+  "extDescription": {
+    "message": "Export, compress, save and hand off AI chats across 12 platforms. One key and credit balance with LISA Nexus and Inference Shield.",
+    "description": "Store summary (max 132)"
+  }
+}

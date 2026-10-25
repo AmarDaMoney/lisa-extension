@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "LISA - Claude, ChatGPT 등 AI 채팅 내보내기",
+    "description": "Extension name in the Chrome Web Store and chrome://extensions (max 75)"
+  },
+  "extDescription": {
+    "message": "12개 플랫폼의 AI 채팅을 내보내고 압축하고 저장하고 넘기세요. LISA Nexus, Inference Shield와 키 하나, 잔액 하나.",
+    "description": "Store summary (max 132)"
+  }
+}

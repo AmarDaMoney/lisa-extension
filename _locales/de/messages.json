@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "LISA - KI-Chats exportieren: Claude, ChatGPT und mehr",
+    "description": "Extension name in the Chrome Web Store and chrome://extensions (max 75)"
+  },
+  "extDescription": {
+    "message": "KI-Chats auf 12 Plattformen exportieren, komprimieren, speichern und übergeben. Ein Schlüssel für LISA Nexus und Inference Shield.",
+    "description": "Store summary (max 132)"
+  }
+}

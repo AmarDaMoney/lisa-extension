@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "LISA - Claude、ChatGPT 等 AI 聊天导出工具",
+    "description": "Extension name in the Chrome Web Store and chrome://extensions (max 75)"
+  },
+  "extDescription": {
+    "message": "在 12 个平台上导出、压缩、保存并交接 AI 聊天。与 LISA Nexus 和 Inference Shield 共用一个密钥和余额。",
+    "description": "Store summary (max 132)"
+  }
+}

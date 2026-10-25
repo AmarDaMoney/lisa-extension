@@ -1,0 +1,29 @@
+LISA sauvegarde vos conversations avec l'IA et vous permet de les poursuivre où vous voulez.
+
+Fonctionne sur 12 plateformes d'IA : Claude, ChatGPT, Gemini, Grok, Mistral, DeepSeek, Copilot, Perplexity, HuggingChat, Meta AI, Poe et Claude Code.
+
+✨ CE QUE VOUS POUVEZ FAIRE
+• Sauvegarder n'importe quelle conversation en Markdown lisible, ou en fichier LISA avec des empreintes d'intégrité qui montrent si elle a été modifiée depuis.
+• Compresser les longues conversations : le début et la fin restent mot pour mot, le milieu est condensé à l'essentiel (décisions, questions ouvertes, code, règles).
+• Transférer une conversation vers une nouvelle session ou une autre IA, qui reprend là où vous vous étiez arrêté.
+• Étoiler les messages importants : survolez un message et cliquez sur ☆. Un message étoilé, et la réponse à une question étoilée, restent mot pour mot.
+• Faire un point d'étape (checkpoint) dans une longue discussion : LISA demande à l'IA de résumer les décisions, les questions ouvertes et les contraintes, dans la langue de la conversation.
+• Choisir quoi sauvegarder : toute la conversation, seulement vos messages, seulement les réponses de l'IA, ou les messages que vous cochez.
+• Garder une bibliothèque dans votre navigateur et injecter une conversation sauvegardée dans n'importe quel chat.
+
+🧩 LA SUITE LISA
+Une seule clé et un seul solde de crédits pour l'extension, LISA Nexus (bibliothèque web et compression par IA) et Inference Shield (vérifie si un texte révèle votre technologie avant que vous le publiiez).
+
+🔒 CONFIDENTIALITÉ
+Votre bibliothèque reste dans votre navigateur. Un texte n'en sort que si vous choisissez une fonction en ligne (compression par IA, synchronisation avec LISA Nexus, Inference Shield).
+
+💰 TARIFS
+• Gratuit : 100 compressions pour commencer, puis 5 par jour, sur les 12 plateformes.
+• Clé gratuite : 50 crédits pour les fonctions en ligne.
+• Paiement à l'usage : 100 crédits pour 1 $. Les crédits n'expirent jamais.
+• Pro : 9,99 $ par mois.
+Détails : nexus.sat-chain.com/pricing
+
+🌐 L'interface est disponible en anglais, français, espagnol, allemand, arabe, russe, chinois, japonais et coréen.
+
+LISA est développé par SAT-CHAIN LLC.

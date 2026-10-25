@@ -139,7 +139,10 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   content `data-lisa-no-translate` (conversation titles). Adding a language: copy fr.js, add it to popup.html, the service worker's `importScripts`
   and before lisa-floating-button.js in every manifest entry.
 - **0.53.2 upload:** store text `docs/CWS_DESCRIPTION_0.53.2.txt` (the "NEW in v0.53.2" section on top). Package = manifest.json +
-  `src/` + `public/` only (never server/, eval/, docs/, node_modules/). After upload, fast-forward `main` to the branch.
+  `src/` + `public/` + `_locales/` only (never server/, eval/, docs/, node_modules/). After upload, fast-forward `main` to the branch.
+  Store name and summary are localized from 0.53.2: manifest `__MSG_extName__` / `__MSG_extDescription__`,
+  `_locales/<lang>/messages.json` (en, fr, es, de, ar, ru, zh_CN, ja, ko; 75 / 132 characters). Localized store
+  descriptions: `docs/cws-listings/` (README = paste steps).
 - **"What's new" after an update:** `LISA_CHANGELOG` in service-worker.js, keyed by exact version; a version without
   a list shows nothing (until 0.53.2 one stale hard-coded list showed on every minor update). Write the list for the
   version you ship; each line needs its entry in the language files. The "vX available" banner reads the backend's

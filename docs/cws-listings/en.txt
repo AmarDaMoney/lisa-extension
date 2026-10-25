@@ -1,0 +1,29 @@
+LISA saves your AI conversations and lets you continue them anywhere.
+
+Works on 12 AI platforms: Claude, ChatGPT, Gemini, Grok, Mistral, DeepSeek, Copilot, Perplexity, HuggingChat, Meta AI, Poe and Claude Code.
+
+✨ WHAT YOU CAN DO
+• Save any conversation as readable Markdown, or as a LISA file with integrity hashes that show whether it was changed later.
+• Compress long conversations: the beginning and the end stay word for word, the middle is condensed to what matters (decisions, open questions, code, rules).
+• Hand off a conversation to a fresh session or to another AI, which picks up where you left off.
+• Star the messages that matter: hover a message and click ☆. A starred message, and the answer to a starred question, stay word for word.
+• Checkpoint a long chat: LISA asks the AI to sum up decisions, open questions and constraints, in your conversation's language.
+• Choose what to save: the whole conversation, only your messages, only the AI's replies, or the messages you tick.
+• Keep a library in your browser and inject a saved conversation into any chat.
+
+🧩 THE LISA SUITE
+One key and one credit balance for the extension, LISA Nexus (web library and AI compression) and Inference Shield (checks whether a text reveals your technology before you publish it).
+
+🔒 PRIVACY
+Your library stays in your browser. Text leaves it only when you choose an online feature (AI compression, sync to LISA Nexus, Inference Shield).
+
+💰 PRICING
+• Free: 100 compressions to start, then 5 a day, on all 12 platforms.
+• Free key: 50 credits for online features.
+• Pay as you go: 100 credits for $1. Credits never expire.
+• Pro: $9.99 a month.
+Details: nexus.sat-chain.com/pricing
+
+🌐 The interface is available in English, French, Spanish, German, Arabic, Russian, Chinese, Japanese and Korean.
+
+LISA is made by SAT-CHAIN LLC.

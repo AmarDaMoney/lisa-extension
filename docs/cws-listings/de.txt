@@ -1,0 +1,29 @@
+LISA speichert deine KI-Unterhaltungen und lässt dich sie überall fortsetzen.
+
+Funktioniert auf 12 KI-Plattformen: Claude, ChatGPT, Gemini, Grok, Mistral, DeepSeek, Copilot, Perplexity, HuggingChat, Meta AI, Poe und Claude Code.
+
+✨ WAS DU TUN KANNST
+• Jede Unterhaltung als lesbares Markdown speichern, oder als LISA-Datei mit Integritäts-Hashes, die zeigen, ob sie später verändert wurde.
+• Lange Unterhaltungen komprimieren: Anfang und Ende bleiben wörtlich erhalten, die Mitte wird auf das Wesentliche verdichtet (Entscheidungen, offene Fragen, Code, Regeln).
+• Eine Unterhaltung an eine neue Sitzung oder eine andere KI übergeben, die dort weitermacht, wo du aufgehört hast.
+• Wichtige Nachrichten markieren: Zeige auf eine Nachricht und klicke auf ☆. Eine markierte Nachricht, und die Antwort auf eine markierte Frage, bleiben wörtlich erhalten.
+• Checkpoint in einem langen Chat: LISA bittet die KI, Entscheidungen, offene Fragen und Vorgaben zusammenzufassen, in der Sprache der Unterhaltung.
+• Auswählen, was gespeichert wird: die ganze Unterhaltung, nur deine Nachrichten, nur die Antworten der KI oder die Nachrichten, die du ankreuzt.
+• Eine Bibliothek in deinem Browser führen und eine gespeicherte Unterhaltung in jeden Chat einfügen.
+
+🧩 DIE LISA SUITE
+Ein Schlüssel und ein Guthaben für die Erweiterung, LISA Nexus (Web-Bibliothek und KI-Komprimierung) und Inference Shield (prüft, ob ein Text deine Technologie verrät, bevor du ihn veröffentlichst).
+
+🔒 DATENSCHUTZ
+Deine Bibliothek bleibt in deinem Browser. Text verlässt ihn nur, wenn du eine Online-Funktion wählst (KI-Komprimierung, Synchronisierung mit LISA Nexus, Inference Shield).
+
+💰 PREISE
+• Kostenlos: 100 Komprimierungen zum Start, danach 5 pro Tag, auf allen 12 Plattformen.
+• Kostenloser Schlüssel: 50 Credits für Online-Funktionen.
+• Nach Verbrauch: 100 Credits für 1 $. Credits verfallen nie.
+• Pro: 9,99 $ pro Monat.
+Details: nexus.sat-chain.com/pricing
+
+🌐 Die Oberfläche gibt es auf Englisch, Französisch, Spanisch, Deutsch, Arabisch, Russisch, Chinesisch, Japanisch und Koreanisch.
+
+LISA wird von SAT-CHAIN LLC entwickelt.

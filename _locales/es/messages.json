@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "LISA - Exporta chats de IA de Claude, ChatGPT y más",
+    "description": "Extension name in the Chrome Web Store and chrome://extensions (max 75)"
+  },
+  "extDescription": {
+    "message": "Exporta, comprime, guarda y transfiere chats de IA en 12 plataformas. Una clave y un saldo con LISA Nexus e Inference Shield.",
+    "description": "Store summary (max 132)"
+  }
+}

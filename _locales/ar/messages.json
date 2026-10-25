@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "LISA - تصدير محادثات الذكاء الاصطناعي من Claude وChatGPT وغيرها",
+    "description": "Extension name in the Chrome Web Store and chrome://extensions (max 75)"
+  },
+  "extDescription": {
+    "message": "صدّر محادثات الذكاء الاصطناعي واضغطها واحفظها وانقلها عبر 12 منصة. مفتاح واحد ورصيد واحد مع LISA Nexus وInference Shield.",
+    "description": "Store summary (max 132)"
+  }
+}

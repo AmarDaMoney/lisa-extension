@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "LISA - Claude・ChatGPT などの AI チャットをエクスポート",
+    "description": "Extension name in the Chrome Web Store and chrome://extensions (max 75)"
+  },
+  "extDescription": {
+    "message": "12 のプラットフォームで AI チャットをエクスポート・圧縮・保存・引き継ぎ。LISA Nexus と Inference Shield で同じキーと残高を利用。",
+    "description": "Store summary (max 132)"
+  }
+}

@@ -1,0 +1,29 @@
+LISA guarda tus conversaciones con la IA y te permite continuarlas donde quieras.
+
+Funciona en 12 plataformas de IA: Claude, ChatGPT, Gemini, Grok, Mistral, DeepSeek, Copilot, Perplexity, HuggingChat, Meta AI, Poe y Claude Code.
+
+✨ QUÉ PUEDES HACER
+• Guardar cualquier conversación en Markdown legible, o como archivo LISA con huellas de integridad que muestran si se modificó después.
+• Comprimir conversaciones largas: el principio y el final se conservan palabra por palabra, y el medio se condensa en lo importante (decisiones, preguntas abiertas, código, reglas).
+• Transferir una conversación a una sesión nueva o a otra IA, que continúa donde lo dejaste.
+• Marcar con estrella los mensajes importantes: pasa el ratón sobre un mensaje y haz clic en ☆. Un mensaje con estrella, y la respuesta a una pregunta con estrella, se conservan palabra por palabra.
+• Crear un punto de control en una conversación larga: LISA pide a la IA que resuma las decisiones, las preguntas abiertas y las restricciones, en el idioma de la conversación.
+• Elegir qué guardar: toda la conversación, solo tus mensajes, solo las respuestas de la IA, o los mensajes que marques.
+• Tener una biblioteca en tu navegador e insertar una conversación guardada en cualquier chat.
+
+🧩 LA SUITE LISA
+Una sola clave y un solo saldo de créditos para la extensión, LISA Nexus (biblioteca web y compresión con IA) e Inference Shield (comprueba si un texto revela tu tecnología antes de publicarlo).
+
+🔒 PRIVACIDAD
+Tu biblioteca se queda en tu navegador. Un texto solo sale de él cuando eliges una función en línea (compresión con IA, sincronización con LISA Nexus, Inference Shield).
+
+💰 PRECIOS
+• Gratis: 100 compresiones para empezar, luego 5 al día, en las 12 plataformas.
+• Clave gratuita: 50 créditos para las funciones en línea.
+• Pago por uso: 100 créditos por 1 $. Los créditos no caducan.
+• Pro: 9,99 $ al mes.
+Detalles: nexus.sat-chain.com/pricing
+
+🌐 La interfaz está disponible en inglés, francés, español, alemán, árabe, ruso, chino, japonés y coreano.
+
+LISA es un producto de SAT-CHAIN LLC.

@@ -363,6 +363,10 @@ remembered as elements (`window.__lisaMistralStale`, a WeakSet; `lisaMistralCurr
 `extractMistralMessages`), never as a count, and never all skipped. Until 2026-10-25 a count was taken; Mistral now
 replaces the old messages, so the count skipped the new conversation's own (exports and Markdown found 0 messages;
 also in 0.53.1). A new chat getting its id (/chat → /chat/<id>) has no stale messages.
+Code blocks: Mistral's `pre` carries a `code-block` class inside a wrapper, so the wrapper and the code both
+match `parseMessageContent`'s code selector. Replacing the second one (already off the page) threw
+"reading 'replaceChild'" and the whole capture returned 0 messages (live console, 2026-10-25). Elements no longer
+in the clone are skipped, and the code text comes from the `pre`/`code` inside (no language label or Copy text).
 
 ### Grok capture (grok.com)
 API-first via `window.__LISA_GROK_API_CAPTURE` in `src/content/grok-parser.js`
@@ -419,10 +423,6 @@ unimplemented. `acm_getStatus` in `service-worker.js` has a handler but
 no caller. Leave as-is unless picking them up deliberately.
 
 ## Roadmap / parked ideas
-
-- **Mistral code blocks are not captured** (Amar, 2026-10-25): needs the live markup of a Mistral code block
-  (select text inside one, run the ancestor-outline console line). Converter and parser handle `pre`/`code`,
-  so Mistral likely renders code another way.
 
 - **MCP Memory Server** (`lisa-web-backend/lisa_mcp.py`, guide in
   `MCP_SETUP.md` there) — early access. Next: public package (`uvx lisa-mcp`),

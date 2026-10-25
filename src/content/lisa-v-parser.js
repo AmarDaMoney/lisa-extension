@@ -129,8 +129,14 @@ class LisaVParser {
       const codeEls = [...clone.querySelectorAll(codeSelector)];
       for (let i = 0; i < codeEls.length; i++) {
         const cb = codeEls[i];
+        // A wrapper and the code inside it can both match (Mistral): once the wrapper
+        // is replaced, the inner one is off the page; replacing it again threw and
+        // lost the whole capture (0 messages).
+        if (!clone.contains(cb)) continue;
+        // The code's own text: not the wrapper's language label or Copy button.
+        const codeEl = cb.matches('pre, code') ? cb : (cb.querySelector('pre code, pre, code') || cb);
         const codeTextEl = cb.querySelector('[data-code-text]');
-        const codeContent = cb.textContent.trim() || (codeTextEl && codeTextEl.getAttribute('data-code-text')) || '';
+        const codeContent = codeEl.textContent.trim() || (codeTextEl && codeTextEl.getAttribute('data-code-text')) || '';
         if (codeContent && codeContent.length >= 25) {
           extractedCode.push({
             marker: '%%LISA_CODE_' + i + '%%',
@@ -143,9 +149,10 @@ class LisaVParser {
             }
           });
           // Replace code element with placeholder text node
-          const container = cb.closest('pre') || cb;
+          const pre = cb.closest('pre');
+          const container = pre && clone.contains(pre) ? pre : cb;
           const placeholder = document.createTextNode('%%LISA_CODE_' + i + '%%');
-          container.parentNode.replaceChild(placeholder, container);
+          if (container.parentNode) container.parentNode.replaceChild(placeholder, container);
         } else {
           // Small code — remove so converter handles it as inline
           const container = cb.closest('pre') || cb;

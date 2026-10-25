@@ -24,6 +24,10 @@ class LISAFloatingButton {
     // hideFloatingButton the wrong way round.
     try {
       chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.action === 'lisaPageAction') {
+          this._runPageAction(request).then(sendResponse, (e) => sendResponse({ error: String(e && e.message || e) }));
+          return true;
+        }
         if (request.action !== 'toggleFloatingButton') return false;
         if (this.button) {
           this.removeButton();
@@ -336,6 +340,11 @@ class LISAFloatingButton {
       .lisa-menu-item:hover {
         background: #3b82f6;
       }
+      .lisa-menu-item.lisa-menu-export {
+        font-weight: 600;
+        border-bottom: 1px solid #333;
+        margin-bottom: 4px;
+      }
       .lisa-scope-note {
         padding: 5px 16px;
         font-size: 11px;
@@ -556,7 +565,8 @@ class LISAFloatingButton {
       }
       if (!action) return;
       menu.remove();
-      if (action === "save-md") this.saveAsMarkdown();
+      if (action === "export") await this.openExportInPopup();
+      else if (action === "save-md") this.saveAsMarkdown();
       else if (action === "save-lisav") this.saveLisaV();
       else if (action === "checkpoint") await this.contextCheckpoint();
       else if (action === "inference-shield") await this.checkWithInferenceShield();
@@ -595,13 +605,20 @@ class LISAFloatingButton {
     return this._pageOptions;
   }
 
+  // Where the floating button is, or would be when the user hid it (actions can
+  // run from the popup's "On this page" section): panels open in the same corner.
+  _anchorRect() {
+    if (this.button) return this.button.getBoundingClientRect();
+    return { top: window.innerHeight - 64, right: window.innerWidth - 24 };
+  }
+
   // A panel anchored to the floating button, replacing the menu (Options, Choose messages).
   _openPanel(className, html) {
     document.querySelectorAll('.lisa-action-menu, .lisa-fab-panel').forEach(el => el.remove());
     const panel = document.createElement('div');
     panel.className = `lisa-fab-panel ${className}`;
     panel.innerHTML = html;
-    const btn = this.button.getBoundingClientRect();
+    const btn = this._anchorRect();
     panel.style.cssText = `
       position: fixed;
       bottom: ${window.innerHeight - btn.top + 10}px;
@@ -776,6 +793,7 @@ class LISAFloatingButton {
   _buildMenuItems(acmStatus) {
     const gated = acmStatus && acmStatus.conversationId;
     return `
+      <div class="lisa-menu-item lisa-menu-export" data-action="export" title="Open LISA to export this conversation and compress it, locally or with AI">📤 Export &amp; compress…</div>
       <div class="lisa-menu-section-label">Save</div>
       <div class="lisa-menu-item" data-action="save-md" title="Human-readable markdown — full conversation as formatted text">📋 Markdown</div>
       <div class="lisa-menu-item" data-action="save-lisav" title="Structured JSONL with integrity hashes — best for AI handoff and continuation">📝 LISA-Verbatim</div>
@@ -1058,8 +1076,49 @@ class LISAFloatingButton {
     }
   }
 
-  async contextCheckpoint() {
-    const checkpointPrompt = `Quick context checkpoint — I need you to summarize where we are right now. Cover the entire conversation if no previous checkpoints were asked for. Reply in this thread — don't re-summarize what any previous checkpoint already covered. Use this exact format:
+  // Export & compress happens in the popup (it shows each step and the results).
+  // The service worker opens it and leaves it a note to start the export; where
+  // Chrome won't open it from a page, the note waits a minute for a toolbar click.
+  async openExportInPopup() {
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: 'openPopupForExport' });
+      if (!resp || !resp.opened) {
+        this.showToast('Click the LISA icon in your browser toolbar: the export starts there.', false, 6000);
+      }
+    } catch (_) {
+      this.showToast('Click the LISA icon in your browser toolbar to export.', false, 6000);
+    }
+  }
+
+  // The floating button's actions, asked for by the popup's "On this page"
+  // section, so hiding the button loses nothing. The popup copies the checkpoint
+  // prompt itself (a page can't write the clipboard while the popup has focus)
+  // and lists Handoff destinations itself.
+  async _runPageAction({ which, platform, url }) {
+    switch (which) {
+      case 'save-md': this.saveAsMarkdown(); return { ok: true };
+      case 'save-lisav': this.saveLisaV(); return { ok: true };
+      case 'inference-shield': await this.checkWithInferenceShield(); return { ok: true };
+      case 'pick': await this.showMessagePicker(); return { ok: true };
+      case 'options': await this.showOptionsPanel(); return { ok: true };
+      case 'checkpoint-prompt': return { ok: true, prompt: this._checkpointPrompt() };
+      case 'handoff-targets': {
+        const acm = window.__lisaACM;
+        if (!acm) return { ok: false, error: 'Handoff is not available on this page' };
+        const current = acm._detectPlatform();
+        const targets = await acm.getHandoffTargets();
+        return { ok: true, current, currentUrl: acm.NEW_CHAT_URLS[current], targets };
+      }
+      case 'handoff': await this._executeHandoff(platform, url); return { ok: true };
+      default: return { ok: false, error: 'Unknown action' };
+    }
+  }
+
+  // The checkpoint request, also copied by the popup ("On this page"). The section
+  // labels stay in English whatever the conversation's language: checkpoint-detect.js
+  // finds the reply by them.
+  _checkpointPrompt() {
+    return `Quick context checkpoint — I need you to summarize where we are right now. Cover the entire conversation if no previous checkpoints were asked for. Reply in this thread — don't re-summarize what any previous checkpoint already covered. Use this exact format:
 
 CURRENT STATE: [1-2 lines on what's true right now — what's been built/decided/tried]
 OBJECTIVE: [1 line — the overall goal we're working toward]
@@ -1070,8 +1129,13 @@ CONSTRAINTS: [list rules, requirements, or things to remember]
 KEY CONTEXT: [the 3-5 most important points from our conversation]
 NEXT: [1-3 lines — the concrete next step(s) to pick up with]
 
-Keep it tight — this is for continuity, not a report. Only include what matters for picking up where we left off.`;
+Write the content in the language of this conversation (not necessarily English), but keep the section labels exactly as written above, in English and in capitals.
 
+Keep it tight — this is for continuity, not a report. Only include what matters for picking up where we left off.`;
+  }
+
+  async contextCheckpoint() {
+    const checkpointPrompt = this._checkpointPrompt();
     try {
       await navigator.clipboard.writeText(checkpointPrompt);
 

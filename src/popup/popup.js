@@ -21,8 +21,10 @@ class LISAPopup {
     await this.loadUserTier();
     await this.loadUsageStats();
     this.setupUI();
-    this.detectPlatform();
+    await this.detectPlatform();
     this.setupEventListeners();
+    this.setupPageActions();
+    this.startPendingExport();
     this.loadSnapshots();
     this.checkForUpdates();
     this.checkWhatsNew();
@@ -450,6 +452,8 @@ class LISAPopup {
 
       this.updatePlatformStatus(`✅ ${platform} detected`, true);
       document.getElementById('extractBtn').disabled = false;
+      this.activeTabId = tab.id;
+      this.showPageActions = platform !== 'Web Page (Universal)';
 
       // Quick language detection from page sample
       this.detectLanguageFromPage(tab.id);
@@ -457,6 +461,93 @@ class LISAPopup {
       console.error('[LISA] Platform detection error:', error);
       this.updatePlatformStatus('Error detecting platform', false);
     }
+  }
+
+  // "On this page": the floating button's actions, run in the page by the button's
+  // own code (content script). Open by default when the user hid the button.
+  async setupPageActions() {
+    const section = document.getElementById('pageActions');
+    if (!section || !this.showPageActions || !this.activeTabId) return;
+    section.style.display = 'block';
+    try {
+      const { hideFloatingButton } = await chrome.storage.sync.get(['hideFloatingButton']);
+      if (hideFloatingButton) section.open = true;
+    } catch (_) {}
+    const status = document.getElementById('pageActionStatus');
+    const say = (text) => { status.textContent = text; };
+    const ask = async (msg) => {
+      try {
+        return await chrome.tabs.sendMessage(this.activeTabId, { action: 'lisaPageAction', ...msg });
+      } catch (_) {
+        return { ok: false, error: 'Reload the page, then try again.' };
+      }
+    };
+    section.querySelectorAll('[data-page-action]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const which = btn.dataset.pageAction;
+        say('');
+        if (which === 'checkpoint') {
+          const r = await ask({ which: 'checkpoint-prompt' });
+          if (!r || !r.prompt) return say((r && r.error) || 'Could not get the checkpoint request.');
+          try {
+            await navigator.clipboard.writeText(r.prompt);
+            say('Checkpoint request copied: paste it in the chat (Ctrl+V) and send. LISA keeps the reply.');
+          } catch (_) {
+            say('Could not copy to the clipboard.');
+          }
+          return;
+        }
+        if (which === 'handoff') return this.showHandoffTargets(ask, say);
+        const r = await ask({ which });
+        if (!r || !r.ok) return say((r && r.error) || 'That did not work on this page.');
+        // Panels open on the page: close the popup so they can be used.
+        if (which === 'pick' || which === 'inference-shield') window.close();
+        else say('Saving… the file downloads from the page.');
+      });
+    });
+  }
+
+  async showHandoffTargets(ask, say) {
+    const box = document.getElementById('handoffTargets');
+    if (box.style.display === 'grid') { box.style.display = 'none'; return; }
+    const r = await ask({ which: 'handoff-targets' });
+    if (!r || !r.ok) return say((r && r.error) || 'Handoff is not available on this page.');
+    const names = {
+      claude: 'Claude', chatgpt: 'ChatGPT', gemini: 'Gemini', grok: 'Grok', deepseek: 'DeepSeek',
+      mistral: 'Mistral', copilot: 'Copilot', perplexity: 'Perplexity', huggingchat: 'HuggingChat',
+      metaai: 'Meta AI', poe: 'Poe', claudecode: 'Claude Code'
+    };
+    const targets = [{ platform: r.current, url: r.currentUrl, label: `${names[r.current] || r.current} (fresh session)` }]
+      .concat((r.targets || []).map(t => ({ ...t, label: names[t.platform] || t.platform })));
+    const label = document.createElement('div');
+    label.className = 'targets-label';
+    label.textContent = 'Hand off to:';
+    box.replaceChildren(label);
+    targets.filter(t => t.url).forEach(t => {
+      const b = document.createElement('button');
+      b.textContent = t.label;
+      b.addEventListener('click', async () => {
+        say('Opening the new tab…');
+        const res = await ask({ which: 'handoff', platform: t.platform, url: t.url });
+        if (!res || !res.ok) return say((res && res.error) || 'Handoff did not start.');
+        window.close();
+      });
+      box.appendChild(b);
+    });
+    box.style.display = 'grid';
+  }
+
+  // "Export & compress…" in the floating button opened the popup: start the export.
+  async startPendingExport() {
+    try {
+      const { lisaPendingExport: p } = await chrome.storage.session.get('lisaPendingExport');
+      if (!p) return;
+      await chrome.storage.session.remove('lisaPendingExport');
+      if (p.tabId === this.activeTabId && Date.now() - p.at < 60000 &&
+          !document.getElementById('extractBtn').disabled) {
+        this.extractConversation();
+      }
+    } catch (_) { /* no session storage: nothing pending */ }
   }
 
   updatePlatformStatus(message, isActive) {
@@ -561,6 +652,9 @@ class LISAPopup {
           toggleBtn.textContent = resp.visible
             ? '💾 Hide Floating Button'
             : '💾 Show Floating Button';
+          // Hidden: its actions are here.
+          const pageActions = document.getElementById('pageActions');
+          if (!resp.visible && pageActions && pageActions.style.display !== 'none') pageActions.open = true;
         } catch (e) {
           toggleBtn.textContent = '❌ Refresh page first';
         }

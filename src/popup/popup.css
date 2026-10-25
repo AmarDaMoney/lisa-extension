@@ -1890,3 +1890,60 @@ input:checked + .toggle-slider:before {
 .acm-platform-option input[type="checkbox"] {
   accent-color: #6366f1;
 }
+
+/* "On this page": the floating button's actions in the popup */
+.page-actions {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.page-actions summary {
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.page-actions-hint {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
+.page-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0 10px 10px;
+}
+.page-action, .page-actions-targets button {
+  padding: 7px 8px;
+  font-size: 12px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.page-action:hover, .page-actions-targets button:hover {
+  border-color: var(--primary-color);
+}
+.page-actions-targets {
+  display: grid;
+  gap: 4px;
+  padding: 0 10px 10px;
+}
+.page-actions-targets .targets-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.page-actions-status {
+  padding: 0 10px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.page-actions-status:empty {
+  display: none;
+}

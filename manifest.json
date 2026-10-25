@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LISA - AI Chat Exporter for Claude, ChatGPT & More",
-  "version": "0.53.1",
+  "version": "0.53.2",
   "description": "Export, compress, save and hand off AI chats across 12 platforms. One key and credit balance with LISA Nexus and Inference Shield.",
   "permissions": [
     "storage",

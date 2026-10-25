@@ -25,7 +25,7 @@
         <span id="userTier" class="tier-badge">Free</span>
         <span id="creditBalance" class="tier-badge" style="display: none; background: var(--accent, #6366f1); cursor: pointer;" title="Your PAYG credit balance">💳 <span id="creditCount">0</span> credits</span>
         <button id="upgradeBtn" class="tier-badge upgrade-badge" style="display: none;">⭐ Keep my context</button>
-        <span class="version">v0.53.1</span>
+        <span class="version">v0.53.2</span>
       </div>
     </header>
 
@@ -48,6 +48,21 @@
       <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,0.5);padding:4px 2px 2px;">
         <span>💡 Tip: checkpoint on the page first (via LISA → Handoff) for higher-quality exports.</span>
       </div>
+
+      <!-- The floating button's actions, here too: hiding the button loses nothing -->
+      <details id="pageActions" class="page-actions" style="display: none;">
+        <summary>🧭 On this page <span class="page-actions-hint">the floating button's actions</span></summary>
+        <div class="page-actions-grid">
+          <button class="page-action" data-page-action="save-md" title="Save the conversation as readable Markdown">📋 Markdown</button>
+          <button class="page-action" data-page-action="save-lisav" title="Every word, with integrity hashes">📝 LISA-Verbatim</button>
+          <button class="page-action" data-page-action="checkpoint" title="Copy the checkpoint request, then paste it in the chat">🧠 Checkpoint</button>
+          <button class="page-action" data-page-action="handoff" title="Open a fresh session with this conversation">🔄 Handoff</button>
+          <button class="page-action" data-page-action="inference-shield" title="See what this conversation reveals before you share it">🛡 Inference Shield</button>
+          <button class="page-action" data-page-action="pick" title="Tick the messages to save or check">☑ Choose messages</button>
+        </div>
+        <div id="handoffTargets" class="page-actions-targets" style="display: none;"></div>
+        <p id="pageActionStatus" class="page-actions-status"></p>
+      </details>
 
       <div id="extractedInfo" class="info-box" style="display: none;">
         <p><strong>Messages:</strong> <span id="messageCount">0</span></p>

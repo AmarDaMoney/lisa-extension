@@ -67,6 +67,6 @@
     "enriched": true,
     "language": "en",
     "rtl": false,
-    "captureMethod": "unknown"
+    "captureMethod": "dom"
   }
 }

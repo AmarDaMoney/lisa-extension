@@ -620,7 +620,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.53.1',
+        lisaVersion: '0.53.2',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
@@ -939,7 +939,7 @@ class LISACompressor {
       platform:          conversation.platform || 'unknown',
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
-      generated_by:      'LISA v0.53.1',
+      generated_by:      'LISA v0.53.2',
       key_entities:    anchorEntities(this.extractEntities(allText).flatMap(e => e.values)),
       note:              'Lightweight anchor — raw verbatim format'
     };
@@ -997,7 +997,7 @@ class LISACompressor {
       key_entities:      anchorEntities([...entitySet]),
       session_intent:    sessionIntent,
       session_register:  register,
-      generated_by:      'LISA v0.53.1'
+      generated_by:      'LISA v0.53.2'
     };
     if (register === 'technical') {
       anchor.files_changed = sessionEvents.files_changed;
@@ -1512,6 +1512,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     sendResponse({ success: true });
     return false;
+  }
+
+  // "Export & compress…" in the floating button: the export runs in the popup.
+  // Leaves the popup a note (this tab, 60 s) and opens it; chrome.action.openPopup
+  // needs Chrome 127+ and a focused window, so the reply says whether it opened
+  // and the page tells the user to click the toolbar icon otherwise.
+  if (request.action === 'openPopupForExport') {
+    if (sender.id !== chrome.runtime.id || !sender.tab) {
+      sendResponse({ opened: false });
+      return false;
+    }
+    (async () => {
+      try {
+        await chrome.storage.session.set({ lisaPendingExport: { tabId: sender.tab.id, at: Date.now() } });
+      } catch (_) { /* session storage unavailable: the popup just won't auto-start */ }
+      let opened = false;
+      try {
+        if (chrome.action && chrome.action.openPopup) {
+          await chrome.action.openPopup({ windowId: sender.tab.windowId });
+          opened = true;
+        }
+      } catch (e) {
+        console.debug('[LISA] openPopup not available here:', e && e.message);
+      }
+      sendResponse({ opened });
+    })();
+    return true;
   }
 
   // Google sign-in token for content scripts (the floating button), which
@@ -2424,4 +2451,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
   aiPlatformTabs.delete(tabId);
 });
-console.debug('[LISA] Core compression engine initialized v0.53.1');
+console.debug('[LISA] Core compression engine initialized v0.53.2');

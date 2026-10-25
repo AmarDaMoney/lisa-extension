@@ -96,6 +96,14 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
 - **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.9 → stay on 0.53.0 until that ships).
+- **0.53.2 (in progress, not submitted; branch `claude/determined-carson-idcmgc`):** floating menu starts with
+  "📤 Export & compress…" (service worker `openPopupForExport`: leaves `lisaPendingExport` {tabId, at} in
+  `chrome.storage.session` and calls `chrome.action.openPopup`; the popup starts the export within 60 s, else the
+  page says "click the LISA icon"); popup section **"On this page"** (`#pageActions`) runs the floating button's
+  actions through `lisaPageAction` messages (open by default when the button is hidden, so hiding loses nothing;
+  the popup copies the checkpoint prompt and lists Handoff targets itself); panels anchor via `_anchorRect()` when
+  the button is hidden. The checkpoint prompt (`_checkpointPrompt()`, one copy) asks for the conversation's
+  language with the section labels kept in English (checkpoint-detect.js reads them).
 - **0.53.1 (submitted to the CWS, in review as of 2026-10-23; the next change bumps to 0.53.2):** 0.53.1 = compressed
   export fixes (system notices labelled, assistant changes kept, compound entities, checkpoint sections parsed
   into the anchor; see "Compressed export anchor" below).

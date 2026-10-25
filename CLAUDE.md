@@ -146,7 +146,9 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   the library holds 25 conversations (`LISA_FREE_LIBRARY_LIMIT`, `lisaHasKey()` in service-worker.js; a new version of
   a saved conversation is always allowed; nothing is ever deleted; a full library throws `LIBRARY_FULL` and the FAB
   downloads the file instead), and Choose messages / Options open a "Free key needed" panel (`_requireKey()` in the
-  FAB, link https://shield.sat-chain.com/app#get-key). Any valid key unlocks both, whatever its balance. Backend side:
+  FAB, link https://shield.sat-chain.com/app#get-key). Any valid key unlocks both, whatever its balance. **Early adopters** (updated from a version before 0.53.2:
+  `lisaMarkEarlyAdopter()` on `onInstalled` sets `lisaEarlyAdopter` in chrome.storage.sync) keep both without a key
+  (Amar, 2026-10-25: nobody who was there first loses anything). Backend side:
   a key at 0 credits keeps the free Nexus compression (1 a day).
 - **0.53.2 upload:** store text `docs/CWS_DESCRIPTION_0.53.2.txt` (the "NEW in v0.53.2" section on top). Package = manifest.json +
   `src/` + `public/` + `_locales/` only (never server/, eval/, docs/, node_modules/). After upload, fast-forward `main` to the branch.

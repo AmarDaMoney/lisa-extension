@@ -502,10 +502,12 @@ class LISAFloatingButton {
     return panel;
   }
 
-  // A key in Settings (any valid key; a free PAYG key counts, whatever its balance).
+  // A key in Settings (any valid key; a free PAYG key counts, whatever its balance), or an
+  // early adopter (installed before 0.53.2; lisaHasKey() in the service worker).
   async _hasKey() {
     try {
-      const r = await chrome.storage.sync.get(['licenseKey', 'userTier', 'isPayg']);
+      const r = await chrome.storage.sync.get(['licenseKey', 'userTier', 'isPayg', 'lisaEarlyAdopter']);
+      if (r.lisaEarlyAdopter === true) return true;
       return !!r.licenseKey && (r.userTier === 'premium' || r.isPayg === true);
     } catch (_) {
       return false;

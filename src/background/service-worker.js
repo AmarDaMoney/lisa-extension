@@ -1265,10 +1265,13 @@ const hasher = new LISAHasher();
 // holds 25 conversations until the user adds a key (a free key, by email, unlocks it).
 const LISA_FREE_LIBRARY_LIMIT = 25;
 
-// A key in Settings: any valid key (a free PAYG key counts, whatever its balance).
+// A key in Settings (any valid key; a free PAYG key counts, whatever its balance), or
+// an early adopter: installed before 0.53.2, so they keep what they had (unlimited
+// library, Choose messages, Options) without a key (Amar, 2026-10-25).
 async function lisaHasKey() {
   try {
-    const r = await chrome.storage.sync.get(['licenseKey', 'userTier', 'isPayg']);
+    const r = await chrome.storage.sync.get(['licenseKey', 'userTier', 'isPayg', 'lisaEarlyAdopter']);
+    if (r.lisaEarlyAdopter === true) return true;
     return !!r.licenseKey && (r.userTier === 'premium' || r.isPayg === true);
   } catch (_) {
     return false;
@@ -2070,6 +2073,24 @@ function createContextMenusNow() {
 // Create menus on install/update
 
 chrome.runtime.setUninstallURL("https://forms.gle/2Vu8M8NQYP6eKBnR9");
+// True when version a is older than b (numeric, "0.53.10" > "0.53.9"). An unknown a is not older.
+function lisaVersionBefore(a, b) {
+  if (!a) return false;
+  const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0);
+  }
+  return false;
+}
+
+// Updated from a version before the free-key limits: an early adopter (see lisaHasKey).
+function lisaMarkEarlyAdopter(details) {
+  if (details && details.reason === 'update' && lisaVersionBefore(details.previousVersion, '0.53.2')) {
+    return chrome.storage.sync.set({ lisaEarlyAdopter: true });
+  }
+  return Promise.resolve();
+}
+
 // Shown once in the popup after an update to that exact version. Plain text
 // (the popup inserts it as text); each line needs its entry in the language files.
 const LISA_CHANGELOG = {
@@ -2099,6 +2120,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   // its own list in LISA_CHANGELOG. (It used to show one hard-coded list from an
   // old release on every minor update.) Write the next version's list here.
   if (details.reason === 'update') {
+    lisaMarkEarlyAdopter(details);
     const currentVersion = chrome.runtime.getManifest().version;
     const changelog = LISA_CHANGELOG[currentVersion];
     if (changelog && details.previousVersion !== currentVersion) {

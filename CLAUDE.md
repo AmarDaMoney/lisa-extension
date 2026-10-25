@@ -357,6 +357,13 @@ history into a handful of messages (popup export showed ~5).
 Conversation URLs are `/a/chat/s/<id>`: the id regex skips the `s/` (it used to give every DeepSeek chat the
 id "s", so stars, checkpoints and ACM state were shared between chats).
 
+### Mistral capture (chat.mistral.ai)
+DOM (`[data-message-author-role]`). SPA: on navigation to another conversation, the messages still on the page are
+remembered as elements (`window.__lisaMistralStale`, a WeakSet; `lisaMistralCurrent()` in mistral-parser.js, used by
+`extractMistralMessages`), never as a count, and never all skipped. Until 2026-10-25 a count was taken; Mistral now
+replaces the old messages, so the count skipped the new conversation's own (exports and Markdown found 0 messages;
+also in 0.53.1). A new chat getting its id (/chat → /chat/<id>) has no stale messages.
+
 ### Grok capture (grok.com)
 API-first via `window.__LISA_GROK_API_CAPTURE` in `src/content/grok-parser.js`
 (found live via DevTools; no extra headers needed): `GET

@@ -1,12 +1,24 @@
 // Mistral AI Conversation Parser
 // Extracts conversation data from chat.mistral.ai
-// Handles SPA navigation: old conversation messages remain in DOM
+// Handles SPA navigation: old conversation messages may remain in the DOM
+// The page's messages minus those left over from the previous conversation; never
+// none of them (if Mistral reused the old elements, everything on the page is current).
+function lisaMistralCurrent(elements) {
+  const all = Array.from(elements);
+  const stale = window.__lisaMistralStale;
+  const current = stale ? all.filter(el => !stale.has(el)) : all;
+  return current.length ? current : all;
+}
+window.__lisaMistralCurrent = lisaMistralCurrent;
+
 class MistralParser {
   constructor() {
     this.platform = 'Mistral AI';
     this.conversationId = this.extractConversationId();
-    // Track stale messages from previous conversations (SPA doesn't unmount)
-    this.staleCount = 0;
+    // Messages still on the page from the previous conversation (SPA navigation).
+    // The elements themselves, not a count: Mistral now replaces them, and a count
+    // taken before the swap skipped the new conversation's own messages (0 exported).
+    window.__lisaMistralStale = window.__lisaMistralStale || new WeakSet();
     this._lastUrl = window.location.href;
     this._watchNavigation();
   }
@@ -19,11 +31,14 @@ class MistralParser {
       if (currentUrl !== this._lastUrl) {
         const newConvId = this.extractConversationId();
         if (newConvId !== this.conversationId) {
-          // Navigation to a different conversation
-          this.staleCount = document.querySelectorAll('[data-message-author-role]').length;
-          window.__lisaMistralStaleCount = this.staleCount;
+          // Navigation to a different conversation: what is on the page now is the old one.
+          // (From no id to an id is the same new chat getting its id: nothing is stale.)
+          const stale = new WeakSet();
+          let n = 0;
+          if (this.conversationId) document.querySelectorAll('[data-message-author-role]').forEach(el => { stale.add(el); n++; });
+          window.__lisaMistralStale = stale;
           this.conversationId = newConvId;
-          console.debug('[LISA] Mistral SPA navigation detected, stale messages:', this.staleCount);
+          console.debug('[LISA] Mistral SPA navigation detected, stale messages:', n);
         }
         this._lastUrl = currentUrl;
       }
@@ -42,8 +57,7 @@ class MistralParser {
   extractMessages() {
     const messages = [];
     const allElements = document.querySelectorAll('[data-message-author-role]');
-    // Skip stale messages from previous conversations
-    const currentElements = Array.from(allElements).slice(this.staleCount);
+    const currentElements = lisaMistralCurrent(allElements);
 
     currentElements.forEach((element, index) => {
       let role = element.getAttribute('data-message-author-role');

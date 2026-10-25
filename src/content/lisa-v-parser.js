@@ -741,11 +741,12 @@ class LisaVParser {
   // ChatGPT-specific extraction
   async extractMistralMessages() {
     const messages = [];
-    const staleCount = window.__lisaMistralStaleCount || 0;
     const allElements = document.querySelectorAll('[data-message-author-role]');
-    const currentElements = Array.from(allElements).slice(staleCount);
-    if (staleCount > 0) {
-      console.debug('[LISA] Mistral: skipping', staleCount, 'stale messages, extracting', currentElements.length);
+    // Leftovers from the previous conversation are skipped (mistral-parser.js)
+    const currentElements = typeof window.__lisaMistralCurrent === 'function'
+      ? window.__lisaMistralCurrent(allElements) : Array.from(allElements);
+    if (currentElements.length !== allElements.length) {
+      console.debug('[LISA] Mistral: skipping', allElements.length - currentElements.length, 'stale messages, extracting', currentElements.length);
     }
     for (const container of currentElements) {
       const role = container.getAttribute('data-message-author-role') || 'assistant';

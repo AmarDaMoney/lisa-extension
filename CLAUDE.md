@@ -116,7 +116,9 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   in exports, since exports read the same API). The same text finder serves Claude Code and Perplexity (API
   capture, no usable markup); the other platforms use page selectors from their parsers. Growing a found message's
   box stops at the first box holding any other message's text. Only an element with a box under the pointer counts
-  (ChatGPT's display:contents wrappers put the star at 0,0 before). Mistral, Copilot, HuggingChat, Meta AI, Poe, Claude Code and Perplexity: stand-in tests only (2026-10-25),
+  (ChatGPT's display:contents wrappers put the star at 0,0 before). A box taller than 85% of the window never counts
+  (Claude Code: a whole panel once held "one message" and the star sat over its close button); pointing at a
+  button/link outside the message or clicking anywhere else hides the star. Mistral, Copilot, HuggingChat, Meta AI, Poe, Claude Code and Perplexity: stand-in tests only (2026-10-25),
   need a live check. Gemini capture strips its screen-reader labels ("You said", "Gemini said",
   "Show thinking", FR/ES/DE) wherever they start a block (`geminiPrefix` in lisa-v-parser.js).
   **Stars** (★ in "Choose messages"; right-click a selection → "⭐ Keep this message word for word" (service worker

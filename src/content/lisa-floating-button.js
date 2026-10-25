@@ -728,6 +728,10 @@ class LISAFloatingButton {
       if (best && best.msg !== hits[0].m) break;
       const r = el.getBoundingClientRect();
       if (r.width < 8 || r.height < 8 || x < r.left - 4 || x > r.right + 4 || y < r.top - 4 || y > r.bottom + 4) continue;
+      // A box nearly as tall as the window is a page panel, not a message (Claude Code: with
+      // part of the conversation on screen, a whole panel can hold "one message"). A very
+      // long message keeps the star on a smaller part of it.
+      if (r.height > innerHeight * 0.85) continue;
       best = { el, role: hits[0].m.role, msg: hits[0].m };
     }
     return best;
@@ -798,8 +802,13 @@ class LISAFloatingButton {
         : 'Keep this message word for word in compressed exports and Handoff';
       place();
     };
+    const hideNow = () => { clearTimeout(hideTimer); btn.style.display = 'none'; current = null; };
+    // The star never covers the page's own controls, and any click elsewhere puts it away.
+    document.addEventListener('mousedown', (e) => { if (e.target !== btn && current) hideNow(); }, true);
     document.addEventListener('mouseover', (e) => {
       if (e.target === btn) { clearTimeout(hideTimer); return; }
+      if (current && e.target.closest && e.target.closest('button, a, [role="button"], input, textarea, select')
+          && !current.el.contains(e.target)) { hideNow(); return; }
       const t = this._inlineStarTarget(e.target);
       if (t) {
         clearTimeout(hideTimer);

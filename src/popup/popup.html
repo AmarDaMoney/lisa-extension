@@ -518,6 +518,17 @@
         <div class="settings-divider"></div>
 
         <section class="settings-section">
+          <h3>🌐 Interface language</h3>
+          <select id="uiLanguageSelect" class="settings-select" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--background); color: var(--text-primary); font-size: 13px;">
+            <option value="auto">Automatic (browser language)</option>
+            <option value="en" data-lisa-no-translate>English</option>
+            <option value="fr" data-lisa-no-translate>Français</option>
+          </select>
+        </section>
+
+        <div class="settings-divider"></div>
+
+        <section class="settings-section">
           <h3>🧠 ACM — Context Management</h3>
           <p class="settings-desc">Select your preferred AI platforms for context handoff. Only compatible targets will be offered.</p>
 
@@ -581,6 +592,9 @@
   <script src="../shared/conversation-id.js"></script>
   <script src="../shared/checkpoint-detect.js"></script>
   <script src="../shared/export-builders.js"></script>
+  <script src="../shared/i18n.js"></script>
+  <script src="../shared/i18n/fr.js"></script>
+  <script src="popup-i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

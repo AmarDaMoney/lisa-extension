@@ -1628,6 +1628,16 @@ Keep it tight — this is for continuity, not a report. Only include what matter
 }
 
 // ============================================
+// Interface language (shared/i18n.js, loaded just before this file): only LISA's
+// own elements are translated, never the chat page.
+try {
+  if (typeof lisaI18nInit === 'function') {
+    const isOwn = (el) => el.id === 'lisa-floating-btn' || (typeof el.className === 'string' && /(^|\s)lisa-/.test(el.className));
+    const startI18n = () => lisaI18nInit().then((lang) => { if (lang !== 'en') lisaWatchOwn(document.body, isOwn); });
+    if (document.body) startI18n(); else document.addEventListener('DOMContentLoaded', startI18n);
+  }
+} catch (_) { /* never break the host page */ }
+
 // Initialize when DOM is ready
 let floatingButton;
 if (document.readyState === 'loading') {

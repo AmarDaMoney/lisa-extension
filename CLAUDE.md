@@ -109,6 +109,15 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   Compress) and in Handoff (`middle` entries of type `starred`). Stored per conversation in
   `chrome.storage.local` `lisa-stars-<conversationId>` as `lisaStarKey()` fingerprints (role + FNV-1a of the
   whitespace-collapsed text; the FAB's `_starKey()` is an inline copy: keep them identical).
+  **Interface languages** (`src/shared/i18n.js` + one file per language in `src/shared/i18n/`, French first):
+  texts are keyed by their English wording (whitespace collapsed) plus regex `patterns` for texts with numbers;
+  nothing in popup.js or the FAB calls a translate function. The popup (`popup-i18n.js`) translates the whole
+  page as it appears and changes (MutationObserver) and wraps alert/confirm; content scripts translate only
+  LISA's own elements (`lisaWatchOwn`: `#lisa-floating-btn` and `.lisa-*` children of body), never the chat
+  page. Setting: Settings → Interface language (`uiLanguage` in chrome.storage.sync: auto = browser language).
+  A new or changed English UI text needs its entry in each language file, or it shows in English. Mark user
+  content `data-lisa-no-translate` (conversation titles). Adding a language: copy fr.js, add it to popup.html
+  and before lisa-floating-button.js in every manifest entry.
 - **0.53.1 (submitted to the CWS, in review as of 2026-10-23; the next change bumps to 0.53.2):** 0.53.1 = compressed
   export fixes (system notices labelled, assistant changes kept, compound entities, checkpoint sections parsed
   into the anchor; see "Compressed export anchor" below).

@@ -2221,7 +2221,7 @@ class LISAPopup {
       <div class="snapshot-item" data-id="${eId}">
           <input type="checkbox" class="snapshot-checkbox" data-id="${eId}" title="Select for injection">
         <div class="snapshot-info">
-          <div class="snapshot-title">${eTitle}</div>
+          <div class="snapshot-title" data-lisa-no-translate>${eTitle}</div>
           <div class="snapshot-meta">${ePlatform} \u2022 ${this.formatTimeAgo(snap.savedAt)} \u2022 v${eVersion}${phoenixLabel}${formatLabel}</div>
         </div>
         <div class="snapshot-actions">

@@ -51,6 +51,8 @@
         "src/content/claude-code-parser.js",
         "src/shared/html-to-markdown.js",
         "src/content/lisa-v-parser.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -68,6 +70,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -85,6 +89,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -101,6 +107,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -117,6 +125,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -133,6 +143,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -149,6 +161,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -167,6 +181,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -194,6 +210,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -210,6 +228,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -226,6 +246,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"
@@ -242,6 +264,8 @@
         "src/shared/conversation-id.js",
         "src/shared/checkpoint-detect.js",
         "src/content/acm-monitor.js",
+        "src/shared/i18n.js",
+        "src/shared/i18n/fr.js",
         "src/content/lisa-floating-button.js"
       ],
       "run_at": "document_idle"

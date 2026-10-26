@@ -96,7 +96,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
 - **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.9 → stay on 0.53.0 until that ships).
-- **0.53.2 (in progress, not submitted; branch `claude/determined-carson-idcmgc`):** floating menu starts with
+- **0.53.2 (submitted to the CWS 2026-10-26 with the 9 localized listings, in review; branch `claude/determined-carson-idcmgc`; after approval: fast-forward `main`, backend `/api/version` → 0.53.2):** floating menu starts with
   "📤 Export & compress…" (service worker `openPopupForExport`: leaves `lisaPendingExport` {tabId, at} in
   `chrome.storage.session` and calls `chrome.action.openPopup`; the popup starts the export within 60 s, else the
   page says "click the LISA icon"); popup section **"On this page"** (`#pageActions`) runs the floating button's

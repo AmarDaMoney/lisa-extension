@@ -375,6 +375,7 @@ class LISAFloatingButton {
     const el = document.getElementById('lisa-floating-btn');
     if (el) el.remove();
     this.button = null;
+    if (this._hideInlineStar) this._hideInlineStar();
     const menu = document.querySelector('.lisa-action-menu');
     if (menu) menu.remove();
     console.debug('[LISA] Floating button removed');
@@ -827,6 +828,7 @@ class LISAFloatingButton {
     const offTitle = (t) => (t.role === 'user' ? "Keep this question and the AI's answer word for word in compressed exports and Handoff"
       : 'Keep this message word for word in compressed exports and Handoff');
     const hideNow = () => { clearTimeout(hideTimer); hideTimer = null; btn.style.display = 'none'; current = null; };
+    this._hideInlineStar = hideNow;
     const hideSoon = () => { if (!hideTimer) hideTimer = setTimeout(() => { hideTimer = null; hideNow(); }, 1000); };
     const keep = () => { clearTimeout(hideTimer); hideTimer = null; };
     // Text-matched platforms: what each hovered element turned out to be is remembered
@@ -834,6 +836,9 @@ class LISAFloatingButton {
     const textFound = new WeakMap();
     let textSearching = null;
     const consider = (node, x, y) => {
+      // No ☆ while the floating button is hidden: hiding LISA hides all of it on the page
+      // (Amar, 2026-10-27). Showing the button again brings the star back, no reload needed.
+      if (!this.button) { if (current) hideNow(); return; }
       if (!node || node.nodeType !== 1) return;
       if (node === btn) { keep(); return; }
       if (current && node.closest('button, a, [role="button"], input, textarea, select') && !current.el.contains(node)) { hideNow(); return; }
@@ -866,7 +871,7 @@ class LISAFloatingButton {
       lastMove = now;
       consider(e.target, lastX, lastY);
     }, true);
-    if (byText()) setTimeout(() => this._inlineStarMessages(), 1500);
+    if (byText()) setTimeout(() => { if (this.button) this._inlineStarMessages(); }, 1500);
     addEventListener('scroll', () => {
       placeSoon();
       clearTimeout(scrollTimer);

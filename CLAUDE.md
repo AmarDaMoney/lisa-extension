@@ -96,7 +96,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
 - **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.9 → stay on 0.53.0 until that ships).
-- **0.53.2 (submitted to the CWS 2026-10-26 with the 9 localized listings, in review; branch `claude/determined-carson-idcmgc`; after approval: fast-forward `main`, backend `/api/version` → 0.53.2):** floating menu starts with
+- **0.53.2 (live in the Chrome Web Store since 2026-10-27, with the 9 localized listings; `main` fast-forwarded, backend `/api/version` = 0.53.2; the next change bumps to 0.53.3):** floating menu starts with
   "📤 Export & compress…" (service worker `openPopupForExport`: leaves `lisaPendingExport` {tabId, at} in
   `chrome.storage.session` and calls `chrome.action.openPopup`; the popup starts the export within 60 s, else the
   page says "click the LISA icon"); popup section **"On this page"** (`#pageActions`) runs the floating button's
@@ -168,7 +168,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   a list shows nothing (until 0.53.2 one stale hard-coded list showed on every minor update). Write the list for the
   version you ship; each line needs its entry in the language files. The "vX available" banner reads the backend's
   `/api/version` (= the version live in the store).
-- **0.53.1 (live in the Chrome Web Store since 2026-10-25; the next change bumps to 0.53.2):** 0.53.1 = compressed
+- **0.53.1 (in the store 2026-10-25 to 2026-10-27):** 0.53.1 = compressed
   export fixes (system notices labelled, assistant changes kept, compound entities, checkpoint sections parsed
   into the anchor; see "Compressed export anchor" below).
 - **0.53.0 (submitted to the CWS, in review as of 2026-10-23):** backend domains, Inference Shield hand-off, floating-button advanced mode, Merkle fix. Popup header: the neon-L logo (54 px, `public/logo.png`), "LISA" over "Your AI Chat Exporter / Library", and **? Help / ⚙ Settings** at the top right (moved from the footer, which scrolls away under the library); badges and version on the second row. Toolbar/store icons (`public/icon16/48/128.png`) stay the previous LISA icon (Amar's choice); only the popup logo is the neon L, on the logo's deep-indigo header. Toasts are compact bubbles above the floating button (max 300 px wide, wrap onto several lines). Before the CWS upload: Amar tests unpacked against the live backend, then fast-forward `main`. Listing text: `docs/CWS_LISTING_0.53.0.md`. Until the review passes, the 0.52.9 in the store calls the old Railway address, which stays working as a fallback (never remove it from the backend while 0.52.9 users exist).

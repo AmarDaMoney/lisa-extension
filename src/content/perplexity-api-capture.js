@@ -78,6 +78,9 @@
         } catch (e) {
           lastError = e;
           console.debug('[LISA] Perplexity bridge attempt ' + attempt + ' failed:', e.message);
+          // Perplexity said no (403/429, or the pause after one): asking again right away only
+          // earns a 429. Retries are for a MAIN world that didn't answer in time.
+          if (!/timeout/i.test(e.message)) break;
           if (attempt < 3) {
             await new Promise(function(r) { setTimeout(r, 500); });
           }

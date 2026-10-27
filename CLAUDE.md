@@ -403,10 +403,12 @@ API-first (`perplexity-api-main.js`, MAIN world, bridged by `perplexity-api-capt
 `window.__LISA_PERPLEXITY_API_CAPTURE`; used by the parser, `LisaVParser`, ACM, ☆ and Handoff): `GET
 <page origin>/rest/thread/<slug>?with_schematized_response=true&…&limit=50&offset=N&from_first=true` → `entries`
 (`query_str` = question; answer = `blocks[]` with `intended_usage` `ask_text…`: `markdown_block.answer` (one string,
-since 2026-09) or `markdown_block.chunks[]`). Thread URLs are `/search/<slug>` (title words + id, with `.` and `_`):
-the slug goes to the API whole. Until 0.53.3 the id pattern was `[a-f0-9-]+` (UUID era): no request was made, so
-capture fell back to the page (1 message) and ACM / ☆ / Handoff had nothing (Amar, live, 2026-10-27). Console:
-`[LISA-MAIN] Perplexity API: N entries, M messages` (lists block types when an answer is missing).
+since 2026-09) or `markdown_block.chunks[]`), 20 entries a page. **Header `x-pplx-account` is required** (403 without
+it; value = cookie `__Host-pplx-last-active-account`, readable by the page; found live 2026-10-27: its absence broke
+capture, ACM, ☆ and Handoff, which fell back to the page = 1 message). After a 403/429 the MAIN script pauses 5 min
+and the bridge doesn't retry (retries had earned a 429). Thread URLs are `/search/<uuid>` or `/search/<slug>` (title
+words + id, with `.` and `_`); the id goes to the API whole (the old `[a-f0-9-]+` pattern cut slugs). Console:
+`[LISA-MAIN] Perplexity API: N entries, M messages` / `403 at offset 0 (no account cookie)`.
 The DOM fallback (`span.whitespace-pre-line`, `div.prose`) is out of date; not fixed without live markup.
 
 ### Grok capture (grok.com)

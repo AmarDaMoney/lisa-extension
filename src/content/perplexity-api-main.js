@@ -39,31 +39,49 @@
     return parts.join('\n\n');
   }
 
+  // Perplexity refuses /rest/thread/ (403) without the account header its own page sends,
+  // x-pplx-account = the __Host-pplx-last-active-account cookie (live, 2026-10-27).
+  function accountId() {
+    const m = document.cookie.match(/(?:^|;\s*)__Host-pplx-last-active-account=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  // After a refusal (403) or "too many requests" (429), don't ask again for 5 minutes:
+  // ACM and the ☆ call this often, and retries turned a 403 into a 429 (live, 2026-10-27).
+  let refusedUntil = 0;
+
   async function fetchFullThread(threadUuid) {
+    if (Date.now() < refusedUntil) throw new Error('Perplexity refused the last request; retrying after a pause');
     const allEntries = [];
     let offset = 0;
-    const limit = 50;
+    const limit = 20;
     let hasMore = true;
+    const headers = { 'accept': '*/*', 'x-app-apiclient': 'web', 'x-app-apiversion': '2.18' };
+    const account = accountId();
+    if (account) headers['x-pplx-account'] = account;
     while (hasMore) {
       // Same origin as the page (perplexity.ai or www.perplexity.ai), so the session cookies go along
       const url = window.location.origin + '/rest/thread/' + encodeURIComponent(threadUuid) +
         '?with_schematized_response=true&version=2.18&source=default' +
         '&limit=' + limit + '&offset=' + offset + '&from_first=true';
       try {
-        const resp = await fetch(url, {
-          credentials: 'include',
-          headers: { 'accept': '*/*', 'x-app-apiclient': 'web', 'x-app-apiversion': '2.18' }
-        });
+        const resp = await fetch(url, { credentials: 'include', headers });
         if (!resp.ok) {
-          console.debug('[LISA-MAIN] Perplexity API: ' + resp.status + ' at offset ' + offset);
+          console.debug('[LISA-MAIN] Perplexity API: ' + resp.status + ' at offset ' + offset +
+            (account ? '' : ' (no account cookie)'));
+          if (resp.status === 403 || resp.status === 429) {
+            refusedUntil = Date.now() + 5 * 60 * 1000;
+            if (offset === 0) throw new Error('Perplexity API ' + resp.status);
+          }
           break;
         }
         const data = await resp.json();
         if (data.entries) allEntries.push(...data.entries);
         hasMore = data.has_next_page === true;
         offset += limit;
-        if (offset > limit * 10) break;
+        if (offset >= limit * 50) break;
       } catch (e) {
+        if (offset === 0 && /^Perplexity API/.test(e.message)) throw e;
         console.debug('[LISA-MAIN] Perplexity API fetch error:', e);
         break;
       }

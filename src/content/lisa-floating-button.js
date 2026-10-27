@@ -1713,7 +1713,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         if (!sessionMetadata && lean.session_metadata) sessionMetadata = lean.session_metadata;
       }
 
-      const instructions = 'LISA context handoff. "opening", "middle", and "closing" are the conversation itself, in order — read them first: "opening"/"closing" are verbatim (how it started, how it ended); "middle" is an ordered array where entries with type "checkpoint" are the AI\'s own verbatim checkpoint replies from earlier in this conversation and entries with type "starred" are messages the user marked as important, verbatim (treat them as exact); entries with type "compressed" are LISA-compressed conversation in between. Continue from the last checkpoint entry\'s "NEXT" section if one exists, otherwise from where "closing" leaves off. "anchors" and "session_metadata" at the end are supplementary analysis (key entities/topics), not part of the conversation flow.';
+      const instructions = 'LISA context handoff. "opening", "middle", and "closing" are the conversation itself, in order — read them first: "opening"/"closing" are verbatim (how it started, how it ended); "middle" is an ordered array where entries with type "checkpoint" are the AI\'s own verbatim checkpoint replies from earlier in this conversation and entries with type "starred" are messages the user marked as important, verbatim (treat them as exact); entries with type "compressed" are LISA-compressed conversation in between. A "closing" entry with type "checkpoint" is the AI\'s own checkpoint reply at the very end, the newest of all. Continue from the "NEXT" section of the newest checkpoint (a "closing" one if any, else the last one in "middle"), otherwise from where "closing" leaves off. "anchors" and "session_metadata" at the end are supplementary analysis (key entities/topics), not part of the conversation flow.';
 
       const payload = {
         _instructions: instructions,
@@ -1722,7 +1722,9 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         messageCount: n,
         opening: opening.map(verbatim),
         middle,
-        closing: closing.map(verbatim),
+        // A checkpoint asked for just before the handoff lands in "closing":
+        // mark it, else the instructions point at an older one in "middle".
+        closing: closing.map(m => (acm.detectCheckpointInMessage(m) ? { type: 'checkpoint', ...verbatim(m) } : verbatim(m))),
         anchors: anchors.length > 0 ? anchors : undefined,
         session_metadata: sessionMetadata || undefined
       };

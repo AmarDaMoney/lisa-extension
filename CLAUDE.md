@@ -397,6 +397,17 @@ match `parseMessageContent`'s code selector. Replacing the second one (already o
 "reading 'replaceChild'" and the whole capture returned 0 messages (live console, 2026-10-25). Elements no longer
 in the clone are skipped, and the code text comes from the `pre`/`code` inside (no language label or Copy text).
 
+### Perplexity capture (perplexity.ai)
+API-first (`perplexity-api-main.js`, MAIN world, bridged by `perplexity-api-capture.js` as
+`window.__LISA_PERPLEXITY_API_CAPTURE`; used by the parser, `LisaVParser`, ACM, ☆ and Handoff): `GET
+<page origin>/rest/thread/<slug>?with_schematized_response=true&…&limit=50&offset=N&from_first=true` → `entries`
+(`query_str` = question; answer = `blocks[]` with `intended_usage` `ask_text…`: `markdown_block.answer` (one string,
+since 2026-09) or `markdown_block.chunks[]`). Thread URLs are `/search/<slug>` (title words + id, with `.` and `_`):
+the slug goes to the API whole. Until 0.53.3 the id pattern was `[a-f0-9-]+` (UUID era): no request was made, so
+capture fell back to the page (1 message) and ACM / ☆ / Handoff had nothing (Amar, live, 2026-10-27). Console:
+`[LISA-MAIN] Perplexity API: N entries, M messages` (lists block types when an answer is missing).
+The DOM fallback (`span.whitespace-pre-line`, `div.prose`) is out of date; not fixed without live markup.
+
 ### Grok capture (grok.com)
 API-first via `window.__LISA_GROK_API_CAPTURE` in `src/content/grok-parser.js`
 (found live via DevTools; no extra headers needed): `GET

@@ -4,20 +4,26 @@
 (function() {
   'use strict';
 
+  // Thread URLs are /search/<slug> (title words + an id, e.g. how-to-plan-a-launch-Xy7.Q2_ab);
+  // /rest/thread/ takes that slug whole. The old pattern ([a-f0-9-]+) dated from UUID URLs: on a
+  // slug it found nothing or a few letters, every API call failed, and capture fell back to the
+  // page (1 message; ACM, ☆ and Handoff had no messages either).
   function getThreadId() {
-    const match = window.location.pathname.match(/\/search\/([a-f0-9-]+)/);
-    return match ? match[1] : null;
+    const match = window.location.pathname.match(/\/search\/([^/?#]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
   }
 
   function extractAnswerText(entry) {
     if (!entry.blocks) return '';
     const parts = [];
     for (const block of entry.blocks) {
-      // Current format: ask_text with markdown_block.chunks[]
-      if (block.intended_usage === 'ask_text' && block.markdown_block) {
-        const chunks = block.markdown_block.chunks || [];
-        const joined = chunks.filter(c => typeof c === 'string').join('');
-        if (joined.trim()) parts.push(joined.trim());
+      // Current format: ask_text with markdown_block.answer (one string, 2026-09) or
+      // markdown_block.chunks[] (earlier)
+      if (String(block.intended_usage || '').startsWith('ask_text') && block.markdown_block) {
+        const mb = block.markdown_block;
+        const text = typeof mb.answer === 'string' && mb.answer.trim() ? mb.answer
+          : (mb.chunks || []).filter(c => typeof c === 'string').join('');
+        if (text.trim() && !parts.includes(text.trim())) parts.push(text.trim());
       }
       // Legacy format: workflow_root with WORKFLOW_ITEM_TEXT
       if (block.intended_usage === 'workflow_root' && block.workflow_block) {
@@ -39,7 +45,8 @@
     const limit = 50;
     let hasMore = true;
     while (hasMore) {
-      const url = 'https://www.perplexity.ai/rest/thread/' + threadUuid +
+      // Same origin as the page (perplexity.ai or www.perplexity.ai), so the session cookies go along
+      const url = window.location.origin + '/rest/thread/' + encodeURIComponent(threadUuid) +
         '?with_schematized_response=true&version=2.18&source=default' +
         '&limit=' + limit + '&offset=' + offset + '&from_first=true';
       try {
@@ -84,13 +91,18 @@
 
       const messages = [];
       const title = entries[0]?.thread_title || document.title;
+      let noAnswer = 0;
 
       for (const entry of entries) {
         const query = entry.query_str || '';
         const answer = extractAnswerText(entry);
+        if (!answer) noAnswer++;
         if (query) messages.push({ role: 'user', content: query.trim() });
         if (answer) messages.push({ role: 'assistant', content: answer.trim() });
       }
+      console.debug('[LISA-MAIN] Perplexity API: ' + entries.length + ' entries, ' + messages.length + ' messages' +
+        (noAnswer ? ', ' + noAnswer + ' without answer text (block types: ' +
+          [...new Set(entries.flatMap(e => (e.blocks || []).map(b => b.intended_usage)))].join(', ') + ')' : ''));
 
       window.postMessage({
         type: '__lisa_perplexity_api_response',

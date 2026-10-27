@@ -622,7 +622,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.53.4',
+        lisaVersion: '0.53.3',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
@@ -941,7 +941,7 @@ class LISACompressor {
       platform:          conversation.platform || 'unknown',
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
-      generated_by:      'LISA v0.53.4',
+      generated_by:      'LISA v0.53.3',
       key_entities:    anchorEntities(this.extractEntities(allText).flatMap(e => e.values)),
       note:              'Lightweight anchor — raw verbatim format'
     };
@@ -999,7 +999,7 @@ class LISACompressor {
       key_entities:      anchorEntities([...entitySet]),
       session_intent:    sessionIntent,
       session_register:  register,
-      generated_by:      'LISA v0.53.4'
+      generated_by:      'LISA v0.53.3'
     };
     if (register === 'technical') {
       anchor.files_changed = sessionEvents.files_changed;
@@ -2531,4 +2531,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
   aiPlatformTabs.delete(tabId);
 });
-console.debug('[LISA] Core compression engine initialized v0.53.4');
+console.debug('[LISA] Core compression engine initialized v0.53.3');

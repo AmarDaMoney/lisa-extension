@@ -96,7 +96,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
 - **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.9 → stay on 0.53.0 until that ships).
-- **0.53.2 (live in the Chrome Web Store since 2026-10-27, with the 9 localized listings; `main` fast-forwarded, backend `/api/version` = 0.53.2; 0.53.3 uploaded to the CWS 2026-10-27, in review; when live: fast-forward `main`, backend `/api/version` = 0.53.3):** floating menu starts with
+- **0.53.3 live in the Chrome Web Store since 2026-10-28** (Handoff resumes from the newest checkpoint, Perplexity capture via `x-pplx-account`, no ☆ while the button is hidden; `main` fast-forwarded; the next change bumps to 0.53.4). **0.53.2 (live 2026-10-27, with the 9 localized listings):** floating menu starts with
   "📤 Export & compress…" (service worker `openPopupForExport`: leaves `lisaPendingExport` {tabId, at} in
   `chrome.storage.session` and calls `chrome.action.openPopup`; the popup starts the export within 60 s, else the
   page says "click the LISA icon"); popup section **"On this page"** (`#pageActions`) runs the floating button's
@@ -116,7 +116,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   `_inlineStarTarget()` holds the per-platform selectors. It stores a probe `p:<u|a>:<letters and digits of the
   message's first paragraph>` (max 120): a message is starred when the role matches and its text contains the probe
   (`_isStarred()` in the FAB = `lisaStarredIndexes()` in export-builders.js; keep identical). Selectors confirmed on
-  stand-in pages; live-confirmed by Amar on Claude, DeepSeek, Grok, Gemini and ChatGPT (2026-10-25). ChatGPT's page (live
+  stand-in pages; live-confirmed by Amar on all 12 platforms (Claude, DeepSeek, Grok, Gemini, ChatGPT 2026-10-25; the other 7 on 2026-10-28). ChatGPT's page (live
   2026-10-25) has no `[data-message-author-role]` and no `article[data-turn]`, so there the ☆ finds the message by
   its text (`_inlineStarTargetByText`): the API messages (`_inlineStarMessages`, cached 20 s), walk up from the
   hovered node to the largest element holding exactly one message; it stores that message's `_starKey` (exact match
@@ -125,8 +125,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
   box stops at the first box holding any other message's text. Only an element with a box under the pointer counts
   (ChatGPT's display:contents wrappers put the star at 0,0 before). A message found by its text is often a full-width row, so the star is placed by the box of its text (30 px right of it), not the row (Claude Code: it sat at the window's far edge, 2026-10-25). A box taller than 85% of the window never counts
   (Claude Code: a whole panel once held "one message" and the star sat over its close button); pointing at a
-  button/link outside the message or clicking anywhere else hides the star. Mistral, Copilot, HuggingChat, Meta AI, Poe, Claude Code and Perplexity: stand-in tests only (2026-10-25),
-  need a live check. Gemini capture strips its screen-reader labels ("You said", "Gemini said",
+  button/link outside the message or clicking anywhere else hides the star. Gemini capture strips its screen-reader labels ("You said", "Gemini said",
   "Show thinking", FR/ES/DE) wherever they start a block (`geminiPrefix` in lisa-v-parser.js).
   **Stars** (★ in "Choose messages"; right-click a selection → "⭐ Keep this message word for word" (service worker
   `star-message` menu → `lisaPageAction` `star-selection`, the FAB finds the message containing the text; the

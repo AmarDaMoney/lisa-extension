@@ -474,7 +474,8 @@ no caller. Leave as-is unless picking them up deliberately.
 - **Ambiguity categories** — 10 targeted (Referential, Temporal, Priority,
   Completion, Social noise, Reasoning, Role, Dependency, State, Relevance).
   Live today: social noise (T1), referential (T1 NER only — compromise coref
-  rewrite is disabled; T1.5 GLiNER + fastcoref), relevance (T2 salience).
+  rewrite is disabled), relevance (T2 salience). The backend's T1.5 GLiNER + fastcoref was never on a live path and was
+  removed 2026-11-08 (with torch).
   Plan: annotate, don't rewrite. Cheap T1 rules next (Role, Priority,
   Completion, Temporal), then have the paid AI Compress prompt emit
   category-tagged fields to cover all 10 in T2.

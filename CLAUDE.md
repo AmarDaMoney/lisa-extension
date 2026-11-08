@@ -469,8 +469,8 @@ no caller. Leave as-is unless picking them up deliberately.
 - **MCP Memory Server** (`lisa-web-backend/lisa_mcp.py`, guide in
   `MCP_SETUP.md` there) — early access. Next: public package (`uvx lisa-mcp`),
   `GET /api/snapshots/{id}` so tools stop downloading the whole library,
-  per-request auth before any multi-user hosting. Semantic search works since
-  backend 8b27d03 (snapshots embedded on save; old ones backfilled on search).
+  per-request auth before any multi-user hosting. Search is by words (the backend's search by meaning
+  was removed 2026-11-08: its model cost ~$34 of Railway RAM and nobody used it).
 - **Ambiguity categories** — 10 targeted (Referential, Temporal, Priority,
   Completion, Social noise, Reasoning, Role, Dependency, State, Relevance).
   Live today: social noise (T1), referential (T1 NER only — compromise coref

@@ -785,6 +785,10 @@ class LISAPopup {
     });
 
     // Links
+    document.getElementById('rateLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: 'https://chromewebstore.google.com/detail/lisa-core-ai-memory-libra/dmgnookddagimdcggdlbjmaobmoofhbj/reviews' });
+    });
     document.getElementById('feedbackLink').addEventListener('click', (e) => {
       e.preventDefault();
       this.showFeedbackPanel();

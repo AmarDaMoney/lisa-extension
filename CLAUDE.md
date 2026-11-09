@@ -96,7 +96,17 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
 - **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.9 → stay on 0.53.0 until that ships).
-- **0.53.3 live in the Chrome Web Store since 2026-10-28** (Handoff resumes from the newest checkpoint, Perplexity capture via `x-pplx-account`, no ☆ while the button is hidden; `main` fast-forwarded; the next change bumps to 0.53.4). **0.53.2 (live 2026-10-27, with the 9 localized listings):** floating menu starts with
+- **0.53.4 (next upload, built 2026-11-09):** the floating button is **compact** (a 44 px icon, "Export to LISA" slides
+  out on hover) and **draggable** (a move under 6 px is still a click; `lisaFabPos` in chrome.storage.local per hostname,
+  `{right,bottom}` on the right half of the window, `{left,bottom}` on the left half so the icon stays put when the label
+  opens; default 112 px up, above most chat inputs: the pill used to cover the Send button, Amar). Menus, panels, the
+  Handoff list, toasts and the rating card open next to it toward the side with room (`_placeNear()`). **Rating card**
+  (`_noteSuccess()` on Markdown/LISA-V saves and Handoffs; `lisaRating` in chrome.storage.local): once, after the 5th
+  success and 3+ days after the first; ⭐ Rate LISA (store reviews page) and 💬 Send feedback side by side for everyone
+  (no review gating); Later = 14 days, No thanks = never. Feedback goes through the service worker (`lisaSendFeedback`,
+  content scripts can't reach the backend: CORS) to the backend's `/api/feedback` (contact@sat-chain.com; 5/hour per IP,
+  escaped). Popup footer: "⭐ Rate LISA" next to "Feedback". Stand-in tested on claude.ai only.
+- **0.53.3 live in the Chrome Web Store since 2026-10-28** (Handoff resumes from the newest checkpoint, Perplexity capture via `x-pplx-account`, no ☆ while the button is hidden; `main` fast-forwarded). **0.53.2 (live 2026-10-27, with the 9 localized listings):** floating menu starts with
   "📤 Export & compress…" (service worker `openPopupForExport`: leaves `lisaPendingExport` {tabId, at} in
   `chrome.storage.session` and calls `chrome.action.openPopup`; the popup starts the export within 60 s, else the
   page says "click the LISA icon"); popup section **"On this page"** (`#pageActions`) runs the floating button's

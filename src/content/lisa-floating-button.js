@@ -3,6 +3,9 @@
 
 // Same addresses as src/stripe/stripe-config.js (content scripts can't load it).
 const LISA_FAB_API_ORIGIN = 'https://api.sat-chain.com';
+const LISA_CWS_REVIEWS_URL = 'https://chromewebstore.google.com/detail/lisa-core-ai-memory-libra/dmgnookddagimdcggdlbjmaobmoofhbj/reviews';
+const LISA_RATING_AFTER = 5;                       // successful saves / Handoffs before the rating card
+const LISA_RATING_WAIT_MS = 3 * 24 * 3600 * 1000;  // and at least 3 days after the first one
 const LISA_FAB_APP_ORIGIN = 'https://nexus.sat-chain.com';
 
 // Advanced options, for this page only: they reset to the defaults on reload, so
@@ -100,10 +103,13 @@ class LISAFloatingButton {
 
     const styles = document.createElement('style');
     styles.textContent = `
+      /* Compact (an icon; the label slides out on hover) and draggable: a full pill in the
+         corner covered the chat's Send button (Amar, 2026-11-09). Starts above the input box;
+         where the user drops it is remembered per site (lisaFabPos in chrome.storage.local). */
       #lisa-floating-btn {
         position: fixed;
-        bottom: 24px;
-        right: 24px;
+        bottom: 112px;
+        right: 20px;
         z-index: 99999;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         display: flex;
@@ -111,15 +117,20 @@ class LISAFloatingButton {
         gap: 8px;
       }
       .lisa-fab {
+        position: relative;
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 10px 16px;
+        justify-content: center;
+        height: 44px;
+        min-width: 44px;
+        padding: 0 13px;
+        touch-action: none;
+        user-select: none;
         background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
         color: white;
         border: none;
         border-radius: 50px;
-        cursor: pointer;
+        cursor: grab;
         font-size: 14px;
         font-weight: 600;
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
@@ -129,10 +140,18 @@ class LISAFloatingButton {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
       }
-      .lisa-fab-icon { font-size: 16px; }
-      .lisa-fab-text { font-size: 13px; }
+      .lisa-fab.dragging { cursor: grabbing; transform: none; }
+      .lisa-fab-icon { font-size: 17px; line-height: 1; }
+      .lisa-fab-text { font-size: 13px; max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap;
+        transition: max-width .2s ease, opacity .2s ease, margin .2s ease; }
+      .lisa-fab:hover .lisa-fab-text, .lisa-fab:focus-visible .lisa-fab-text { max-width: 160px; opacity: 1; margin-left: 7px; }
+      .lisa-fab.dragging .lisa-fab-text { max-width: 0; opacity: 0; margin-left: 0; }
       .lisa-acm-dot {
         display: none;
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        box-shadow: 0 0 0 2px #1d4ed8;
         width: 8px;
         height: 8px;
         border-radius: 50%;
@@ -174,6 +193,21 @@ class LISAFloatingButton {
         border-top-color: var(--lisa-toast-bg);
       }
       .lisa-toast.error { --lisa-toast-bg: #ef4444; }
+      .lisa-toast.below::after { bottom: auto; top: -6px; border-top: 0; border-bottom: 6px solid var(--lisa-toast-bg); }
+      .lisa-toast.left::after { right: auto; left: 16px; }
+      .lisa-rate-card { position: fixed; z-index: 2147483647; width: 300px; max-width: calc(100vw - 24px); padding: 14px 16px;
+        background: #1f1f23; border: 1px solid #3b82f6; border-radius: 12px; color: #e5e7eb; box-shadow: 0 8px 28px rgba(0,0,0,.45);
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; animation: lisa-slide-up 0.3s ease; }
+      .lisa-rate-card h4 { margin: 0 0 4px; font-size: 14px; color: #fff; }
+      .lisa-rate-card p { margin: 0 0 10px; color: #9ca3af; }
+      .lisa-rate-card .lisa-rate-row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .lisa-rate-card button { border: 1px solid #374151; background: #111827; color: #e5e7eb; border-radius: 8px;
+        padding: 6px 10px; font: 600 12.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; cursor: pointer; }
+      .lisa-rate-card button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+      .lisa-rate-card button.quiet { border: none; background: none; color: #9ca3af; padding: 6px 4px; font-weight: 500; }
+      .lisa-rate-card textarea { width: 100%; box-sizing: border-box; min-height: 80px; margin: 2px 0 8px; padding: 8px; resize: vertical;
+        background: #111827; color: #e5e7eb; border: 1px solid #374151; border-radius: 8px;
+        font: 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
       @keyframes lisa-slide-up {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
@@ -350,8 +384,14 @@ class LISAFloatingButton {
     document.head.appendChild(styles);
     document.body.appendChild(button);
 
-    button.querySelector(".lisa-fab").addEventListener("click", () => this.showActionMenu());
+    const fab = button.querySelector(".lisa-fab");
     this.button = button;
+    this._setupDrag(fab);
+    fab.addEventListener("click", (e) => {
+      if (this._dragged) { this._dragged = false; e.stopPropagation(); return; }  // the end of a drag, not a click
+      this.showActionMenu();
+    });
+    this._restorePosition();
 
     // Listen for ACM checkpoint suggestions
     document.addEventListener('lisa-acm-suggest', (e) => {
@@ -394,12 +434,10 @@ class LISAFloatingButton {
     menu.className = "lisa-action-menu";
     await this._renderMainMenuInto(menu);
 
-    // Position near the button
-    const btn = this.button.getBoundingClientRect();
+    // Position near the button, toward the side of the screen with room
     menu.style.cssText = `
       position: fixed;
-      bottom: ${window.innerHeight - btn.top + 10}px;
-      right: ${window.innerWidth - btn.right}px;
+      overflow-y: auto;
       background: #1f1f23;
       border: 1px solid #3b82f6;
       border-radius: 8px;
@@ -410,6 +448,7 @@ class LISAFloatingButton {
     `;
 
     document.body.appendChild(menu);
+    this._placeNear(menu, this._anchorRect());
 
     // Handle clicks
     menu.addEventListener("click", async (e) => {
@@ -467,7 +506,92 @@ class LISAFloatingButton {
   // run from the popup's "On this page" section): panels open in the same corner.
   _anchorRect() {
     if (this.button) return this.button.getBoundingClientRect();
-    return { top: window.innerHeight - 64, right: window.innerWidth - 24 };
+    return { top: window.innerHeight - 64, bottom: window.innerHeight - 24, left: window.innerWidth - 68, right: window.innerWidth - 24 };
+  }
+
+  // Place a menu, panel, toast or card next to the floating button wherever the user dragged it:
+  // above it in the lower half of the window, below it in the upper half; lined up with its right
+  // edge on the right half, its left edge on the left half. Height is capped to the room there.
+  _placeNear(el, rect, gap = 10) {
+    const below = (rect.top + rect.bottom) / 2 < window.innerHeight / 2;
+    const leftSide = (rect.left + rect.right) / 2 < window.innerWidth / 2;
+    el.style.top = below ? `${rect.bottom + gap}px` : 'auto';
+    el.style.bottom = below ? 'auto' : `${window.innerHeight - rect.top + gap}px`;
+    el.style.left = leftSide ? `${Math.max(8, rect.left)}px` : 'auto';
+    el.style.right = leftSide ? 'auto' : `${Math.max(8, window.innerWidth - rect.right)}px`;
+    el.style.maxHeight = `${Math.max(160, (below ? window.innerHeight - rect.bottom : rect.top) - gap - 12)}px`;
+    return { below, leftSide };
+  }
+
+  // pos = {right, bottom} or {left, bottom}: on the left half of the window the button holds its
+  // left edge, so its label slides out to the right and the icon stays where it was dropped.
+  _applyPosition(pos) {
+    if (!this.button || !pos) return;
+    const w = this.button.offsetWidth || 44, h = this.button.offsetHeight || 44;
+    const clampX = (x) => Math.round(Math.max(8, Math.min(x, window.innerWidth - w - 8)));
+    const bottom = Math.round(Math.max(8, Math.min(pos.bottom, window.innerHeight - h - 8)));
+    if (pos.left != null) {
+      this._pos = { left: clampX(pos.left), bottom };
+      Object.assign(this.button.style, { left: this._pos.left + 'px', right: 'auto', bottom: bottom + 'px' });
+    } else {
+      this._pos = { right: clampX(pos.right), bottom };
+      Object.assign(this.button.style, { right: this._pos.right + 'px', left: 'auto', bottom: bottom + 'px' });
+    }
+  }
+
+  async _restorePosition() {
+    try {
+      const saved = ((await chrome.storage.local.get('lisaFabPos')).lisaFabPos || {})[location.hostname];
+      if (saved) this._applyPosition(saved);
+    } catch (_) { /* extension reloading */ }
+    if (!this._resizeHooked) {
+      this._resizeHooked = true;
+      window.addEventListener('resize', () => { if (this._pos) this._applyPosition(this._pos); });
+    }
+  }
+
+  // Drag the button anywhere (a move under 6 px is still a click); the spot is kept per site.
+  _setupDrag(fab) {
+    let start = null;
+    fab.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || !this.button) return;
+      const r = this.button.getBoundingClientRect();
+      start = { x: e.clientX, y: e.clientY, left: r.left, right: window.innerWidth - r.right,
+        bottom: window.innerHeight - r.bottom, byLeft: !!(this._pos && this._pos.left != null), moved: false };
+      try { fab.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    fab.addEventListener('pointermove', (e) => {
+      if (!start) return;
+      const dx = e.clientX - start.x, dy = e.clientY - start.y;
+      if (!start.moved) {
+        if (Math.hypot(dx, dy) < 6) return;
+        start.moved = true;
+        fab.classList.add('dragging');
+        document.querySelectorAll('.lisa-action-menu, .lisa-fab-panel, .lisa-handoff-dest-panel, .lisa-toast, .lisa-rate-card')
+          .forEach(n => n.remove());
+      }
+      this._applyPosition(start.byLeft ? { left: start.left + dx, bottom: start.bottom - dy }
+        : { right: start.right - dx, bottom: start.bottom - dy });
+    });
+    const end = async () => {
+      if (!start) return;
+      const moved = start.moved;
+      start = null;
+      fab.classList.remove('dragging');
+      if (!moved) return;
+      const r = this.button.getBoundingClientRect();  // label folded away while dragging: the icon's box
+      this._applyPosition(r.left + r.width / 2 < window.innerWidth / 2 ? { left: r.left, bottom: this._pos.bottom }
+        : { right: window.innerWidth - r.right, bottom: this._pos.bottom });
+      this._dragged = true;
+      setTimeout(() => { this._dragged = false; }, 400);
+      try {
+        const all = (await chrome.storage.local.get('lisaFabPos')).lisaFabPos || {};
+        all[location.hostname] = this._pos;
+        await chrome.storage.local.set({ lisaFabPos: all });
+      } catch (_) { /* extension reloading */ }
+    };
+    fab.addEventListener('pointerup', end);
+    fab.addEventListener('pointercancel', end);
   }
 
   // A panel anchored to the floating button, replacing the menu (Options, Choose messages).
@@ -476,11 +600,9 @@ class LISAFloatingButton {
     const panel = document.createElement('div');
     panel.className = `lisa-fab-panel ${className}`;
     panel.innerHTML = html;
-    const btn = this._anchorRect();
     panel.style.cssText = `
       position: fixed;
-      bottom: ${window.innerHeight - btn.top + 10}px;
-      right: ${window.innerWidth - btn.right}px;
+      overflow-y: auto;
       width: 340px;
       max-width: calc(100vw - 24px);
       background: #1f1f23;
@@ -492,6 +614,7 @@ class LISAFloatingButton {
       animation: lisa-menu-unfold 0.2s ease;
     `;
     document.body.appendChild(panel);
+    this._placeNear(panel, this._anchorRect());
     setTimeout(() => {
       document.addEventListener('click', function closePanel(e) {
         if (!panel.contains(e.target)) {
@@ -1314,6 +1437,7 @@ class LISAFloatingButton {
       }
       if (response && response.success) {
         this.showToast("✅ Markdown saved to library!");
+        this._noteSuccess();
         if (usedFallbackCapture) {
           setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
         }
@@ -1390,6 +1514,7 @@ class LISAFloatingButton {
           ? stats.apiMessageCount + " messages, " + stats.totalBlocks + " blocks"
           : stats.totalBlocks + " blocks";
         this.showToast("✅ LISA-V saved! " + countLabel);
+        this._noteSuccess();
         if (parser.usedFallbackCapture) {
           setTimeout(() => this.showToast("⚠️ Used fallback capture — message count may be incomplete", true), 2000);
         }
@@ -1543,8 +1668,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     const menuRect = menu.getBoundingClientRect();
     destPanel.style.cssText = `
       position: fixed;
-      bottom: ${window.innerHeight - menuRect.bottom + 20}px;
-      right: ${window.innerWidth - menuRect.right + 16}px;
+      overflow-y: auto;
       background: #1f1f23;
       border: 1px solid #3b82f6;
       border-radius: 8px;
@@ -1556,6 +1680,12 @@ Keep it tight — this is for continuity, not a report. Only include what matter
       animation: lisa-menu-unfold 0.2s ease;
     `;
     document.body.appendChild(destPanel);
+    // Over the menu, shifted 20 px in and 16 px across, whichever side of the screen the menu is on.
+    const side = this._placeNear(destPanel, this._anchorRect());
+    if (side.below) destPanel.style.top = `${menuRect.top + 20}px`;
+    else destPanel.style.bottom = `${window.innerHeight - menuRect.bottom + 20}px`;
+    if (side.leftSide) destPanel.style.left = `${menuRect.left + 16}px`;
+    else destPanel.style.right = `${window.innerWidth - menuRect.right + 16}px`;
 
     destPanel.addEventListener('click', async (e) => {
       const targetItem = e.target.closest('[data-url]');
@@ -1623,6 +1753,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
           if (!limitCheck.credits) await this.incrementFloatingLimit('handoff');
           const waits = mdResult.method === 'clipboard' || mdResult.method === 'pasteIntercept';
           this.showToast(`Handoff ${waits ? 'ready — press Ctrl+V' : 'injected'} into the new tab.`);
+          this._noteSuccess();
         } else {
           this.showToast("Could not auto-transfer — " + (mdResult?.error || "open the new tab and paste manually"), true);
         }
@@ -1761,6 +1892,7 @@ Keep it tight — this is for continuity, not a report. Only include what matter
         const waitsForPaste = injectResult.method === 'clipboard' || injectResult.method === 'pasteIntercept';
         const methodLabel = waitsForPaste ? 'ready — press Ctrl+V' : 'injected';
         this.showToast(`Handoff ${methodLabel} into the new tab.`);
+        this._noteSuccess();
       } else {
         this.showToast("Could not auto-transfer — " + (injectResult?.error || "open the new tab and paste manually") , true);
       }
@@ -1839,6 +1971,87 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     };
   }
 
+  // Rating and feedback card (0.53.4): asked once, after the 5th successful save or Handoff and at
+  // least 3 days after the first one. Both choices sit side by side for everyone (no "do you like
+  // it?" filter first: review gating). Later = again in 14 days; No thanks / a choice = never again.
+  async _noteSuccess() {
+    try {
+      const st = (await chrome.storage.local.get('lisaRating')).lisaRating || { count: 0, since: Date.now(), state: 'pending' };
+      st.count = (st.count || 0) + 1;
+      await chrome.storage.local.set({ lisaRating: st });
+      const due = st.count >= LISA_RATING_AFTER && Date.now() - (st.since || 0) >= LISA_RATING_WAIT_MS
+        && (st.state === 'pending' || (st.state === 'later' && Date.now() >= (st.snoozeUntil || 0)));
+      if (due) setTimeout(() => this._showRatingCard(), 3500);
+    } catch (_) { /* extension reloading */ }
+  }
+
+  async _setRating(patch) {
+    try {
+      const st = (await chrome.storage.local.get('lisaRating')).lisaRating || { count: 0, since: Date.now() };
+      await chrome.storage.local.set({ lisaRating: { ...st, ...patch } });
+    } catch (_) {}
+  }
+
+  _showRatingCard() {
+    if (!this.button || document.querySelector('.lisa-rate-card')) return;
+    const card = document.createElement('div');
+    card.className = 'lisa-rate-card';
+    card.innerHTML = `
+      <h4>How is LISA working for you?</h4>
+      <p>A rating or a few words help a small team a lot.</p>
+      <div class="lisa-rate-row">
+        <button class="primary" data-r="rate">⭐ Rate LISA</button>
+        <button data-r="feedback">💬 Send feedback</button>
+      </div>
+      <div class="lisa-rate-row" style="margin-top:6px">
+        <button class="quiet" data-r="later">Later</button>
+        <button class="quiet" data-r="never">No thanks</button>
+      </div>`;
+    document.body.appendChild(card);
+    this._placeNear(card, this.button.getBoundingClientRect(), 12);
+    card.style.maxHeight = '';
+    card.addEventListener('click', async (e) => {
+      const r = e.target.closest('button')?.dataset.r;
+      if (r === 'rate') {
+        window.open(LISA_CWS_REVIEWS_URL, '_blank', 'noopener');
+        await this._setRating({ state: 'rated' });
+        card.remove();
+      } else if (r === 'later') {
+        await this._setRating({ state: 'later', snoozeUntil: Date.now() + 14 * 86400000 });
+        card.remove();
+      } else if (r === 'never') {
+        await this._setRating({ state: 'never' });
+        card.remove();
+      } else if (r === 'feedback') {
+        card.innerHTML = `
+          <h4>Send feedback</h4>
+          <p>What works, what's missing, what broke: it goes straight to the people who build LISA.</p>
+          <textarea maxlength="3000" placeholder="Your message"></textarea>
+          <div class="lisa-rate-row"><button class="primary" data-r="send">Send</button><button class="quiet" data-r="close">Close</button></div>`;
+        card.querySelector('textarea').focus();
+      } else if (r === 'close') {
+        await this._setRating({ state: 'later', snoozeUntil: Date.now() + 14 * 86400000 });
+        card.remove();
+      } else if (r === 'send') {
+        const text = card.querySelector('textarea').value.trim();
+        if (text.length < 3) { card.querySelector('textarea').focus(); return; }
+        e.target.disabled = true;
+        let res = null;
+        try {
+          res = await chrome.runtime.sendMessage({ action: 'lisaSendFeedback', subject: `Rating card (${location.hostname})`, message: text });
+        } catch (_) {}
+        if (res && res.success) {
+          await this._setRating({ state: 'feedback' });
+          card.remove();
+          this.showToast('Thank you! Your message was sent.');
+        } else {
+          e.target.disabled = false;
+          this.showToast(`Couldn't send: ${(res && res.error) || 'try again in a moment'}`, true);
+        }
+      }
+    });
+  }
+
   showToast(message, isError = false, duration = 0) {
     const existing = document.querySelector('.lisa-toast');
     if (existing) existing.remove();
@@ -1847,6 +2060,12 @@ Keep it tight — this is for continuity, not a report. Only include what matter
     toast.className = 'lisa-toast' + (isError ? ' error' : '');
     toast.textContent = message;
     document.body.appendChild(toast);
+    if (this.button) {
+      const side = this._placeNear(toast, this.button.getBoundingClientRect(), 12);
+      toast.style.maxHeight = '';
+      toast.classList.toggle('below', side.below);
+      toast.classList.toggle('left', side.leftSide);
+    }
 
     // Progress toasts ("Exporting as Markdown...", "Extracting LISA-V...")
     // stay up until the result toast replaces them — a long capture can

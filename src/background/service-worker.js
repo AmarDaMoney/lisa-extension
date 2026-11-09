@@ -622,7 +622,7 @@ class LISACompressor {
   compress(conversation) {
     const compressed = {
       metadata: {
-        lisaVersion: '0.53.3',
+        lisaVersion: '0.53.4',
         platform: conversation.platform,
         conversationId: conversation.conversationId,
         originalUrl: conversation.url,
@@ -941,7 +941,7 @@ class LISACompressor {
       platform:          conversation.platform || 'unknown',
       message_count:     { user: userMsgs.length, assistant: assistantMsgs.length },
       dominant_concepts: dominantConcepts,
-      generated_by:      'LISA v0.53.3',
+      generated_by:      'LISA v0.53.4',
       key_entities:    anchorEntities(this.extractEntities(allText).flatMap(e => e.values)),
       note:              'Lightweight anchor — raw verbatim format'
     };
@@ -999,7 +999,7 @@ class LISACompressor {
       key_entities:      anchorEntities([...entitySet]),
       session_intent:    sessionIntent,
       session_register:  register,
-      generated_by:      'LISA v0.53.3'
+      generated_by:      'LISA v0.53.4'
     };
     if (register === 'technical') {
       anchor.files_changed = sessionEvents.files_changed;
@@ -1572,6 +1572,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // prompt must never pop up over a web page; the user signs in from the
   // popup. Only this extension's own scripts can reach this handler (web
   // pages can't message it), and the token is verified server-side.
+  // The floating button's rating card: content scripts can't reach the backend (CORS), the service worker can.
+  if (request.action === 'lisaSendFeedback') {
+    fetch(`${LISA_SW_API_ORIGIN}/api/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: String(request.subject || 'General Feedback').slice(0, 80),
+        message: String(request.message || '').slice(0, 3000), version: chrome.runtime.getManifest().version })
+    }).then(r => r.json()).then(sendResponse, (e) => sendResponse({ success: false, error: String((e && e.message) || e) }));
+    return true;
+  }
+
   if (request.action === 'getGoogleAuthToken') {
     if (sender.id !== chrome.runtime.id) {
       sendResponse({ token: null });
@@ -2094,6 +2105,9 @@ function lisaMarkEarlyAdopter(details) {
 // Shown once in the popup after an update to that exact version. Plain text
 // (the popup inserts it as text); each line needs its entry in the language files.
 const LISA_CHANGELOG = {
+  '0.53.4': [
+    'The floating button is smaller: drag it anywhere, LISA remembers the spot on each site'
+  ],
   '0.53.2': [
     'Everything LISA does on your computer is now free and unlimited: no daily cap',
     'Star a message (☆ next to it in the chat): it stays word for word in compressed exports and Handoff',
@@ -2234,6 +2248,7 @@ function detectSourcePlatform(sourceUrl) {
 // keyed by the new tab's id, for at most 2 minutes, and are handed over once
 // to src/content/shield-bridge.js, which runs only on the Shield origin.
 const SHIELD_ORIGIN = 'https://shield.sat-chain.com';
+const LISA_SW_API_ORIGIN = 'https://api.sat-chain.com';  // same backend as stripe-config.js's LISA_API_ORIGIN
 const SHIELD_APP_URL = SHIELD_ORIGIN + '/app';
 const SHIELD_HANDOFF_TTL_MS = 2 * 60 * 1000;
 
@@ -2531,4 +2546,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   readyTabs.delete(tabId);
   aiPlatformTabs.delete(tabId);
 });
-console.debug('[LISA] Core compression engine initialized v0.53.3');
+console.debug('[LISA] Core compression engine initialized v0.53.4');

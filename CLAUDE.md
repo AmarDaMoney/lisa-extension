@@ -96,7 +96,7 @@ This is a raw Chrome extension — no bundler, no transpiler. All JS is vanilla 
 
 - **Branch strategy:** `main` is the release branch (pushed to Chrome Web Store). Feature work goes on `feature/*` branches.
 - **Version bumps:** Update `manifest.json` → `"version"` field. Follow semver-ish: patch for fixes, minor for features. Keep it at the *next unreleased* Chrome Web Store version — don't bump per commit (e.g. CWS has 0.52.9 → stay on 0.53.0 until that ships).
-- **0.53.4 (uploaded to the CWS 2026-11-09, in review; live-tested by Amar; when live: fast-forward `main`, backend `/api/version` = 0.53.4):** the floating button is **compact** (a 44 px icon, "Export to LISA" slides
+- **0.53.4 live in the Chrome Web Store since 2026-11-21** (`main` fast-forwarded, backend `/api/version` = 0.53.4): the floating button is **compact** (a 44 px icon, "Export to LISA" slides
   out on hover) and **draggable** (a move under 6 px is still a click; `lisaFabPos` in chrome.storage.local per hostname,
   `{right,bottom}` on the right half of the window, `{left,bottom}` on the left half so the icon stays put when the label
   opens; default 112 px up, above most chat inputs: the pill used to cover the Send button, Amar). Menus, panels, the
